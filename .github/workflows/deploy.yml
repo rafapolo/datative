@@ -34,8 +34,9 @@ jobs:
           set -euo pipefail
           ssh "${{ secrets.LIVRE_USER }}@${{ secrets.LIVRE_HOST }}" "
             set -euo pipefail
+            export PATH=\"\$HOME/.local/bin:\$PATH\"
             cd '${{ secrets.LIVRE_APP_DIR }}'
             git fetch origin main
             git reset --hard origin/main
-            haloy deploy
+            \$HOME/.local/bin/haloy deploy
           "
