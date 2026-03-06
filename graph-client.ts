@@ -591,8 +591,25 @@ function collapsibleTreeLayout(graph: Graph) {
 
   const maxDepth = Math.max(...depth.values(), 0);
   const leaves = Math.max(nextRow, 1);
-  const rowSpacing = Math.max(36, Math.min(92, 1800 / leaves));
-  const depthSpacing = Math.max(150, Math.min(300, 2200 / (maxDepth + 1)));
+  const maxLabelChars = Math.max(
+    ...[...visited].map((node) =>
+      String(
+        graph.getNodeAttribute(node, "fullLabel") ??
+          graph.getNodeAttribute(node, "label") ??
+          "",
+      ).length,
+    ),
+    0,
+  );
+  const labelFactor = Math.max(1, Math.min(1.8, maxLabelChars / 24));
+  const rowSpacing = Math.max(
+    58,
+    Math.min(160, (2200 / leaves) * labelFactor),
+  );
+  const depthSpacing = Math.max(
+    260,
+    Math.min(560, (4200 / (maxDepth + 1)) * Math.min(1.4, labelFactor)),
+  );
   const rootRow = rowOrder.get(root) ?? 0;
 
   for (const node of visited) {
@@ -1778,6 +1795,10 @@ async function init() {
     labelColor: { color: "#c8d0e0" },
     nodeReducer: (node, data) => {
       const res = { ...data };
+      const alwaysShowLabels = currentLayout === "collapsible-tree";
+      if (alwaysShowLabels && res.fullLabel) {
+        res.label = res.fullLabel as string;
+      }
       // Restore label for leaf nodes on hover
       if (!res.label && res.fullLabel) {
         if (hoveredNode === node || selectedNode === node) {
@@ -1798,7 +1819,7 @@ async function init() {
           res.zIndex = 5;
         } else {
           res.color = COLOR_FADE_NODE;
-          res.label = "";
+          if (!alwaysShowLabels) res.label = "";
           res.zIndex = 0;
         }
       } else if (hoveredNode !== null) {
