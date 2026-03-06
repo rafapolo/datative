@@ -665,7 +665,85 @@ function packLayout(graph: Graph) {
     return weight;
   };
   const totalWeight = calcWeight(root);
-  const rootRadius = Math.max(140, Math.sqrt(totalWeight) * 22);
+  const rootRadius = Math.max(180, Math.sqrt(totalWeight) * 30);
+
+  type PackedCircle = {
+    id: string;
+    x: number;
+    y: number;
+    radius: number;
+  };
+
+  const collides = (
+    x: number,
+    y: number,
+    radius: number,
+    circles: PackedCircle[],
+    padding: number,
+  ) => {
+    for (const circle of circles) {
+      const minDistance = radius + circle.radius + padding;
+      if (Math.hypot(x - circle.x, y - circle.y) < minDistance) return true;
+    }
+    return false;
+  };
+
+  const packSiblings = (ids: string[]) => {
+    const sorted = [...ids].sort(
+      (a, b) => (subtreeWeight.get(b) ?? 1) - (subtreeWeight.get(a) ?? 1),
+    );
+    const circles: PackedCircle[] = [];
+
+    const baseRadius = (id: string) => Math.max(1, Math.sqrt(subtreeWeight.get(id) ?? 1));
+    const spiralStep = 0.35;
+    const radialFactor = 0.95;
+    const padding = 0.18;
+
+    for (const id of sorted) {
+      const radius = baseRadius(id);
+      let best: PackedCircle | null = null;
+
+      for (let t = 0; t <= 2200; t += spiralStep) {
+        const radial = Math.max(
+          radius + 0.25,
+          radialFactor * Math.sqrt(t) + radius + 0.12,
+        );
+        const x = Math.cos(t) * radial;
+        const y = Math.sin(t) * radial;
+        if (collides(x, y, radius, circles, padding)) continue;
+        best = { id, x, y, radius };
+        break;
+      }
+
+      if (!best) {
+        const fallbackX = (circles.length + 1) * (radius * 2.2 + padding);
+        best = { id, x: fallbackX, y: 0, radius };
+      }
+      circles.push(best);
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let farthest = 1;
+    for (const circle of circles) {
+      minX = Math.min(minX, circle.x - circle.radius);
+      maxX = Math.max(maxX, circle.x + circle.radius);
+      minY = Math.min(minY, circle.y - circle.radius);
+      maxY = Math.max(maxY, circle.y + circle.radius);
+    }
+
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    for (const circle of circles) {
+      circle.x -= cx;
+      circle.y -= cy;
+      farthest = Math.max(farthest, Math.hypot(circle.x, circle.y) + circle.radius);
+    }
+
+    return { circles, extentRadius: farthest };
+  };
 
   const place = (node: string, x: number, y: number, radius: number) => {
     graph.setNodeAttribute(node, "x", x);
@@ -674,28 +752,16 @@ function packLayout(graph: Graph) {
     const nodeChildren = children.get(node) ?? [];
     if (nodeChildren.length === 0) return;
 
-    const sortedChildren = [...nodeChildren].sort(
-      (a, b) => (subtreeWeight.get(b) ?? 1) - (subtreeWeight.get(a) ?? 1),
-    );
-    const totalChildWeight = sortedChildren.reduce(
-      (sum, child) => sum + (subtreeWeight.get(child) ?? 1),
-      0,
-    );
+    const { circles, extentRadius } = packSiblings(nodeChildren);
+    const usableRadius = Math.max(radius * 0.86, 28);
+    const scale = usableRadius / extentRadius;
 
-    let cursor = -Math.PI / 2;
-    const ringDistance = Math.max(radius * 0.62, 80);
-    for (const child of sortedChildren) {
-      const weight = subtreeWeight.get(child) ?? 1;
-      const share = weight / totalChildWeight;
-      const span = Math.max((2 * Math.PI * share) * 0.95, 0.22);
-      const angle = cursor + span / 2;
-      cursor += span;
-
-      const childRadius = Math.max(46, Math.min(radius * 0.74, radius * Math.sqrt(share) * 1.08));
-      const distance = Math.max(childRadius + 10, ringDistance - childRadius * 0.24);
-      place(child, x + Math.cos(angle) * distance, y + Math.sin(angle) * distance, childRadius);
+    for (const child of circles) {
+      const childRadius = child.radius * scale;
+      place(child.id, x + child.x * scale, y + child.y * scale, childRadius);
     }
   };
+
   place(root, 0, 0, rootRadius);
 
   const detached = graph.nodes().filter((n) => !visited.has(n));

@@ -2,69 +2,125 @@
 
 ![Datative Logo](assets/logo.png)
 
-O Datative e uma plataforma de analise investigativa focada em conexoes entre empresas, agentes politicos e estruturas de poder, usando dados publicos.
+Datative e uma plataforma de analise investigativa para explorar conexoes entre empresas, socios e dados publicos relacionados. O projeto combina consultas no BigQuery com visualizacao de grafo interativa para acelerar investigacoes.
 
-![Datative Logo](assets/datative.png)
+![Datative Screenshot](assets/datative.png)
 
-## Foco
+## Principais capacidades
 
-- Mapear relacoes societarias, contratos, doacoes e participacoes cruzadas.
-- Investigar redes de influencia entre empresas e politicos.
-- Transformar dados publicos em evidencias acionaveis para jornalismo, pesquisa e controle social.
+- Busca de empresa por CNPJ e expansao de vizinhanca (empresa <-> socios).
+- Lookup cruzado em multiplos datasets com deteccao de CNPJ em colunas relevantes.
+- Painel lateral com detalhes por dataset e destaque de linhas ligadas ao no selecionado.
+- Layouts de grafo:
+  - `radial`
+  - `forceatlas2`
+  - `collapsible-tree`
+  - `pack` (circle packing hierarquico, estilo D3 pack)
+- Controle de limite de lookup (10, 20, 30, 40) e cache local para reduzir custo de consulta.
+- Tracking de bytes processados no BigQuery via `usage.json`.
 
-## O que investigamos
+## Stack
 
-- Estruturas empresariais complexas e beneficiarios finais.
-- Vinculos entre atores politicos, financiadores e fornecedores.
-- Padroes de risco em licitacoes, contratos e nomeacoes.
-- Evolucao temporal de conexoes relevantes para auditoria civica.
+- Runtime: Bun
+- Backend: `Bun.serve` em `index.ts`
+- Frontend do grafo: Sigma + Graphology (`graph-client.ts` compilado para `public/graph.js`)
+- Dados: Google BigQuery
 
-## Deploy
+## Requisitos
 
-### Requisitos
+- Bun 1.x
+- Projeto GCP com BigQuery habilitado
+- Credencial de service account com permissao de leitura nos datasets usados
 
-- Docker + Docker Compose
-- Conta de serviço GCP com acesso ao projeto BigQuery
-- Traefik como reverse proxy (na mesma rede Docker do container)
+## Configuracao
 
-### Passos
+1. Copie o arquivo de exemplo:
 
-1. Copie o arquivo de exemplo e preencha as variáveis:
-   ```bash
-   cp .env.example .env
-   # edite .env com seu GCP_PROJECT_ID
-   ```
+```bash
+cp .env.example .env
+```
 
-2. Coloque o JSON da conta de serviço GCP em `gcp-credentials.json` (nunca comitar).
+2. Preencha variaveis em `.env`:
 
-3. (Opcional) Crie o middleware de autenticação no Traefik:
-   ```bash
-   # gere o hash da senha
-   htpasswd -nbB usuario senha
-   ```
-   Crie o arquivo de config dinâmica do Traefik (ex: `/etc/traefik/dynamic/<nome-app>-auth.yaml`):
-   ```yaml
-   http:
-     middlewares:
-       <nome-app>-auth:
-         basicAuth:
-           users:
-             - "usuario:$2y$..."
-   ```
-   E configure o label no `docker-compose.yaml`:
-   ```yaml
-   - traefik.http.routers.<nome-app>.middlewares=<nome-app>-auth@file
-   ```
+- `GCP_PROJECT_ID`: ID do projeto GCP
+- `GOOGLE_APPLICATION_CREDENTIALS`: caminho para o arquivo JSON (opcional se usar `GCP_SERVICE_ACCOUNT_JSON`)
+- `GCP_SERVICE_ACCOUNT_JSON`: JSON completo da credencial (opcional)
+- `PORT`: porta HTTP (padrao no codigo: `3003`)
+- `DOMAIN`, `CERT_RESOLVER`, `TRAEFIK_NETWORK`: usados no deploy com Traefik
 
-4. Suba o container:
-   ```bash
-   docker compose up -d
-   ```
+## Executar localmente
 
-#todo
+```bash
+bun install
+bun build graph-client.ts --outfile public/graph.js --target browser
+bun run dev
+```
 
-- [ ] Melhorar o README com exemplos de investigacao.
-- [ ] Criar um botao `view labels` para ajustar o tamanho dos nos ao texto completo.
-- [ ] Rodar `/smiplify` e remover estado/layout redundante.
-- [ ] Remover referencias antigas de `DATATIVE` no frontend e padronizar para `datative`.
-- [ ] Adaptar para mobile e rodar `/frontend`.
+App local:
+
+- Landing/graph: `http://localhost:3003/`
+- Tabela: `http://localhost:3003/table`
+
+## Scripts
+
+- `bun run start`: sobe o servidor (`index.ts`)
+- `bun run dev`: modo watch
+
+## Rotas principais
+
+HTML:
+
+- `GET /` ou `GET /graph?cnpj=<cnpj>`
+- `GET /table`
+
+Assets:
+
+- `GET /graph.js`
+
+APIs:
+
+- `GET /api/graph/:cnpj`
+- `GET /api/lookup/:cnpj?limit=10|20|30|40`
+- `GET /api/lookup/:cnpj/dataset/:datasetId?fresh=1&limit=...`
+- `GET /api/lookup/related?datasetId=...&foreignKey=...&value=...&limit=...`
+
+## Docker / deploy
+
+O repositorio inclui `docker-compose.yaml` com:
+
+- container Bun (`oven/bun:1`)
+- labels para roteamento Traefik
+- volume de credencial GCP como somente leitura (`/gcp-credentials.json`)
+
+Subida tipica de deploy:
+
+```bash
+docker compose up -d
+```
+
+## Estrutura de arquivos
+
+- `index.ts`: servidor HTTP, HTML e APIs
+- `graph-client.ts`: logica de visualizacao e interacao do grafo
+- `public/graph.js`: bundle browser gerado
+- `cnpj-datasets.ts`: configuracao de datasets e relacoes
+- `cache.ts`: cache em memoria
+- `usage.json`: controle de bytes processados no mes
+
+## Desenvolvimento
+
+Sempre que alterar `graph-client.ts`, gere novamente o bundle:
+
+```bash
+bun build graph-client.ts --outfile public/graph.js --target browser
+```
+
+Antes de commit:
+
+```bash
+git status
+```
+
+## Licenca
+
+Defina aqui a licenca oficial do projeto (ex.: MIT, Apache-2.0, proprietaria).
