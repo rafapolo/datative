@@ -45,7 +45,15 @@ interface InexigibilityFlag {
   lastDate: string;         // ISO date
 }
 
-type PatternFlag = SplitContractFlag | ConcentrationFlag | InexigibilityFlag;
+type PatternFlag =
+  | SplitContractFlag
+  | ConcentrationFlag
+  | InexigibilityFlag
+  | SingleBidderFlag
+  | AlwaysWinnerFlag
+  | AmendmentInflationFlag
+  | NewbornCompanyFlag
+  | SuddenSurgeFlag;
 
 interface PatternResult {
   cnpj: string;
@@ -85,6 +93,6 @@ const INEXIGIBILITY_MIN_COUNT = 3;
 
 - [ ] All interfaces defined before any pattern function
 - [ ] `runPatterns()` uses `Promise.allSettled` — one failure never blocks others
-- [ ] "Alertas de Risco" section renders with 0, 1, and 3 simultaneous flags
+- [ ] "Alertas de Risco" section renders with 0, 1, and 8 simultaneous flags
 - [ ] Section does not appear on the company list page
 - [ ] All thresholds are named constants with a comment citing their legal basis
