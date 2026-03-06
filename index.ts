@@ -1177,6 +1177,8 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
     </nav>
     <select id="layout-select">
       <option value="radial">Radial</option>
+      <option value="collapsible-tree">Collapsible Tree</option>
+      <option value="pack">Pack</option>
       <option value="forceatlas2">Force Atlas 2</option>
     </select>
     <select id="query-limit-select">
