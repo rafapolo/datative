@@ -9873,11 +9873,133 @@ function radialLayout(graph) {
     });
   });
 }
+function buildRootedTree(graph, root) {
+  const children = new Map;
+  const depth = new Map([[root, 0]]);
+  const visited = new Set([root]);
+  const queue = [root];
+  const sortNodes = (a3, b3) => {
+    const aType = String(nodeTypeMap.get(a3) ?? "");
+    const bType = String(nodeTypeMap.get(b3) ?? "");
+    if (aType !== bType)
+      return aType.localeCompare(bType);
+    const aLabel = String(graph.getNodeAttribute(a3, "fullLabel") ?? graph.getNodeAttribute(a3, "label") ?? a3);
+    const bLabel = String(graph.getNodeAttribute(b3, "fullLabel") ?? graph.getNodeAttribute(b3, "label") ?? b3);
+    return aLabel.localeCompare(bLabel);
+  };
+  while (queue.length > 0) {
+    const node = queue.shift();
+    const nodeDepth = depth.get(node) ?? 0;
+    const nodeChildren = [];
+    const neighbors = graph.neighbors(node).filter((n2) => graph.hasNode(n2)).sort(sortNodes);
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor))
+        continue;
+      visited.add(neighbor);
+      depth.set(neighbor, nodeDepth + 1);
+      nodeChildren.push(neighbor);
+      queue.push(neighbor);
+    }
+    children.set(node, nodeChildren);
+  }
+  return { children, depth, visited };
+}
+function collapsibleTreeLayout(graph) {
+  const root = layoutRootId;
+  if (!root || !graph.hasNode(root))
+    return;
+  const { children, depth, visited } = buildRootedTree(graph, root);
+  const rowOrder = new Map;
+  let nextRow = 0;
+  const assignRows = (node) => {
+    const nodeChildren = children.get(node) ?? [];
+    if (nodeChildren.length === 0) {
+      const row2 = nextRow++;
+      rowOrder.set(node, row2);
+      return row2;
+    }
+    const childRows = nodeChildren.map(assignRows);
+    const row = (childRows[0] + childRows[childRows.length - 1]) / 2;
+    rowOrder.set(node, row);
+    return row;
+  };
+  assignRows(root);
+  const maxDepth = Math.max(...depth.values(), 0);
+  const leaves = Math.max(nextRow, 1);
+  const rowSpacing = Math.max(36, Math.min(92, 1800 / leaves));
+  const depthSpacing = Math.max(150, Math.min(300, 2200 / (maxDepth + 1)));
+  const rootRow = rowOrder.get(root) ?? 0;
+  for (const node of visited) {
+    const d2 = depth.get(node) ?? 0;
+    const row = rowOrder.get(node) ?? 0;
+    graph.setNodeAttribute(node, "x", d2 * depthSpacing);
+    graph.setNodeAttribute(node, "y", (row - rootRow) * rowSpacing);
+  }
+  const detached = graph.nodes().filter((n2) => !visited.has(n2));
+  if (detached.length === 0)
+    return;
+  const ringRadius = Math.max(220, detached.length * 24);
+  detached.forEach((node, index) => {
+    const angle = index / detached.length * 2 * Math.PI;
+    graph.setNodeAttribute(node, "x", -depthSpacing);
+    graph.setNodeAttribute(node, "y", ringRadius * Math.sin(angle));
+  });
+}
+function packLayout(graph) {
+  const root = layoutRootId;
+  if (!root || !graph.hasNode(root))
+    return;
+  const { children, visited } = buildRootedTree(graph, root);
+  const subtreeWeight = new Map;
+  const calcWeight = (node) => {
+    const nodeChildren = children.get(node) ?? [];
+    const weight = 1 + nodeChildren.reduce((sum, child) => sum + calcWeight(child), 0);
+    subtreeWeight.set(node, weight);
+    return weight;
+  };
+  const totalWeight = calcWeight(root);
+  const rootRadius = Math.max(140, Math.sqrt(totalWeight) * 22);
+  const place = (node, x, y, radius) => {
+    graph.setNodeAttribute(node, "x", x);
+    graph.setNodeAttribute(node, "y", y);
+    const nodeChildren = children.get(node) ?? [];
+    if (nodeChildren.length === 0)
+      return;
+    const sortedChildren = [...nodeChildren].sort((a3, b3) => (subtreeWeight.get(b3) ?? 1) - (subtreeWeight.get(a3) ?? 1));
+    const totalChildWeight = sortedChildren.reduce((sum, child) => sum + (subtreeWeight.get(child) ?? 1), 0);
+    let cursor = -Math.PI / 2;
+    const ringDistance = Math.max(radius * 0.62, 80);
+    for (const child of sortedChildren) {
+      const weight = subtreeWeight.get(child) ?? 1;
+      const share = weight / totalChildWeight;
+      const span = Math.max(2 * Math.PI * share * 0.95, 0.22);
+      const angle = cursor + span / 2;
+      cursor += span;
+      const childRadius = Math.max(46, Math.min(radius * 0.74, radius * Math.sqrt(share) * 1.08));
+      const distance = Math.max(childRadius + 10, ringDistance - childRadius * 0.24);
+      place(child, x + Math.cos(angle) * distance, y + Math.sin(angle) * distance, childRadius);
+    }
+  };
+  place(root, 0, 0, rootRadius);
+  const detached = graph.nodes().filter((n2) => !visited.has(n2));
+  if (detached.length === 0)
+    return;
+  const detachedRadius = Math.max(220, detached.length * 24);
+  detached.forEach((node, index) => {
+    const angle = index / detached.length * 2 * Math.PI;
+    graph.setNodeAttribute(node, "x", -rootRadius * 1.7);
+    graph.setNodeAttribute(node, "y", detachedRadius * Math.sin(angle));
+  });
+}
 function runLayout(graph, _iterations, onDone) {
   requestAnimationFrame(() => {
     if (currentLayout === "forceatlas2") {
       const settings = import_graphology_layout_forceatlas2.default.inferSettings(graph);
       import_graphology_layout_forceatlas2.default.assign(graph, { iterations: 150, settings });
+    } else if (currentLayout === "pack") {
+      packLayout(graph);
+    } else if (currentLayout === "collapsible-tree") {
+      collapsibleTreeLayout(graph);
     } else {
       radialLayout(graph);
     }
