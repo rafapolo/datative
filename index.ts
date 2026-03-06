@@ -35,6 +35,7 @@ const cnpjsInteresse = loadCnpjsInteresse();
 // --- Config ---
 const PROJECT_ID = process.env.GCP_PROJECT_ID ?? "";
 const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const KEY_JSON = process.env.GCP_SERVICE_ACCOUNT_JSON;
 const PORT = parseInt(process.env.PORT ?? "3003", 10);
 
 const TABLE = "basedosdados.br_me_cnpj.empresas";
@@ -103,7 +104,15 @@ function getSchemaColumnsForTable(tableRef: string): SchemaColumn[] {
 function createClient(): BigQuery {
   const opts: ConstructorParameters<typeof BigQuery>[0] = { location: "US" };
   if (PROJECT_ID) opts.projectId = PROJECT_ID;
-  if (KEY_FILE) opts.keyFilename = KEY_FILE;
+  if (KEY_FILE) {
+    opts.keyFilename = KEY_FILE;
+  } else if (KEY_JSON) {
+    try {
+      opts.credentials = JSON.parse(KEY_JSON);
+    } catch (error) {
+      console.error("Invalid GCP_SERVICE_ACCOUNT_JSON:", error);
+    }
+  }
   return new BigQuery(opts);
 }
 
