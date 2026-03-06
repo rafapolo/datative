@@ -200,10 +200,10 @@ async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[]; bytesPr
   const sql = `
     SELECT nome, documento, qualificacao
     FROM \`${SOCIOS_TABLE}\`
-    WHERE cnpj_basico = @cnpj AND ano = 2023
+    WHERE cnpj_basico = @cnpj AND ano = @ano
     LIMIT 50
   `;
-  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico }, location: "US" });
+  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico, ano: DEFAULT_YEAR }, location: "US" });
   const [rows] = await job.getQueryResults();
   const [meta] = await job.getMetadata();
   const bytesProcessed = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
@@ -221,10 +221,10 @@ async function queryEmpresa(cnpjBasico: string): Promise<{ row: Company | null; 
   const sql = `
     SELECT cnpj_basico, razao_social, natureza_juridica, qualificacao_responsavel, capital_social, porte, ente_federativo, ano
     FROM \`${TABLE}\`
-    WHERE cnpj_basico = @cnpj AND ano = 2023
+    WHERE cnpj_basico = @cnpj AND ano = @ano
     LIMIT 1
   `;
-  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico }, location: "US" });
+  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico, ano: DEFAULT_YEAR }, location: "US" });
   const [rows] = await job.getQueryResults();
   const [meta] = await job.getMetadata();
   const bytesProcessed = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
