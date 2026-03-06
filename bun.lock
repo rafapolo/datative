@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "investiga",
+      "name": "datative",
       "dependencies": {
         "@google-cloud/bigquery": "^8.1.1",
         "@sigma/edge-curve": "^3.1.0",

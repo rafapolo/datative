@@ -595,7 +595,7 @@ function renderPage(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Investiga — CNPJ Browser</title>
+  <title>DATATIVE — CNPJ Browser</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #f5f7fa; color: #1a1a2e; }
@@ -632,7 +632,7 @@ function renderPage(
 </head>
 <body>
   <header>
-    <h1>Investiga</h1>
+    <h1>DATATIVE</h1>
     <span>CNPJ / Receita Federal · basedosdados.br_me_cnpj.empresas</span>
     <span style="margin-left:auto;font-size:0.8rem;opacity:0.85">
       BQ ${usageData.month} &nbsp;·&nbsp;
@@ -729,7 +729,7 @@ function renderGraphLanding(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Investiga</title>
+  <title>DATATIVE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap">
   <style>
@@ -976,7 +976,7 @@ function renderGraphLanding(): string {
 </head>
 <body>
   <nav>
-    <span class="nav-brand">INV_</span>
+    <span class="nav-brand">DATA_</span>
     <div class="nav-links">
       <a href="/table">BASE DE DADOS →</a>
     </div>
@@ -985,7 +985,7 @@ function renderGraphLanding(): string {
     <main>
       <p class="eyebrow">// sistema de investigação · br</p>
       <h1 class="wordmark">
-        <span style="animation-delay:.04s">I</span><span style="animation-delay:.09s">N</span><span style="animation-delay:.14s">V</span><span style="animation-delay:.19s">E</span><span style="animation-delay:.24s">S</span><span style="animation-delay:.29s">T</span><span style="animation-delay:.34s">I</span><span style="animation-delay:.39s">G</span><span style="animation-delay:.44s">A</span>
+        <span style="animation-delay:.04s">D</span><span style="animation-delay:.09s">A</span><span style="animation-delay:.14s">T</span><span style="animation-delay:.19s">A</span><span style="animation-delay:.24s">T</span><span style="animation-delay:.29s">I</span><span style="animation-delay:.34s">V</span><span style="animation-delay:.39s">E</span>
       </h1>
       <div class="gold-rule"></div>
       <p class="tagline">Cruzamento de CNPJs com bases públicas federais — Receita Federal, CGU, TSE, SIAFI e mais.</p>
@@ -1006,7 +1006,7 @@ function renderGraphLanding(): string {
     </aside>
   </div>
   <footer>
-    <span class="footer-copy">INVESTIGA · CNPJ GRAPH · BASE DOS DADOS</span>
+    <span class="footer-copy">DATATIVE · CNPJ GRAPH · BASE DOS DADOS</span>
     <span class="footer-status"><span class="status-dot"></span> SISTEMA ATIVO</span>
   </footer>
 </body>
@@ -1023,7 +1023,7 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>INV_ ${escHtml(cnpj)}</title>
+  <title>DATA_ ${escHtml(cnpj)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap">
   <style>
@@ -1193,7 +1193,7 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
 <body>
   <div class="gold-bar"></div>
   <header>
-    <span class="h-brand">INV_</span>
+    <span class="h-brand">DATA_</span>
     <span class="h-divider"></span>
     <nav class="breadcrumb">
       <a href="/">INÍCIO</a>

@@ -66,5 +66,5 @@ O Datative e uma plataforma de analise investigativa focada em conexoes entre em
 - [ ] Melhorar o README com exemplos de investigacao.
 - [ ] Criar um botao `view labels` para ajustar o tamanho dos nos ao texto completo.
 - [ ] Rodar `/smiplify` e remover estado/layout redundante.
-- [ ] Remover referencias antigas de `investiga` no frontend e padronizar para `datative`.
+- [ ] Remover referencias antigas de `DATATIVE` no frontend e padronizar para `datative`.
 - [ ] Adaptar para mobile e rodar `/frontend`.
