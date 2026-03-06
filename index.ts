@@ -98,15 +98,15 @@ function getSchemaColumnsForTable(tableRef: string): SchemaColumn[] {
   return dataset[tableId] ?? [];
 }
 
-// --- BigQuery client ---
+// --- BigQuery client (singleton) ---
 function createClient(): BigQuery {
-  const opts: ConstructorParameters<typeof BigQuery>[0] = {
-    location: "US",
-  };
+  const opts: ConstructorParameters<typeof BigQuery>[0] = { location: "US" };
   if (PROJECT_ID) opts.projectId = PROJECT_ID;
   if (KEY_FILE) opts.keyFilename = KEY_FILE;
   return new BigQuery(opts);
 }
+
+const bq = createClient();
 
 // --- Custom errors ---
 class BillingError extends Error {
@@ -145,8 +145,6 @@ async function queryCompanies(params: QueryParams): Promise<{ rows: Company[]; b
   const cacheKey = `companies_${params.ano}_${params.limit}_${params.offset}_${params.search.replace(/\s+/g, "_")}`;
   const cached = getCache<Company[]>(cacheKey);
   if (cached) return { rows: cached, bytesProcessed: 0 };
-
-  const bq = createClient();
 
   let whereClause = "WHERE ano = @ano";
   const queryParams: Record<string, unknown> = {
@@ -199,14 +197,13 @@ async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[]; bytesPr
   const cached = getCache<Socio[]>(cacheKey);
   if (cached) return { rows: cached, bytesProcessed: 0 };
 
-  const bq = createClient();
   const sql = `
     SELECT nome, documento, qualificacao
     FROM \`${SOCIOS_TABLE}\`
-    WHERE cnpj_basico = @cnpj AND ano = 2023
+    WHERE cnpj_basico = @cnpj AND ano = @ano
     LIMIT 50
   `;
-  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico }, location: "US" });
+  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico, ano: DEFAULT_YEAR }, location: "US" });
   const [rows] = await job.getQueryResults();
   const [meta] = await job.getMetadata();
   const bytesProcessed = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
@@ -221,14 +218,13 @@ async function queryEmpresa(cnpjBasico: string): Promise<{ row: Company | null; 
   const cached = getCache<Company | null>(cacheKey);
   if (cached !== null) return { row: cached, bytesProcessed: 0 };
 
-  const bq = createClient();
   const sql = `
     SELECT cnpj_basico, razao_social, natureza_juridica, qualificacao_responsavel, capital_social, porte, ente_federativo, ano
     FROM \`${TABLE}\`
-    WHERE cnpj_basico = @cnpj AND ano = 2023
+    WHERE cnpj_basico = @cnpj AND ano = @ano
     LIMIT 1
   `;
-  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico }, location: "US" });
+  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico, ano: DEFAULT_YEAR }, location: "US" });
   const [rows] = await job.getQueryResults();
   const [meta] = await job.getMetadata();
   const bytesProcessed = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
@@ -325,7 +321,6 @@ async function queryLookupDataset(
   const inferredFields = inferLookupNodeFields(ds);
 
   try {
-    const bq = createClient();
     const [job] = await bq.createQueryJob({
       query: sql,
       params: { cnpj_root: cnpjRoot, doc_digits: docDigits, doc_len: docLen, year },
@@ -395,6 +390,10 @@ async function queryByField(
 ): Promise<{ result: LookupResult; bytes: number }> {
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(foreignKey)) {
+    throw new Error(`Invalid foreignKey: ${foreignKey}`);
+  }
+
   const ds = RELATED_DATASETS.find((d) => d.id === datasetId);
   if (!ds) throw new Error(`Related dataset not found: ${datasetId}`);
 
@@ -407,7 +406,6 @@ async function queryByField(
   const sql = `SELECT ${ds.displayFields.join(", ")} FROM \`${ds.table}\` WHERE ${foreignKey} = @value LIMIT 10`;
 
   try {
-    const bq = createClient();
     const [job] = await bq.createQueryJob({ query: sql, params: { value }, location: "US" });
     const [rows] = await job.getQueryResults();
     const [meta] = await job.getMetadata();
@@ -563,6 +561,8 @@ function renderPage(
     .pagination a { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 0.4rem 0.9rem; font-size: 0.85rem; font-weight: 600; color: #4f46e5; text-decoration: none; }
     .pagination a:hover { background: #4f46e5; color: #fff; border-color: #4f46e5; }
     .pagination .page-info { font-size: 0.8rem; color: #888; }
+    .graph-link { text-decoration: none; font-size: 1rem; color: #4f46e5; opacity: 0.7; }
+    .graph-link:hover { opacity: 1; }
   </style>
 </head>
 <body>
@@ -798,27 +798,6 @@ function renderGraphLanding(): string {
       white-space: nowrap;
     }
     button[type=submit]:hover { background: #f5cc6a; }
-    .examples {
-      margin-top: 1.1rem;
-      display: flex;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-    }
-    .example-label {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.6rem;
-      color: #2a2a4a;
-      letter-spacing: 0.1em;
-    }
-    .example-item {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.6rem;
-      color: #3a3a5a;
-      cursor: pointer;
-      transition: color 0.15s;
-      letter-spacing: 0.05em;
-    }
-    .example-item:hover { color: var(--muted); }
     footer {
       padding: 0.9rem 3rem;
       border-top: 1px solid var(--border);
