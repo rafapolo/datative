@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve } from "path";
 
 const CACHE_DIR = resolve(import.meta.dir, ".cache");
@@ -15,10 +15,8 @@ function filePath(key: string): string {
 }
 
 export function getCache<T>(key: string): T | null {
-  const p = filePath(key);
-  if (!existsSync(p)) return null;
   try {
-    const entry = JSON.parse(readFileSync(p, "utf-8")) as CacheEntry<T>;
+    const entry = JSON.parse(readFileSync(filePath(key), "utf-8")) as CacheEntry<T>;
     if (Date.now() > entry.expiresAt) return null;
     return entry.data;
   } catch {
@@ -27,7 +25,7 @@ export function getCache<T>(key: string): T | null {
 }
 
 export function setCache<T>(key: string, data: T): void {
-  if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+  mkdirSync(CACHE_DIR, { recursive: true });
   const entry: CacheEntry<T> = { expiresAt: Date.now() + TTL_MS, data };
   writeFileSync(filePath(key), JSON.stringify(entry));
 }
