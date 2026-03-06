@@ -1,4 +1,4 @@
-# Task: Pattern Detection Infrastructure (foundational)
+# Task: Pattern Detection Infrastructure
 **Status:** TODO
 **Priority:** P0 — must complete before any pattern task
 **User Story:** all
@@ -7,25 +7,45 @@
 
 ## What to Build
 
-Shared infrastructure that all pattern detection functions depend on. No pattern code can be written until this is in place.
+Shared scaffolding all 3 pattern functions depend on. No pattern code begins until this is done.
 
 ---
 
 ## Components
 
-### 1. Pattern result types (TypeScript interfaces)
-
-Define a union type `PatternFlag` covering all 7 pattern output shapes. Define a `PatternResult` wrapper:
+### 1. TypeScript interfaces (in `index.ts`)
 
 ```typescript
-type PatternFlag =
-  | SplitContractFlag
-  | ConcentrationFlag
-  | InexigibilityFlag
-  | AmendmentBeneficiaryFlag
-  | SanctionedReceivingFlag
-  | DebtorContractsFlag
-  | EmbargoedReceivingFlag;
+interface SplitContractFlag {
+  pattern: 'split_contracts_below_threshold';
+  agencyName: string;
+  month: string;            // "YYYY-MM"
+  contractCount: number;
+  combinedValue: number;    // BRL
+  maxSingleValue: number;   // BRL
+}
+
+interface ConcentrationFlag {
+  pattern: 'contract_concentration';
+  agencyName: string;
+  agencyId: string;
+  supplierShare: number;    // 0.0–1.0
+  supplierSpend: number;    // BRL
+  agencyTotalSpend: number; // BRL
+  year: number;
+}
+
+interface InexigibilityFlag {
+  pattern: 'inexigibility_recurrence';
+  agencyUnit: string;
+  agencyUnitId: string;
+  contractCount: number;
+  totalValue: number;       // BRL
+  firstDate: string;        // ISO date
+  lastDate: string;         // ISO date
+}
+
+type PatternFlag = SplitContractFlag | ConcentrationFlag | InexigibilityFlag;
 
 interface PatternResult {
   cnpj: string;
@@ -34,42 +54,37 @@ interface PatternResult {
 }
 ```
 
-### 2. Pattern runner
+### 2. Configurable thresholds (named constants in `index.ts`)
 
-A `runPatterns(cnpj: string): Promise<PatternResult>` function that:
-- Checks cache first (`getCache<PatternResult>(\`patterns_${cnpj}\`)`)
-- Runs all enabled patterns in parallel (`Promise.allSettled`)
-- Collects successful results, logs failures without throwing
-- Writes result to cache (`setCache`)
-- Returns `PatternResult`
-
-### 3. Pattern toggle (env-based)
-
-Each pattern can be enabled/disabled via env var:
-```
-PATTERN_SPLIT_CONTRACTS=true
-PATTERN_CONCENTRATION=true
-PATTERN_INEXIGIBILITY=true
-PATTERN_AMENDMENT=false          # requires TRANSPARENCIA_API_KEY
-PATTERN_SANCTIONED=true
-PATTERN_DEBTOR=false             # requires TRANSPARENCIA_API_KEY
-PATTERN_EMBARGOED=false          # blocked on schema verification
+```typescript
+const SPLIT_THRESHOLD_BRL     = 17_600;
+const SPLIT_MIN_COUNT         = 3;
+const CONCENTRATION_THRESHOLD = 0.40;
+const CONCENTRATION_MIN_SPEND = 50_000;
+const INEXIGIBILITY_MIN_COUNT = 3;
 ```
 
-### 4. UI section on CNPJ detail page
+### 3. `runPatterns(cnpj: string): Promise<PatternResult>`
 
-Add a "Alertas de Risco" (Risk Alerts) section to the CNPJ detail page, below the existing sections. Renders:
-- Empty state: "Nenhum alerta identificado" (grey)
-- Each flag as a colored badge + expandable detail row
-- Data source attribution per flag (e.g., "Fonte: CGU / Contratos Públicos")
+- Check `getCache<PatternResult>(\`patterns_${cnpj}\`)`; return immediately if hit
+- Run all 3 pattern functions via `Promise.allSettled`
+- Collect fulfilled values into `flags[]`; log (but do not throw) rejected patterns
+- Write to cache via `setCache`
+- Return `PatternResult`
+
+### 4. "Alertas de Risco" UI section (in `index.ts` HTML renderer)
+
+- Appears on the CNPJ detail page only (not on main company list)
+- Empty state: grey box, text "Nenhum alerta identificado"
+- Each flag: colored left-border card with pattern title, key metrics, and data source attribution
+- Color by severity: yellow (informational), orange (medium), red (high)
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `PatternResult` and all flag interfaces defined in `index.ts` before pattern functions
-- [ ] `runPatterns()` uses `Promise.allSettled` — one failing pattern never blocks others
-- [ ] Pattern enable/disable works via env vars with sensible defaults (external-API patterns off by default)
-- [ ] "Alertas de Risco" section renders correctly when flag list is empty
-- [ ] "Alertas de Risco" section renders correctly with 1, 2, and 7 simultaneous flags
-- [ ] Section does not appear at all on the main company list page — only on CNPJ detail
+- [ ] All interfaces defined before any pattern function
+- [ ] `runPatterns()` uses `Promise.allSettled` — one failure never blocks others
+- [ ] "Alertas de Risco" section renders with 0, 1, and 3 simultaneous flags
+- [ ] Section does not appear on the company list page
+- [ ] All thresholds are named constants with a comment citing their legal basis

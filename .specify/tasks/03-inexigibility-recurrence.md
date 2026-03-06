@@ -1,81 +1,52 @@
-# Task: Inexigibility Recurrence (recorrencia_inexigibilidade)
+# Task: Inexigibility Recurrence
 **Status:** TODO
 **Priority:** P1
 **User Story:** US3
 **Pattern ID:** `inexigibility_recurrence`
+**Cache key:** `patterns_inexigibility_{cnpj}_{year}`
 
 ---
 
-## What to Build
-
-A detection function that identifies suppliers repeatedly winning non-competitive ("inexigibilidade") contracts from the same managing unit for similar work — abusing the sole-source exemption.
-
----
-
-## Data Sources
-
-| Table | Key Columns Used | Partition Filter |
-|---|---|---|
-| `br_cgu_licitacao_contrato.contrato_compra` | `cpf_cnpj_contratado`, `id_unidade_gestora`, `nome_unidade_gestora`, `fundamento_legal`, `objeto`, `valor_inicial_compra`, `data_assinatura_contrato` | `ano`, `mes` |
-
-No external API required.
-
----
-
-## Detection Logic
+## Query
 
 ```sql
-SELECT id_unidade_gestora, nome_unidade_gestora,
-       COUNT(*) AS contrato_count,
-       SUM(valor_inicial_compra) AS total_value,
-       MIN(data_assinatura_contrato) AS first_date,
-       MAX(data_assinatura_contrato) AS last_date
-FROM contrato_compra
+SELECT
+  id_unidade_gestora,
+  nome_unidade_gestora,
+  COUNT(*)                      AS contrato_count,
+  SUM(valor_inicial_compra)     AS total_value,
+  MIN(data_assinatura_contrato) AS first_date,
+  MAX(data_assinatura_contrato) AS last_date
+FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra`
 WHERE cpf_cnpj_contratado = @cnpj
   AND ano = @ano
   AND UPPER(fundamento_legal) LIKE '%INEXIGIBILIDADE%'
 GROUP BY id_unidade_gestora, nome_unidade_gestora
-HAVING COUNT(*) >= @min_count  -- configurable, default 3
+HAVING COUNT(*) >= @min_count
 ```
+
+Parameters: `cnpj`, `ano`, `min_count = INEXIGIBILITY_MIN_COUNT`
 
 ---
 
-## Configurable Constants
+## Output → `InexigibilityFlag[]`
 
-```typescript
-const INEXIGIBILITY_MIN_COUNT = 3;  // minimum occurrences per agency to trigger
-```
+One flag per managing unit where the supplier has ≥ 3 inexigibilidade contracts.
 
 ---
 
-## Output Shape
+## UI
 
-```typescript
-interface InexigibilityFlag {
-  pattern: 'inexigibility_recurrence';
-  agencyUnit: string;
-  agencyUnitId: string;
-  contractCount: number;
-  totalValue: number;      // BRL
-  firstDate: string;       // ISO date
-  lastDate: string;        // ISO date
-}
-```
-
----
-
-## UI Specification
-
-- Flag label (PT-BR): **"Recorrência de Inexigibilidade"**
-- Show: managing unit name, number of sole-source contracts, total value, date range
-- Risk indicator: yellow for 3–5, orange for 6–9, red for 10+
+- Section title (PT-BR): **"Recorrência de Inexigibilidade"**
+- Show per flag: managing unit name, contract count, total value, date range
+- Severity: yellow for 3–5, orange for 6–9, red for 10+
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Detects inexigibilidade via case-insensitive `LIKE '%INEXIGIBILIDADE%'` on `fundamento_legal`
+- [ ] Detects all `fundamento_legal` variants via case-insensitive `LIKE '%INEXIGIBILIDADE%'`
 - [ ] Returns flag when ≥ 3 inexigibilidade contracts from same managing unit
-- [ ] Returns empty when contracts are spread across different units
-- [ ] Result cached under key `inexigibility_{cnpj}_{year}` for 5 days
-- [ ] Covers both "inexigibilidade de licitação" and "inexigibilidade" variants in `fundamento_legal`
+- [ ] Returns empty when spread across units or fewer than 3 per unit
+- [ ] Partition filter `ano` present; no full-table scan
+- [ ] Integrated into `runPatterns()` via `Promise.allSettled`
