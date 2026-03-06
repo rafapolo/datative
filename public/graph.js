@@ -37,80 +37,6 @@ var require_is_graph = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/graphology-utils/defaults.js
-var require_defaults = __commonJS((exports, module) => {
-  function isLeaf(o2) {
-    return !o2 || typeof o2 !== "object" || typeof o2 === "function" || Array.isArray(o2) || o2 instanceof Set || o2 instanceof Map || o2 instanceof RegExp || o2 instanceof Date;
-  }
-  function resolveDefaults(target, defaults) {
-    target = target || {};
-    var output = {};
-    for (var k2 in defaults) {
-      var existing = target[k2];
-      var def = defaults[k2];
-      if (!isLeaf(def)) {
-        output[k2] = resolveDefaults(existing, def);
-        continue;
-      }
-      if (existing === undefined) {
-        output[k2] = def;
-      } else {
-        output[k2] = existing;
-      }
-    }
-    return output;
-  }
-  module.exports = resolveDefaults;
-});
-
-// node_modules/graphology-layout/circular.js
-var require_circular = __commonJS((exports, module) => {
-  var resolveDefaults = require_defaults();
-  var isGraph2 = require_is_graph();
-  var DEFAULTS2 = {
-    dimensions: ["x", "y"],
-    center: 0.5,
-    scale: 1
-  };
-  function genericCircularLayout(assign3, graph, options) {
-    if (!isGraph2(graph))
-      throw new Error("graphology-layout/random: the given graph is not a valid graphology instance.");
-    options = resolveDefaults(options, DEFAULTS2);
-    var dimensions = options.dimensions;
-    if (!Array.isArray(dimensions) || dimensions.length !== 2)
-      throw new Error("graphology-layout/random: given dimensions are invalid.");
-    var center = options.center;
-    var scale2 = options.scale;
-    var tau = Math.PI * 2;
-    var offset = (center - 0.5) * scale2;
-    var l2 = graph.order;
-    var x = dimensions[0];
-    var y = dimensions[1];
-    function assignPosition(i4, target) {
-      target[x] = scale2 * Math.cos(i4 * tau / l2) + offset;
-      target[y] = scale2 * Math.sin(i4 * tau / l2) + offset;
-      return target;
-    }
-    var i3 = 0;
-    if (!assign3) {
-      var positions = {};
-      graph.forEachNode(function(node) {
-        positions[node] = assignPosition(i3++, {});
-      });
-      return positions;
-    }
-    graph.updateEachNodeAttributes(function(_, attr) {
-      assignPosition(i3++, attr);
-      return attr;
-    }, {
-      attributes: dimensions
-    });
-  }
-  var circularLayout = genericCircularLayout.bind(null, false);
-  circularLayout.assign = genericCircularLayout.bind(null, true);
-  module.exports = circularLayout;
-});
-
 // node_modules/graphology-utils/getters.js
 var require_getters = __commonJS((exports) => {
   function coerceWeight(value) {
@@ -752,7 +678,7 @@ var require_helpers = __commonJS((exports) => {
 });
 
 // node_modules/graphology-layout-forceatlas2/defaults.js
-var require_defaults2 = __commonJS((exports, module) => {
+var require_defaults = __commonJS((exports, module) => {
   module.exports = {
     linLogMode: false,
     outboundAttractionDistribution: false,
@@ -773,7 +699,7 @@ var require_graphology_layout_forceatlas2 = __commonJS((exports, module) => {
   var createEdgeWeightGetter = require_getters().createEdgeWeightGetter;
   var iterate = require_iterate();
   var helpers = require_helpers();
-  var DEFAULT_SETTINGS2 = require_defaults2();
+  var DEFAULT_SETTINGS2 = require_defaults();
   function abstractSynchronousLayout(assign3, graph, params) {
     if (!isGraph2(graph))
       throw new Error("graphology-layout-forceatlas2: the given graph is not a valid graphology instance.");
@@ -9613,109 +9539,7 @@ var EdgeCurvedDoubleArrowProgram = createEdgeCurveProgram({
   })
 });
 
-// node-shape-programs.ts
-var { FLOAT: FLOAT4, UNSIGNED_BYTE: UNSIGNED_BYTE4 } = WebGLRenderingContext;
-var UNIFORMS2 = ["u_sizeRatio", "u_correctionRatio", "u_matrix"];
-var VERTEX_SHADER_SOURCE2 = `
-attribute vec4 a_id;
-attribute vec4 a_color;
-attribute vec2 a_position;
-attribute float a_size;
-attribute float a_angle;
-
-uniform mat3 u_matrix;
-uniform float u_sizeRatio;
-uniform float u_correctionRatio;
-
-varying vec4 v_color;
-
-const float bias = 255.0 / 254.0;
-
-void main() {
-  float size = a_size * u_correctionRatio / u_sizeRatio * 4.0;
-  vec2 diffVector = size * vec2(cos(a_angle), sin(a_angle));
-  vec2 position = a_position + diffVector;
-  gl_Position = vec4(
-    (u_matrix * vec3(position, 1)).xy,
-    0,
-    1
-  );
-
-  #ifdef PICKING_MODE
-  v_color = a_id;
-  #else
-  v_color = a_color;
-  #endif
-
-  v_color.a *= bias;
-}
-`;
-var FRAGMENT_SHADER_SOURCE2 = `
-precision mediump float;
-varying vec4 v_color;
-void main(void) {
-  gl_FragColor = v_color;
-}
-`;
-var ATTRIBUTES = [
-  { name: "a_position", size: 2, type: FLOAT4 },
-  { name: "a_size", size: 1, type: FLOAT4 },
-  { name: "a_color", size: 4, type: UNSIGNED_BYTE4, normalized: true },
-  { name: "a_id", size: 4, type: UNSIGNED_BYTE4, normalized: true }
-];
-var CONSTANT_ATTRIBUTES = [{ name: "a_angle", size: 1, type: FLOAT4 }];
-var SQUARE_CONSTANT_DATA = [
-  [Math.PI / 4],
-  [3 * Math.PI / 4],
-  [5 * Math.PI / 4],
-  [Math.PI / 4],
-  [5 * Math.PI / 4],
-  [7 * Math.PI / 4]
-];
-var DIAMOND_CONSTANT_DATA = [
-  [Math.PI / 2],
-  [0],
-  [3 * Math.PI / 2],
-  [Math.PI / 2],
-  [3 * Math.PI / 2],
-  [Math.PI]
-];
-function createShapeProgram(constantData) {
-  return class NodeShapeProgram extends NodeProgram {
-    getDefinition() {
-      return {
-        VERTICES: 6,
-        VERTEX_SHADER_SOURCE: VERTEX_SHADER_SOURCE2,
-        FRAGMENT_SHADER_SOURCE: FRAGMENT_SHADER_SOURCE2,
-        METHOD: WebGLRenderingContext.TRIANGLES,
-        UNIFORMS: UNIFORMS2,
-        ATTRIBUTES,
-        CONSTANT_ATTRIBUTES,
-        CONSTANT_DATA: constantData
-      };
-    }
-    processVisibleItem(nodeIndex, startIndex, data) {
-      const array = this.array;
-      const color = floatColor(data.color);
-      array[startIndex++] = data.x;
-      array[startIndex++] = data.y;
-      array[startIndex++] = data.size;
-      array[startIndex++] = color;
-      array[startIndex++] = nodeIndex;
-    }
-    setUniforms(params, { gl, uniformLocations }) {
-      const { u_sizeRatio, u_correctionRatio, u_matrix } = uniformLocations;
-      gl.uniform1f(u_correctionRatio, params.correctionRatio);
-      gl.uniform1f(u_sizeRatio, params.sizeRatio);
-      gl.uniformMatrix3fv(u_matrix, false, params.matrix);
-    }
-  };
-}
-var NodeSquareProgram = createShapeProgram(SQUARE_CONSTANT_DATA);
-var NodeDiamondProgram = createShapeProgram(DIAMOND_CONSTANT_DATA);
-
 // graph-client.ts
-var import_circular = __toESM(require_circular(), 1);
 var import_graphology_layout_forceatlas2 = __toESM(require_graphology_layout_forceatlas2(), 1);
 var EMPRESA_COLORS = [
   "#4a72a0",
@@ -9751,12 +9575,16 @@ var nodeTypeMap = new Map;
 var nodeDetailsMap = new Map;
 var knownNodeDetailKeys = new Set;
 var queriedDatasetKeys = new Set;
+var rowSignatureToNodeIds = new Map;
 var renderer = null;
 var isExpanding = false;
 var hoveredNode = null;
 var selectedNode = null;
 var layoutRootId = "";
 var currentLayout = "radial";
+var currentLookupLimit = 10;
+var currentGraph = null;
+var LOOKUP_LIMIT_OPTIONS = new Set([10, 20, 30, 40]);
 var DATASET_COLORS = window.__DATASET_COLORS ?? {};
 var DATASET_RELATIONS = window.__DATASET_RELATIONS ?? {};
 var expandedRelatedKeys = new Set;
@@ -9811,6 +9639,49 @@ function debugLog(...args) {
     return;
   console.log("[lookup-debug]", ...args);
 }
+function rowSignature(datasetId, row) {
+  return `${datasetId}|${JSON.stringify(row)}`;
+}
+function lookupLimitParam() {
+  return String(currentLookupLimit);
+}
+function sanitizeLookupLimit(raw) {
+  const parsed = Number(raw ?? "");
+  if (!Number.isFinite(parsed))
+    return 10;
+  return LOOKUP_LIMIT_OPTIONS.has(parsed) ? parsed : 10;
+}
+function selectedRowSignatures() {
+  const signatures = new Set;
+  if (!selectedNode)
+    return signatures;
+  const graph = currentGraph;
+  const nodeType = nodeTypeMap.get(selectedNode);
+  const details = [];
+  if (nodeType === "group" && graph?.hasNode(selectedNode)) {
+    for (const neighbor of graph.neighbors(selectedNode)) {
+      const neighborType = nodeTypeMap.get(neighbor);
+      if (neighborType === "group")
+        continue;
+      details.push(...nodeDetailsMap.get(neighbor) ?? []);
+    }
+  } else {
+    details.push(...nodeDetailsMap.get(selectedNode) ?? []);
+  }
+  for (const detail of details) {
+    signatures.add(rowSignature(detail.datasetId, detail.attributes));
+  }
+  return signatures;
+}
+function syncLookupRowHighlight() {
+  const selectedSignatures = selectedRowSignatures();
+  const rows = document.querySelectorAll(".lookup-table tbody tr[data-row-signature]");
+  for (const row of rows) {
+    const signature = row.dataset.rowSignature;
+    const isLinked = !!signature && selectedSignatures.has(signature);
+    row.classList.toggle("linked", isLinked);
+  }
+}
 async function fetchGraph(cnpj) {
   debugLog("GET /api/graph", { cnpj });
   const res = await fetch(`/api/graph/${cnpj}`);
@@ -9820,8 +9691,12 @@ async function fetchGraph(cnpj) {
   return res.json();
 }
 async function fetchLookupDataset(cnpj, datasetId) {
-  debugLog("GET /api/lookup/:cnpj/dataset/:datasetId", { cnpj, datasetId });
-  const res = await fetch(`/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1`);
+  debugLog("GET /api/lookup/:cnpj/dataset/:datasetId", {
+    cnpj,
+    datasetId,
+    limit: currentLookupLimit
+  });
+  const res = await fetch(`/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1&limit=${lookupLimitParam()}`);
   if (!res.ok)
     throw new Error(`Lookup dataset API error ${res.status}`);
   const payload = await res.json();
@@ -9849,16 +9724,8 @@ function lighten(hex) {
   const b3 = Math.min(255, (n2 & 255) + 80);
   return `#${r2.toString(16).padStart(2, "0")}${g2.toString(16).padStart(2, "0")}${b3.toString(16).padStart(2, "0")}`;
 }
-function nodeShapeType(type) {
-  if (type === "empresa")
-    return "square";
-  if (type === "socio")
-    return "diamond";
-  return "circle";
-}
 function nodeAttrs(type, label, opts) {
   const o2 = typeof opts === "string" ? { empresaId: opts } : opts ?? {};
-  const shapeType = nodeShapeType(type);
   if (o2.datasetId) {
     const color = DATASET_COLORS[o2.datasetId] ?? NODE_COLORS[type] ?? "#888888";
     return {
@@ -9866,7 +9733,7 @@ function nodeAttrs(type, label, opts) {
       fullLabel: label,
       size: 9,
       color,
-      type: shapeType,
+      type: "circle",
       x: Math.random() * 10,
       y: Math.random() * 10
     };
@@ -9886,82 +9753,28 @@ function nodeAttrs(type, label, opts) {
     size,
     isRoot: o2.isRoot ?? false,
     color: type === "empresa" ? baseColor : lighten(baseColor),
-    type: shapeType,
+    type: "circle",
     x: Math.random() * 10,
     y: Math.random() * 10
   };
 }
-function drawNodeLabelPill(ctx, text, cx, topY, size, color = "#fff", bg = "rgba(8,8,20,0.88)") {
-  const padding = 5;
-  const w2 = ctx.measureText(text).width;
-  ctx.fillStyle = bg;
-  ctx.beginPath();
-  ctx.roundRect(cx - w2 / 2 - padding, topY, w2 + padding * 2, size + padding * 2, 3);
-  ctx.fill();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = color;
-  ctx.fillText(text, cx, topY + padding);
-}
 function drawLabelInsideNode(ctx, data, settings) {
-  const d2 = data;
-  const nodeType = d2.type;
-  if (nodeType === "square" || nodeType === "diamond") {
-    if (!data.label)
-      return;
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    ctx.font = `${weight} ${size}px ${font}`;
-    const hs = data.size * 0.7;
-    if (d2.isRoot) {
-      drawNodeLabelPill(ctx, data.label, data.x, data.y + hs + 5, size, "#e8b84b");
-    } else {
-      const maxW = hs * 1.7;
-      let label = data.label;
-      if (ctx.measureText(label).width > maxW) {
-        while (label.length > 1 && ctx.measureText(label + "…").width > maxW)
-          label = label.slice(0, -1);
-        label += "…";
-      }
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.strokeText(label, data.x, data.y);
-      ctx.fillStyle = "#fff";
-      ctx.fillText(label, data.x, data.y);
-    }
-  } else {
-    if (!data.label)
-      return;
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    const color = settings.labelColor.color ?? "#000";
-    const tx = data.x + data.size + 3;
-    const ty = data.y + size / 3;
-    ctx.font = `${weight} ${size}px ${font}`;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "#000";
-    ctx.strokeText(data.label, tx, ty);
-    ctx.fillStyle = color;
-    ctx.fillText(data.label, tx, ty);
-  }
+  if (!data.label)
+    return;
+  const size = settings.labelSize ?? 12;
+  const font = settings.labelFont ?? "sans-serif";
+  const weight = settings.labelWeight ?? "500";
+  const color = settings.labelColor.color ?? "#000";
+  const tx = data.x + data.size + 3;
+  const ty = data.y + size / 3;
+  ctx.font = `${weight} ${size}px ${font}`;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#000";
+  ctx.strokeText(data.label, tx, ty);
+  ctx.fillStyle = color;
+  ctx.fillText(data.label, tx, ty);
 }
-function drawHoverInsideNode(ctx, data, settings) {
-  const d2 = data;
-  const nodeType = d2.type;
-  if (nodeType === "square" || nodeType === "diamond") {
-    if (!data.label || d2.isRoot)
-      return;
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    ctx.font = `${weight} ${size}px ${font}`;
-    drawNodeLabelPill(ctx, data.label, data.x, data.y + data.size * 0.7 + 5, size);
-  }
-}
+function drawHoverInsideNode(ctx, data, settings) {}
 function edgeAttrs() {
   return { type: "curved", color: COLOR_EDGE_BASE, size: 1.2, zIndex: 1 };
 }
@@ -10062,9 +9875,7 @@ function radialLayout(graph) {
 }
 function runLayout(graph, _iterations, onDone) {
   requestAnimationFrame(() => {
-    if (currentLayout === "circular") {
-      import_circular.default.assign(graph);
-    } else if (currentLayout === "forceatlas2") {
+    if (currentLayout === "forceatlas2") {
       const settings = import_graphology_layout_forceatlas2.default.inferSettings(graph);
       import_graphology_layout_forceatlas2.default.assign(graph, { iterations: 150, settings });
     } else {
@@ -10090,7 +9901,8 @@ async function expandRelatedDatasets(nodeId, graph) {
       expandedRelatedKeys.add(expandKey);
       try {
         const url = `/api/lookup/related?datasetId=${encodeURIComponent(rel.datasetId)}&foreignKey=${encodeURIComponent(rel.foreignKey)}&value=${encodeURIComponent(String(value))}`;
-        const res = await fetch(url);
+        const urlWithLimit = `${url}&limit=${lookupLimitParam()}`;
+        const res = await fetch(urlWithLimit);
         if (!res.ok)
           continue;
         const { result } = await res.json();
@@ -10316,6 +10128,11 @@ function injectPanelStyles() {
     .lookup-table tbody tr:nth-child(odd) td { background: #0a0f22; }
     .lookup-table tbody tr:nth-child(even) td { background: #0b132b; }
     .lookup-table tbody tr:hover td { background: #121a34; color: #dbeafe; }
+    .lookup-table tbody tr.linked td {
+      background: #1d2b52 !important;
+      color: #e6f0ff;
+      box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.45);
+    }
     .lookup-skeleton {
       padding: 1rem;
       color: #44446a;
@@ -10690,7 +10507,7 @@ function renderResultSections(results, cnpj, graph) {
         <span style="color:${datasetColor};margin-right:0.3em;font-size:0.85em">⦿</span>${result.label}
       </span>
       <div class="lookup-section-actions">
-        ${hasHits ? `<span class="lookup-badge">${result.count}${result.count === 10 ? "+" : ""}</span>` : ""}
+        ${hasHits ? `<span class="lookup-badge">${result.count}</span>` : ""}
         ${actionsHtml}
         <span class="chevron">▶</span>
       </div>
@@ -10709,6 +10526,9 @@ function renderResultSections(results, cnpj, graph) {
       const tbody = table.querySelector("tbody");
       for (const row of result.rows) {
         const tr = document.createElement("tr");
+        const signature = rowSignature(result.id, row);
+        tr.dataset.rowSignature = signature;
+        tr.dataset.datasetId = result.id;
         for (const col of cols) {
           const val = row[col];
           const text = val == null ? "—" : String(val);
@@ -10718,13 +10538,10 @@ function renderResultSections(results, cnpj, graph) {
             const span = document.createElement("span");
             span.className = "cnpj-link";
             span.textContent = text;
-            span.addEventListener("click", () => {
+            span.addEventListener("click", (e3) => {
+              e3.stopPropagation();
               const basico = extractBasico(text);
-              lookupHistory.push({
-                cnpj: currentLookupCnpj,
-                label: currentLookupLabel
-              });
-              openLookupPanel(basico, graph);
+              window.open(`/?cnpj=${encodeURIComponent(basico)}`, "_blank", "noopener,noreferrer");
             });
             td.appendChild(span);
           } else {
@@ -10732,11 +10549,22 @@ function renderResultSections(results, cnpj, graph) {
           }
           tr.appendChild(td);
         }
+        tr.addEventListener("click", () => {
+          const nodeIds = rowSignatureToNodeIds.get(signature);
+          if (!nodeIds || nodeIds.size === 0 || !currentGraph)
+            return;
+          const nodeId = [...nodeIds][0];
+          selectedNode = nodeId;
+          hoveredNode = null;
+          renderer?.refresh({ skipIndexation: true });
+          showNodeDetails(nodeId, currentGraph);
+          syncLookupRowHighlight();
+        });
         tbody.appendChild(tr);
       }
       bodyDiv.appendChild(table);
     }
-    const datasetKey = `${cnpj}:${result.id}`;
+    const datasetKey = `${cnpj}:${result.id}:${lookupLimitParam()}`;
     const queryAndAddDataset = async () => {
       if (!canAddToGraph || datasetAdded || queriedDatasetKeys.has(datasetKey))
         return;
@@ -10811,6 +10639,7 @@ function renderResultSections(results, cnpj, graph) {
     section.appendChild(bodyDiv);
     body.appendChild(section);
   }
+  syncLookupRowHighlight();
 }
 function addResultsToGraph(result, companyCnpj, graph) {
   const newNodes = [];
@@ -10829,6 +10658,11 @@ function addResultsToGraph(result, companyCnpj, graph) {
     }
     seenInBatch.add(nodeId);
     trackNodeDetail(nodeId, result.id, result.label, companyCnpj, row);
+    const signature = rowSignature(result.id, row);
+    if (!rowSignatureToNodeIds.has(signature)) {
+      rowSignatureToNodeIds.set(signature, new Set);
+    }
+    rowSignatureToNodeIds.get(signature).add(nodeId);
     if (!knownNodeIds.has(nodeId)) {
       knownNodeIds.add(nodeId);
       nodeTypeMap.set(nodeId, nodeType);
@@ -10846,9 +10680,11 @@ function addResultsToGraph(result, companyCnpj, graph) {
   if (newNodes.length > 0) {
     runLayout(graph, 100, () => {
       setStatus(`+${newNodes.length} nó(s) de "${result.label}" adicionado(s)`);
+      syncLookupRowHighlight();
     });
   } else {
     setStatus(`Nenhum nó novo para "${result.label}".`);
+    syncLookupRowHighlight();
   }
 }
 function inferNodeId(result, row, companyCnpj, rowIndex) {
@@ -10917,8 +10753,8 @@ async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
     return;
   }
   try {
-    debugLog("GET /api/lookup/:cnpj", { cnpj });
-    const res = await fetch(`/api/lookup/${cnpj}`);
+    debugLog("GET /api/lookup/:cnpj", { cnpj, limit: currentLookupLimit });
+    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
     if (!res.ok)
       throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -10935,6 +10771,7 @@ async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
 async function init() {
   const params = new URLSearchParams(location.search);
   const cnpj = params.get("cnpj");
+  currentLookupLimit = sanitizeLookupLimit(params.get("qlimit"));
   const container = document.getElementById("graph-container");
   if (!cnpj) {
     setStatus("CNPJ não informado na URL.");
@@ -10952,6 +10789,7 @@ async function init() {
     return;
   }
   const graph = new Graph;
+  currentGraph = graph;
   const rootNode = data.nodes.find((n2) => n2.type === "empresa");
   const rootId = rootNode?.id ?? cnpj;
   layoutRootId = rootId;
@@ -10989,10 +10827,6 @@ async function init() {
     renderEdgeLabels: false,
     defaultEdgeType: "curved",
     edgeProgramClasses: { curved: createEdgeCurveProgram() },
-    nodeProgramClasses: {
-      square: NodeSquareProgram,
-      diamond: NodeDiamondProgram
-    },
     defaultDrawNodeLabel: drawLabelInsideNode,
     defaultDrawNodeHover: drawHoverInsideNode,
     labelRenderedSizeThreshold: 8,
@@ -11069,6 +10903,17 @@ async function init() {
       runLayout(graph, 200);
     });
   }
+  const queryLimitSelect = document.getElementById("query-limit-select");
+  if (queryLimitSelect) {
+    queryLimitSelect.value = lookupLimitParam();
+    queryLimitSelect.addEventListener("change", () => {
+      currentLookupLimit = sanitizeLookupLimit(queryLimitSelect.value);
+      queryLimitSelect.value = lookupLimitParam();
+      const next = new URL(location.href);
+      next.searchParams.set("qlimit", lookupLimitParam());
+      location.href = next.toString();
+    });
+  }
   const overlay = document.getElementById("loading-overlay");
   const loadingText = overlay?.querySelector(".loading-text");
   if (loadingText)
@@ -11076,7 +10921,7 @@ async function init() {
   setStatus("Cruzando com bases de dados…");
   let lookupResults = [];
   try {
-    const res = await fetch(`/api/lookup/${cnpj}`);
+    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
     if (res.ok) {
       const payload = await res.json();
       lookupResults = payload.results;
@@ -11084,7 +10929,7 @@ async function init() {
         if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
           addResultsToGraph(result, cnpj, graph);
           autoAddedDatasets.add(result.id);
-          queriedDatasetKeys.add(`${cnpj}:${result.id}`);
+          queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
         }
       }
       const hits = lookupResults.filter((r2) => r2.count > 0).length;
@@ -11139,11 +10984,13 @@ async function init() {
   renderer.on("clickStage", () => {
     selectedNode = null;
     renderer.refresh({ skipIndexation: true });
+    syncLookupRowHighlight();
   });
   renderer.on("clickNode", ({ node }) => {
     selectedNode = selectedNode === node ? null : node;
     hoveredNode = null;
     renderer.refresh({ skipIndexation: true });
+    syncLookupRowHighlight();
     const nodeType = nodeTypeMap.get(node);
     if (nodeType === "group") {
       showNodeDetails(node, graph);
