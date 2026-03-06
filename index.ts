@@ -768,6 +768,7 @@ function renderGraphLanding(): string {
       font-size: 1.35rem;
       letter-spacing: 0.12em;
       color: var(--gold);
+      text-decoration: none;
     }
     .nav-links { display: flex; gap: 1.5rem; }
     .nav-links a {
@@ -976,7 +977,7 @@ function renderGraphLanding(): string {
 </head>
 <body>
   <nav>
-    <span class="nav-brand">DATA_</span>
+    <a class="nav-brand" href="/">DATA_</a>
     <div class="nav-links">
       <a href="/table">BASE DE DADOS →</a>
     </div>
