@@ -10,7 +10,8 @@ interface CacheEntry<T> {
 }
 
 function filePath(key: string): string {
-  return resolve(CACHE_DIR, key + ".json");
+  const safe = key.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  return resolve(CACHE_DIR, safe + ".json");
 }
 
 export function getCache<T>(key: string): T | null {

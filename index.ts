@@ -395,6 +395,10 @@ async function queryByField(
 ): Promise<{ result: LookupResult; bytes: number }> {
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(foreignKey)) {
+    throw new Error(`Invalid foreignKey: ${foreignKey}`);
+  }
+
   const ds = RELATED_DATASETS.find((d) => d.id === datasetId);
   if (!ds) throw new Error(`Related dataset not found: ${datasetId}`);
 
