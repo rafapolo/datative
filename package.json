@@ -1,0 +1,20 @@
+{
+  "name": "datative",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun --watch run index.ts"
+  },
+  "dependencies": {
+    "@google-cloud/bigquery": "^8.1.1",
+    "@sigma/edge-curve": "^3.1.0",
+    "graphology": "^0.26.0",
+    "graphology-layout": "^0.6.1",
+    "graphology-layout-forceatlas2": "^0.10.1",
+    "sigma": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
