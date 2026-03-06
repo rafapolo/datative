@@ -69,6 +69,7 @@ function saveUsage(data: UsageData): void {
 let usage = loadUsage();
 const DEFAULT_YEAR = 2023;
 const DEFAULT_LIMIT = 25;
+const LOOKUP_LIMIT_DEFAULT = 10;
 
 interface SchemaColumn {
   name: string;
@@ -289,8 +290,8 @@ function inferLookupNodeFields(ds: (typeof CNPJ_DATASETS)[number]): {
 async function queryLookupDataset(
   cnpjBasico: string,
   datasetId: string,
-  year = 2023,
   forceFresh = false,
+  limit = LOOKUP_LIMIT_DEFAULT,
 ): Promise<{ result: LookupResult; bytes: number }> {
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
   const docDigits = cnpjBasico.replace(/\D/g, "");
@@ -303,37 +304,54 @@ async function queryLookupDataset(
   const ds = CNPJ_DATASETS.find((d) => d.id === datasetId);
   if (!ds) throw new Error(`Dataset not found: ${datasetId}`);
 
-  const dsKey = `lookup_${docDigits}_${year}_${ds.id}`;
+  const dsKey = `lookup_${docDigits}_${ds.id}_limit_${limit}`;
   if (!forceFresh) {
     const cachedDs = getCache<LookupResult>(dsKey);
     if (cachedDs) return { result: cachedDs, bytes: 0 };
   }
 
   const whereParts = ds.cnpjColumns.map((col) => buildCnpjWhere(col));
-  let whereClause =
+  const whereClause =
     whereParts.length === 1 ? whereParts[0] : `(${whereParts.join(" OR ")})`;
-  if (ds.yearField) {
-    whereClause += ` AND ${ds.yearField} = @year`;
-  }
 
   const fields = ds.displayFields.join(", ");
-  const sql = `SELECT ${fields} FROM \`${ds.table}\` WHERE ${whereClause} LIMIT 10`;
+  const sql = `
+    WITH matched AS (
+      SELECT ${fields}
+      FROM \`${ds.table}\`
+      WHERE ${whereClause}
+    )
+    SELECT
+      *,
+      COUNT(*) OVER() AS __total_count
+    FROM matched
+    LIMIT @limit
+  `;
   const inferredFields = inferLookupNodeFields(ds);
 
   try {
     const [job] = await bq.createQueryJob({
       query: sql,
-      params: { cnpj_root: cnpjRoot, doc_digits: docDigits, doc_len: docLen, year },
+      params: { cnpj_root: cnpjRoot, doc_digits: docDigits, doc_len: docLen, limit },
       location: "US",
     });
-    const [rows] = await job.getQueryResults();
+    const [rawRows] = await job.getQueryResults();
     const [meta] = await job.getMetadata();
     const bytes = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
+    const rowsWithCount = rawRows as Array<Record<string, unknown>>;
+    const totalCountRaw = rowsWithCount[0]?.__total_count;
+    const totalCount =
+      typeof totalCountRaw === "number"
+        ? totalCountRaw
+        : totalCountRaw != null
+          ? Number(totalCountRaw)
+          : 0;
+    const rows = rowsWithCount.map(({ __total_count: _ignored, ...row }) => row);
     const result: LookupResult = {
       id: ds.id,
       label: ds.label,
-      count: rows.length,
-      rows: rows as Record<string, unknown>[],
+      count: Number.isFinite(totalCount) ? totalCount : rows.length,
+      rows,
       cnpjColumnNames: ds.cnpjColumns.map((c) => c.name),
       nodeType: ds.nodeType,
       nodeIdField: ds.nodeIdField ?? inferredFields.nodeIdField,
@@ -360,19 +378,22 @@ async function queryLookupDataset(
   }
 }
 
-async function queryLookup(cnpjBasico: string, year = 2023): Promise<{ results: LookupResult[]; totalBytes: number }> {
+async function queryLookup(
+  cnpjBasico: string,
+  limit = LOOKUP_LIMIT_DEFAULT,
+): Promise<{ results: LookupResult[]; totalBytes: number }> {
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
   const docDigits = cnpjBasico.replace(/\D/g, "");
   if (docDigits.length < 8) {
     throw new Error("Lookup value must have at least 8 digits.");
   }
 
-  const topKey = `lookup_${docDigits}_${year}`;
+  const topKey = `lookup_${docDigits}_limit_${limit}`;
   const cachedAll = getCache<LookupResult[]>(topKey);
   if (cachedAll) return { results: cachedAll, totalBytes: 0 };
 
   const jobs = CNPJ_DATASETS.map((ds) =>
-    queryLookupDataset(cnpjBasico, ds.id, year),
+    queryLookupDataset(cnpjBasico, ds.id, false, limit),
   );
 
   const settled = await Promise.all(jobs);
@@ -387,6 +408,7 @@ async function queryByField(
   foreignKey: string,
   value: string,
   forceFresh = false,
+  limit = LOOKUP_LIMIT_DEFAULT,
 ): Promise<{ result: LookupResult; bytes: number }> {
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
@@ -397,24 +419,48 @@ async function queryByField(
   const ds = RELATED_DATASETS.find((d) => d.id === datasetId);
   if (!ds) throw new Error(`Related dataset not found: ${datasetId}`);
 
-  const cacheKey = `related_${datasetId}_${foreignKey}_${value}`;
+  const cacheKey = `related_${datasetId}_${foreignKey}_${value}_limit_${limit}`;
   if (!forceFresh) {
     const cached = getCache<LookupResult>(cacheKey);
     if (cached) return { result: cached, bytes: 0 };
   }
 
-  const sql = `SELECT ${ds.displayFields.join(", ")} FROM \`${ds.table}\` WHERE ${foreignKey} = @value LIMIT 10`;
+  const sql = `
+    WITH matched AS (
+      SELECT ${ds.displayFields.join(", ")}
+      FROM \`${ds.table}\`
+      WHERE ${foreignKey} = @value
+    )
+    SELECT
+      *,
+      COUNT(*) OVER() AS __total_count
+    FROM matched
+    LIMIT @limit
+  `;
 
   try {
-    const [job] = await bq.createQueryJob({ query: sql, params: { value }, location: "US" });
-    const [rows] = await job.getQueryResults();
+    const [job] = await bq.createQueryJob({
+      query: sql,
+      params: { value, limit },
+      location: "US",
+    });
+    const [rawRows] = await job.getQueryResults();
     const [meta] = await job.getMetadata();
     const bytes = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
+    const rowsWithCount = rawRows as Array<Record<string, unknown>>;
+    const totalCountRaw = rowsWithCount[0]?.__total_count;
+    const totalCount =
+      typeof totalCountRaw === "number"
+        ? totalCountRaw
+        : totalCountRaw != null
+          ? Number(totalCountRaw)
+          : 0;
+    const rows = rowsWithCount.map(({ __total_count: _ignored, ...row }) => row);
     const result: LookupResult = {
       id: ds.id,
       label: ds.label,
-      count: rows.length,
-      rows: rows as Record<string, unknown>[],
+      count: Number.isFinite(totalCount) ? totalCount : rows.length,
+      rows,
       cnpjColumnNames: [],
       nodeType: ds.nodeType,
       nodeIdField: ds.nodeIdField,
@@ -448,6 +494,16 @@ function classifyError(err: unknown): { kind: "auth" | "billing" | "other"; mess
     return { kind: "billing", message: msg };
   }
   return { kind: "other", message: msg };
+}
+
+function parseLookupLimit(value: string | null): number {
+  const parsed = Number(value ?? "");
+  if (!Number.isFinite(parsed)) return LOOKUP_LIMIT_DEFAULT;
+  const normalized = Math.trunc(parsed);
+  if (normalized === 10 || normalized === 20 || normalized === 30 || normalized === 40) {
+    return normalized;
+  }
+  return LOOKUP_LIMIT_DEFAULT;
 }
 
 // --- HTML renderer ---
@@ -1026,7 +1082,7 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    #layout-select {
+    #layout-select, #query-limit-select {
       margin-left: auto;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -1038,8 +1094,13 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       cursor: pointer;
       outline: none;
     }
-    #layout-select:hover { border-color: var(--gold); color: var(--text); }
-    #layout-select option { background: #0d0d20; }
+    #query-limit-select {
+      margin-left: 0;
+      min-width: 56px;
+      text-align: center;
+    }
+    #layout-select:hover, #query-limit-select:hover { border-color: var(--gold); color: var(--text); }
+    #layout-select option, #query-limit-select option { background: #0d0d20; }
     #status {
       font-family: 'Space Mono', monospace;
       font-size: 0.6rem;
@@ -1116,8 +1177,13 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
     </nav>
     <select id="layout-select">
       <option value="radial">Radial</option>
-      <option value="circular">Circular</option>
       <option value="forceatlas2">Force Atlas 2</option>
+    </select>
+    <select id="query-limit-select">
+      <option value="10">10</option>
+      <option value="20">20</option>
+      <option value="30">30</option>
+      <option value="40">40</option>
     </select>
     <span id="status">Carregando…</span>
   </header>
@@ -1188,13 +1254,14 @@ Bun.serve({
       const datasetId = url.searchParams.get("datasetId") ?? "";
       const foreignKey = url.searchParams.get("foreignKey") ?? "";
       const value = url.searchParams.get("value") ?? "";
+      const limit = parseLookupLimit(url.searchParams.get("limit"));
       if (!datasetId || !foreignKey || !value) {
         return new Response(JSON.stringify({ error: "Missing datasetId, foreignKey or value" }), {
           status: 400, headers: { "Content-Type": "application/json" },
         });
       }
       try {
-        const { result, bytes } = await queryByField(datasetId, foreignKey, value);
+        const { result, bytes } = await queryByField(datasetId, foreignKey, value, false, limit);
         trackBytes(bytes);
         return new Response(JSON.stringify({ result }), {
           headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -1214,12 +1281,13 @@ Bun.serve({
       const cnpj = lookupDatasetMatch[1];
       const datasetId = decodeURIComponent(lookupDatasetMatch[2]);
       const fresh = url.searchParams.get("fresh") === "1";
+      const limit = parseLookupLimit(url.searchParams.get("limit"));
       try {
         const { result, bytes } = await queryLookupDataset(
           cnpj,
           datasetId,
-          2023,
           fresh,
+          limit,
         );
         trackBytes(bytes);
         return new Response(JSON.stringify({ cnpj, result }), {
@@ -1239,8 +1307,9 @@ Bun.serve({
     const lookupMatch = url.pathname.match(/^\/api\/lookup\/([^/]+)$/);
     if (lookupMatch) {
       const cnpj = lookupMatch[1];
+      const limit = parseLookupLimit(url.searchParams.get("limit"));
       try {
-        const { results, totalBytes } = await queryLookup(cnpj);
+        const { results, totalBytes } = await queryLookup(cnpj, limit);
         trackBytes(totalBytes);
         return new Response(JSON.stringify({ cnpj, results }), {
           headers: { "Content-Type": "application/json; charset=utf-8" },
