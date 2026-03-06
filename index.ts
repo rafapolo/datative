@@ -561,6 +561,8 @@ function renderPage(
     .pagination a { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 0.4rem 0.9rem; font-size: 0.85rem; font-weight: 600; color: #4f46e5; text-decoration: none; }
     .pagination a:hover { background: #4f46e5; color: #fff; border-color: #4f46e5; }
     .pagination .page-info { font-size: 0.8rem; color: #888; }
+    .graph-link { text-decoration: none; font-size: 1rem; color: #4f46e5; opacity: 0.7; }
+    .graph-link:hover { opacity: 1; }
   </style>
 </head>
 <body>
@@ -796,27 +798,6 @@ function renderGraphLanding(): string {
       white-space: nowrap;
     }
     button[type=submit]:hover { background: #f5cc6a; }
-    .examples {
-      margin-top: 1.1rem;
-      display: flex;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-    }
-    .example-label {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.6rem;
-      color: #2a2a4a;
-      letter-spacing: 0.1em;
-    }
-    .example-item {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.6rem;
-      color: #3a3a5a;
-      cursor: pointer;
-      transition: color 0.15s;
-      letter-spacing: 0.05em;
-    }
-    .example-item:hover { color: var(--muted); }
     footer {
       padding: 0.9rem 3rem;
       border-top: 1px solid var(--border);
