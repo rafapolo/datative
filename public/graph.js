@@ -9768,6 +9768,18 @@ function drawLabelInsideNode(ctx, data, settings) {
   const tx = data.x + data.size + 3;
   const ty = data.y + size / 3;
   ctx.font = `${weight} ${size}px ${font}`;
+  if (currentLayout === "collapsible-tree") {
+    const text = String(data.label);
+    const metrics = ctx.measureText(text);
+    const padX = 4;
+    const padY = 2;
+    const boxX = tx - padX;
+    const boxY = ty - size + 1 - padY;
+    const boxW = metrics.width + padX * 2;
+    const boxH = size + padY * 2;
+    ctx.fillStyle = "rgba(6, 8, 18, 0.86)";
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+  }
   ctx.lineWidth = 1;
   ctx.strokeStyle = "#000";
   ctx.strokeText(data.label, tx, ty);
@@ -9928,13 +9940,16 @@ function collapsibleTreeLayout(graph) {
   const leaves = Math.max(nextRow, 1);
   const maxLabelChars = Math.max(...[...visited].map((node) => String(graph.getNodeAttribute(node, "fullLabel") ?? graph.getNodeAttribute(node, "label") ?? "").length), 0);
   const labelFactor = Math.max(1, Math.min(1.8, maxLabelChars / 24));
-  const rowSpacing = Math.max(58, Math.min(160, 2200 / leaves * labelFactor));
-  const depthSpacing = Math.max(260, Math.min(560, 4200 / (maxDepth + 1) * Math.min(1.4, labelFactor)));
+  const rowSpacing = Math.max(84, Math.min(220, 2600 / leaves * labelFactor));
+  const depthSpacing = Math.max(360, Math.min(760, 5200 / (maxDepth + 1) * Math.min(1.7, labelFactor)));
   const rootRow = rowOrder.get(root) ?? 0;
+  const depthCenterOffset = (maxDepth + 1) * depthSpacing / 2;
   for (const node of visited) {
     const d2 = depth.get(node) ?? 0;
     const row = rowOrder.get(node) ?? 0;
-    graph.setNodeAttribute(node, "x", d2 * depthSpacing);
+    const nodeType = String(nodeTypeMap.get(node) ?? "");
+    const typeOffset = nodeType === "group" ? 18 : nodeType === "empresa" ? -12 : nodeType === "socio" ? 12 : 0;
+    graph.setNodeAttribute(node, "x", d2 * depthSpacing - depthCenterOffset + typeOffset);
     graph.setNodeAttribute(node, "y", (row - rootRow) * rowSpacing);
   }
   const detached = graph.nodes().filter((n2) => !visited.has(n2));
@@ -10996,17 +11011,22 @@ async function init() {
     edgeReducer: (edge, data2) => {
       const res = { ...data2 };
       const g2 = renderer?.getGraph();
+      if (currentLayout === "collapsible-tree") {
+        res.type = "line";
+        res.size = 1;
+        res.color = "rgba(96,122,176,0.45)";
+      }
       if (selectedNode !== null) {
         const src = g2?.source(edge);
         const tgt = g2?.target(edge);
         const touchesSelected = src === selectedNode || tgt === selectedNode;
         if (touchesSelected) {
           res.color = COLOR_EDGE_HOVER;
-          res.size = 2;
+          res.size = currentLayout === "collapsible-tree" ? 1.5 : 2;
           res.zIndex = 5;
         } else {
           res.color = COLOR_FADE_EDGE;
-          res.size = 0.5;
+          res.size = currentLayout === "collapsible-tree" ? 0.25 : 0.5;
           res.zIndex = 0;
         }
       } else if (hoveredNode !== null) {
@@ -11014,10 +11034,10 @@ async function init() {
         const tgt = g2?.target(edge);
         if (src === hoveredNode || tgt === hoveredNode) {
           res.color = COLOR_EDGE_HOVER;
-          res.size = 2;
+          res.size = currentLayout === "collapsible-tree" ? 1.5 : 2;
         } else {
           res.color = interpolateColor(COLOR_EDGE_BASE, COLOR_FADE_EDGE, 0.6);
-          res.size = 0.8;
+          res.size = currentLayout === "collapsible-tree" ? 0.5 : 0.8;
         }
       }
       return res;
