@@ -5,9 +5,9 @@
 
 ## Overview
 
-Given a company CNPJ, detect suspicious procurement patterns using data already available in `basedosdados.br_cgu_licitacao_contrato`. Results appear as risk flags on the company detail page. No external APIs required.
+Given a company CNPJ, detect suspicious procurement patterns using data already available in basedosdados. Results appear as risk flags on the company detail page. No external APIs required.
 
-**In scope:** 3 patterns, all from a single BigQuery dataset.
+**In scope:** 8 patterns across 3 BigQuery datasets.
 **Out of scope:** sanction registries (CEIS/CNEP), PGFN debt, IBAMA embargoes — all require external APIs or inaccessible tables.
 
 ---
@@ -50,22 +50,83 @@ Given a company CNPJ, detect suspicious procurement patterns using data already 
 
 ---
 
-## Data Source
+### US4 — P1: Single Bidder
+**As** an investigative journalist,
+**I want** to see if this supplier frequently wins tenders where they were the only participant,
+**So that** I can identify possible insider access, tailored specifications, or deliberate exclusion of competitors.
 
-All patterns use a single table:
+**Acceptance scenarios:**
+- Given a CNPJ with ≥ 2 tenders in `licitacao_participante` where `total_participantes = 1` AND this CNPJ won → flag shown with occurrence count, combined tender value, and agencies involved
+- Given a CNPJ with only 1 such occurrence → no flag (could be coincidence)
+- Given a CNPJ with solo-bidder tenders in a single specialized niche → flag still shown (context is for the journalist to assess)
 
-| Table | Key Columns |
-|---|---|
-| `basedosdados.br_cgu_licitacao_contrato.contrato_compra` | `cpf_cnpj_contratado`, `id_orgao_superior`, `nome_orgao_superior`, `id_unidade_gestora`, `nome_unidade_gestora`, `objeto`, `fundamento_legal`, `modalidade`, `valor_inicial_compra`, `valor_final_compra`, `data_assinatura_contrato`, `ano`, `mes` |
+---
 
-Partition filters `ano` and `mes` are mandatory on every query.
+### US5 — P1: Always Winner
+**As** a researcher analyzing bidding behavior,
+**I want** to see if this supplier wins an unusually high share of the bids it enters,
+**So that** I can identify possible bid-rigging, insider advantage, or specifications tailored to this vendor.
+
+**Acceptance scenarios:**
+- Given a CNPJ with ≥ 5 participations in `licitacao_participante` AND win rate ≥ 60% → flag shown with win rate %, wins vs total participations, and total value competed
+- Given fewer than 5 participations → no flag (insufficient sample)
+- Given win rate below 60% → no flag
+
+---
+
+### US6 — P1: Contract Amendment Inflation
+**As** a fiscal auditor reviewing a company's contracts,
+**I want** to see if its contracts were amended to values far above the originally signed price,
+**So that** I can identify superfaturamento or low-ball-then-inflate schemes.
+
+**Acceptance scenarios:**
+- Given a CNPJ with contracts where `valor_final_compra / valor_inicial_compra >= 1.25` (legal ceiling under Lei 14.133/2021) AND `valor_inicial_compra > R$ 10.000` → flag shown with count of inflated contracts, total excess value, and worst inflation ratio seen
+- Given all contracts within 25% of original value → no flag
+- Given `valor_inicial_compra = 0` → contract excluded (division guard)
+
+---
+
+### US7 — P2: Newborn Company
+**As** an investigative journalist,
+**I want** to see if this company won significant public contracts very shortly after being incorporated,
+**So that** I can identify possible shell companies created specifically for a procurement scheme.
+
+**Acceptance scenarios:**
+- Given a CNPJ where `data_inicio_atividade` in `br_me_cnpj.empresas` is within 180 days of the first `data_assinatura_contrato`, AND total contract value ≥ R$ 50.000 → flag shown with company age at first contract, size category, and total value won
+- Given founding date NULL → no flag (insufficient data)
+- Given only small contracts (< R$ 50.000) → no flag
+
+---
+
+### US8 — P2: Sudden Contract Surge
+**As** a researcher tracking procurement trends,
+**I want** to see if this supplier's annual government revenue spiked dramatically in a recent year,
+**So that** I can identify possible capture of public budgets following political or management changes.
+
+**Acceptance scenarios:**
+- Given a CNPJ where `value[year_N] / value[year_N-1] >= 5.0` AND `value[year_N] >= R$ 1.000.000` AND `value[year_N-1] > 0` → flag shown with surge year, growth multiplier, prior-year value, surge-year value, and agency count
+- Given no prior-year activity → no flag (use `newborn_company` instead)
+- Given surge below 5× or absolute value below R$ 1M → no flag
+
+---
+
+## Data Sources
+
+| Table | Used by | Key Columns |
+|---|---|---|
+| `br_cgu_licitacao_contrato.contrato_compra` | US1–3, US6–8 | `cpf_cnpj_contratado`, `valor_inicial_compra`, `valor_final_compra`, `id_orgao_superior`, `id_unidade_gestora`, `fundamento_legal`, `data_assinatura_contrato`, `ano`, `mes` |
+| `br_cgu_licitacao_contrato.licitacao_participante` | US4–5 | `id_licitacao`, `cpf_cnpj_participante`, `vencedor` |
+| `br_cgu_licitacao_contrato.licitacao` | US4–5 | `id_licitacao`, `id_orgao_superior`, `valor_licitacao`, `ano` |
+| `br_cgu_licitacao_contrato.contrato_termo_aditivo` | US6 | `id_contrato`, `id_termo_aditivo` |
+| `br_me_cnpj.empresas` | US7 | `cnpj_basico`, `data_inicio_atividade`, `porte`, `ano`, `mes` |
 
 ---
 
 ## Success Criteria
 
-- All 3 flags computed in parallel and cached per CNPJ for 5 days
-- One failing pattern never blocks the others (use `Promise.allSettled`)
+- All 8 flags computed in parallel and cached per CNPJ for 5 days
+- One failing pattern never blocks the others (`Promise.allSettled`)
 - Each flag shown in a "Alertas de Risco" section on the CNPJ detail page in Portuguese
 - Zero full-table scans — every query filters by `ano`
-- Thresholds are named constants, not magic numbers
+- All thresholds are named constants with comments citing legal basis or source
+- No external API dependency for any of the 8 patterns
