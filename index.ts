@@ -98,15 +98,15 @@ function getSchemaColumnsForTable(tableRef: string): SchemaColumn[] {
   return dataset[tableId] ?? [];
 }
 
-// --- BigQuery client ---
+// --- BigQuery client (singleton) ---
 function createClient(): BigQuery {
-  const opts: ConstructorParameters<typeof BigQuery>[0] = {
-    location: "US",
-  };
+  const opts: ConstructorParameters<typeof BigQuery>[0] = { location: "US" };
   if (PROJECT_ID) opts.projectId = PROJECT_ID;
   if (KEY_FILE) opts.keyFilename = KEY_FILE;
   return new BigQuery(opts);
 }
+
+const bq = createClient();
 
 // --- Custom errors ---
 class BillingError extends Error {
@@ -145,8 +145,6 @@ async function queryCompanies(params: QueryParams): Promise<{ rows: Company[]; b
   const cacheKey = `companies_${params.ano}_${params.limit}_${params.offset}_${params.search.replace(/\s+/g, "_")}`;
   const cached = getCache<Company[]>(cacheKey);
   if (cached) return { rows: cached, bytesProcessed: 0 };
-
-  const bq = createClient();
 
   let whereClause = "WHERE ano = @ano";
   const queryParams: Record<string, unknown> = {
@@ -199,7 +197,6 @@ async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[]; bytesPr
   const cached = getCache<Socio[]>(cacheKey);
   if (cached) return { rows: cached, bytesProcessed: 0 };
 
-  const bq = createClient();
   const sql = `
     SELECT nome, documento, qualificacao
     FROM \`${SOCIOS_TABLE}\`
@@ -221,7 +218,6 @@ async function queryEmpresa(cnpjBasico: string): Promise<{ row: Company | null; 
   const cached = getCache<Company | null>(cacheKey);
   if (cached !== null) return { row: cached, bytesProcessed: 0 };
 
-  const bq = createClient();
   const sql = `
     SELECT cnpj_basico, razao_social, natureza_juridica, qualificacao_responsavel, capital_social, porte, ente_federativo, ano
     FROM \`${TABLE}\`
@@ -325,7 +321,6 @@ async function queryLookupDataset(
   const inferredFields = inferLookupNodeFields(ds);
 
   try {
-    const bq = createClient();
     const [job] = await bq.createQueryJob({
       query: sql,
       params: { cnpj_root: cnpjRoot, doc_digits: docDigits, doc_len: docLen, year },
@@ -411,7 +406,6 @@ async function queryByField(
   const sql = `SELECT ${ds.displayFields.join(", ")} FROM \`${ds.table}\` WHERE ${foreignKey} = @value LIMIT 10`;
 
   try {
-    const bq = createClient();
     const [job] = await bq.createQueryJob({ query: sql, params: { value }, location: "US" });
     const [rows] = await job.getQueryResults();
     const [meta] = await job.getMetadata();
