@@ -1082,8 +1082,24 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    #layout-select, #query-limit-select {
+    .control-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
       margin-left: auto;
+    }
+    .control-group + .control-group {
+      margin-left: 0.6rem;
+    }
+    .control-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      color: var(--muted);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    #layout-select, #query-limit-select {
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--muted);
@@ -1094,11 +1110,7 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       cursor: pointer;
       outline: none;
     }
-    #query-limit-select {
-      margin-left: 0;
-      min-width: 56px;
-      text-align: center;
-    }
+    #query-limit-select { min-width: 56px; text-align: center; }
     #layout-select:hover, #query-limit-select:hover { border-color: var(--gold); color: var(--text); }
     #layout-select option, #query-limit-select option { background: #0d0d20; }
     #status {
@@ -1124,16 +1136,22 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       height: 30px;
       display: flex;
       align-items: center;
-      gap: 0;
+      justify-content: space-between;
       flex-shrink: 0;
     }
     footer span {
       font-family: 'Space Mono', monospace;
       font-size: 0.58rem;
-      color: #2e2e50;
+      color: var(--muted);
       letter-spacing: 0.05em;
     }
-    footer span + span::before { content: " · "; color: #1e1e38; }
+    .footer-meta {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+    }
+    .footer-meta span + span::before { content: " | "; color: #2e2e50; }
     #loading-overlay {
       position: absolute;
       inset: 0;
@@ -1175,19 +1193,24 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       <span class="bc-sep">›</span>
       <span class="bc-current" id="bc-label">GRAFO</span>
     </nav>
-    <select id="layout-select">
-      <option value="radial">Radial</option>
-      <option value="collapsible-tree">Collapsible Tree</option>
-      <option value="pack">Pack</option>
-      <option value="forceatlas2">Force Atlas 2</option>
-    </select>
-    <select id="query-limit-select">
-      <option value="10">10</option>
-      <option value="20">20</option>
-      <option value="30">30</option>
-      <option value="40">40</option>
-    </select>
-    <span id="status">Carregando…</span>
+    <div class="control-group">
+      <label class="control-label" for="layout-select">Layout</label>
+      <select id="layout-select" class="layout-select">
+        <option value="radial">Radial</option>
+        <option value="collapsible-tree">Collapsible Tree</option>
+        <option value="pack">Pack</option>
+        <option value="forceatlas2">Force Atlas 2</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="query-limit-select">Limit</label>
+      <select id="query-limit-select" class="query-limit-select">
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="30">30</option>
+        <option value="40">40</option>
+      </select>
+    </div>
   </header>
   <div id="graph-container">
     <div id="loading-overlay">
@@ -1196,10 +1219,13 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
     </div>
   </div>
   <footer>
-    <span>BQ ${escHtml(usageData.month)}</span>
-    <span>${gbUsed} GB</span>
-    <span>${pct}% do 1 TB free</span>
-    <span>${gbLeft} GB restantes</span>
+    <span id="status">Carregando…</span>
+    <div class="footer-meta">
+      <span>BQ ${escHtml(usageData.month)}</span>
+      <span>${gbUsed} GB</span>
+      <span>${pct}% do 1 TB free</span>
+      <span>${gbLeft} GB restantes</span>
+    </div>
   </footer>
   <script>
     window.__DATASET_COLORS = ${JSON.stringify(
