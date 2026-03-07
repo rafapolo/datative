@@ -443,47 +443,53 @@ if (OUT_FILE) {
 }
 
 if (IMPORT_DB) {
-  // Fetch company names from BigQuery for all flagged CNPJs
-  const cnpjList = ranked.map((r) => `'${r.cnpj}'`).join(",");
-  const nameRows = await runQuery("NAMES", `
-    SELECT cnpj_basico, razao_social
-    FROM \`basedosdados.br_me_cnpj.empresas\`
-    WHERE ano = ${ANO} AND mes = 12
-      AND cnpj_basico IN (${cnpjList})
-  `);
-  const nameMap = new Map<string, string>(
-    nameRows.map((r) => [String(r.cnpj_basico), String(r.razao_social)])
-  );
+  if (ranked.length === 0) {
+    console.error("\nNo flagged CNPJs to import.");
+  } else {
+    // Fetch company names from BigQuery for all flagged CNPJs.
+    // cnpjList is safe: values are digit-only strings from a prior BigQuery result.
+    // Guard above ensures ranked.length > 0 so IN (...) is never empty.
+    const cnpjList = ranked.map((r) => `'${r.cnpj}'`).join(",");
+    const nameRows = await runQuery("NAMES", `
+      SELECT cnpj_basico, razao_social
+      FROM \`basedosdados.br_me_cnpj.empresas\`
+      WHERE ano = ${ANO} AND mes = 12
+        AND cnpj_basico IN (${cnpjList})
+    `);
+    const nameMap = new Map<string, string>(
+      nameRows.map((r) => [String(r.cnpj_basico), String(r.razao_social)])
+    );
 
-  const db = new Database(IMPORT_DB, { create: true });
-  db.run(`CREATE TABLE IF NOT EXISTS cnpj_flags (
-    cnpj         TEXT PRIMARY KEY,
-    flag_count   INTEGER NOT NULL DEFAULT 0,
-    flag_types   TEXT NOT NULL DEFAULT '[]',
-    razao_social TEXT,
-    updated_at   TEXT NOT NULL
-  )`);
-  try { db.run("ALTER TABLE cnpj_flags ADD COLUMN razao_social TEXT"); } catch {}
-  const upsert = db.prepare(
-    `INSERT INTO cnpj_flags(cnpj, flag_count, flag_types, razao_social, updated_at)
-     VALUES(?, ?, ?, ?, datetime('now'))
-     ON CONFLICT(cnpj) DO UPDATE SET
-       flag_count   = excluded.flag_count,
-       flag_types   = excluded.flag_types,
-       razao_social = excluded.razao_social,
-       updated_at   = excluded.updated_at`
-  );
-  let imported = 0;
-  for (const { cnpj, flags } of ranked) {
-    const patterns = [...new Set(
-      flags.map((f) => {
-        const prefix = f.split(/\s+/)[0];
-        return PREFIX_TO_PATTERN[prefix] ?? prefix.toLowerCase();
-      })
-    )];
-    upsert.run(cnpj, patterns.length, JSON.stringify(patterns), nameMap.get(cnpj) ?? null);
-    imported++;
+    const db = new Database(IMPORT_DB, { create: true });
+    db.run(`CREATE TABLE IF NOT EXISTS cnpj_flags (
+      cnpj         TEXT PRIMARY KEY,
+      flag_count   INTEGER NOT NULL DEFAULT 0,
+      flag_types   TEXT NOT NULL DEFAULT '[]',
+      razao_social TEXT,
+      updated_at   TEXT NOT NULL
+    )`);
+    try { db.run("ALTER TABLE cnpj_flags ADD COLUMN razao_social TEXT"); } catch {}
+    const upsert = db.prepare(
+      `INSERT INTO cnpj_flags(cnpj, flag_count, flag_types, razao_social, updated_at)
+       VALUES(?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(cnpj) DO UPDATE SET
+         flag_count   = excluded.flag_count,
+         flag_types   = excluded.flag_types,
+         razao_social = excluded.razao_social,
+         updated_at   = excluded.updated_at`
+    );
+    let imported = 0;
+    for (const { cnpj, flags } of ranked) {
+      const patterns = [...new Set(
+        flags.map((f) => {
+          const prefix = f.split(/\s+/)[0];
+          return PREFIX_TO_PATTERN[prefix] ?? prefix.toLowerCase();
+        })
+      )];
+      upsert.run(cnpj, patterns.length, JSON.stringify(patterns), nameMap.get(cnpj) ?? null);
+      imported++;
+    }
+    db.close();
+    console.error(`\nImported ${imported} CNPJs into ${IMPORT_DB}`);
   }
-  db.close();
-  console.error(`\nImported ${imported} CNPJs into ${IMPORT_DB}`);
 }
