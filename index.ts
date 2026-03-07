@@ -1077,7 +1077,7 @@ async function patternNewbornCompany(cnpj: string): Promise<NewbornCompanyFlag |
 }
 
 async function patternSuddenSurge(cnpj: string, ano: number): Promise<SuddenSurgeFlag | null> {
-  const cacheKey = `patterns_sudden_surge_${cnpj}`;
+  const cacheKey = `patterns_sudden_surge_${cnpj}_${ano}`;
   const cached = getCache<SuddenSurgeFlag | null>(cacheKey);
   if (cached !== undefined) return cached ?? null;
 
