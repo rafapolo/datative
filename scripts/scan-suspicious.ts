@@ -57,6 +57,7 @@ async function checkSplit(cnpj: string, ano: number) {
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
     WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
       AND ano = @ano AND valor_inicial_compra > 0 AND valor_inicial_compra < @thr
+      AND data_assinatura_contrato IS NOT NULL
     GROUP BY id_orgao_superior, nome_orgao_superior, mes
     HAVING COUNT(*) >= @min AND SUM(valor_inicial_compra) > @thr`, {
     cnpj, ano, thr: SPLIT_THRESHOLD_BRL, min: SPLIT_MIN_COUNT

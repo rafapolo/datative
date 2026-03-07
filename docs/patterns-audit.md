@@ -25,11 +25,14 @@ Deep audit of all 8 risk patterns. For each pattern: legal basis, threshold rati
 - None structural. Filter `valor_inicial_compra > 0` prevents division issues.
 
 ### Known data quality issues
-- `data_assinatura_contrato` can be NULL for some older contracts — those rows are excluded by `FORMAT_DATE`.
+- `data_assinatura_contrato` can be NULL for some older contracts. **`FORMAT_DATE` on NULL returns NULL — it does NOT exclude those rows.** Without a guard, all NULL-dated contracts from the same agency would be grouped together under a single `NULL` month bucket, potentially producing a false flag if ≥3 of them are below threshold with combined value > threshold. Fixed (iteration 5): all three implementations now include `AND data_assinatura_contrato IS NOT NULL` in the WHERE clause.
 - `valor_inicial_compra` vs `valor_final_compra`: we use `valor_inicial_compra` intentionally since splitting is defined by the contract as signed, not final.
 
+### Improvements applied (iteration 5)
+- Added `AND data_assinatura_contrato IS NOT NULL` to WHERE clause in all three implementations to prevent NULL-date contracts from being grouped into a spurious `mes = NULL` bucket.
+
 ### Per-CNPJ vs batch consistency
-✅ Identical logic. Both group by `(id_orgao_superior, month)`, same thresholds.
+✅ Identical logic. Both group by `(id_orgao_superior, month)`, same thresholds, same NULL guard.
 
 ---
 
@@ -228,7 +231,7 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 
 | Pattern | FP Risk | Legal Basis | Iteration 2 Fix |
 |---------|---------|------------|-----------------|
-| US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 | Threshold documented |
+| US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 | Added NULL date guard to prevent spurious null-month bucket |
 | US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations |
 | US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations |
 | US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | No change |

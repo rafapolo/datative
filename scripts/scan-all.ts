@@ -114,6 +114,7 @@ async function batchSplit() {
       AND LENGTH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', '')) = 14
       AND valor_inicial_compra > 0
       AND valor_inicial_compra < ${SPLIT_THRESHOLD_BRL}
+      AND data_assinatura_contrato IS NOT NULL
     GROUP BY 1, 2, 3
     HAVING COUNT(1) >= ${SPLIT_MIN_COUNT}
       AND SUM(valor_inicial_compra) > ${SPLIT_THRESHOLD_BRL}

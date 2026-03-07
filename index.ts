@@ -755,6 +755,7 @@ async function patternSplitContracts(cnpj: string, ano: number): Promise<SplitCo
       AND ano = @ano
       AND valor_inicial_compra > 0
       AND valor_inicial_compra < @threshold
+      AND data_assinatura_contrato IS NOT NULL
     GROUP BY id_orgao_superior, nome_orgao_superior, mes
     HAVING COUNT(*) >= @min_count
        AND SUM(valor_inicial_compra) > @threshold

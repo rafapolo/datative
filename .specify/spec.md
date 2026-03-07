@@ -43,6 +43,7 @@ DATATIVE surfaces companies that are statistically anomalous in public procureme
 - Given a CNPJ with ≥ 3 contracts from the same `id_orgao_superior`, all below R$ 17.600, in the same calendar month, with combined value exceeding R$ 17.600 → flag shown with agency, month, count, and combined value
 - Given contracts spread across different months or agencies → no flag
 - Given contracts above R$ 17.600 individually → no flag
+- Given `data_assinatura_contrato` is NULL → contract excluded (cannot be assigned to a month; grouping NULLs together would produce false flags)
 
 ---
 
