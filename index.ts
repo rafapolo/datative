@@ -25,16 +25,18 @@ communityDb.run(`CREATE TABLE IF NOT EXISTS notes (
 )`);
 // Cache of flag counts populated by /api/patterns/:cnpj responses
 communityDb.run(`CREATE TABLE IF NOT EXISTS cnpj_flags (
-  cnpj       TEXT PRIMARY KEY,
-  flag_count INTEGER NOT NULL DEFAULT 0,
-  flag_types TEXT,           -- JSON array of pattern names
-  updated_at TEXT DEFAULT (datetime('now'))
+  cnpj         TEXT PRIMARY KEY,
+  flag_count   INTEGER NOT NULL DEFAULT 0,
+  flag_types   TEXT,           -- JSON array of pattern names
+  razao_social TEXT,
+  updated_at   TEXT DEFAULT (datetime('now'))
 )`);
+try { communityDb.run("ALTER TABLE cnpj_flags ADD COLUMN razao_social TEXT"); } catch {}
 communityDb.run(`CREATE INDEX IF NOT EXISTS notes_cnpj ON notes(cnpj)`);
 communityDb.run(`CREATE INDEX IF NOT EXISTS votes_cnpj ON votes(cnpj)`);
 
 interface CommunityNote   { id: number; cnpj: string; author: string; body: string; created_at: string }
-interface LeaderboardEntry { cnpj: string; score: number; flag_count: number; flag_types: string }
+interface LeaderboardEntry { cnpj: string; score: number; flag_count: number; flag_types: string; razao_social: string | null }
 
 const PATTERN_LABELS: Record<string, string> = {
   split_contracts_below_threshold: "Fracionamento",
@@ -87,7 +89,8 @@ function getLeaderboard(limit = 40): LeaderboardEntry[] {
     SELECT v.cnpj,
            COALESCE(SUM(v.direction), 0)  AS score,
            COALESCE(f.flag_count, 0)      AS flag_count,
-           COALESCE(f.flag_types, '[]')   AS flag_types
+           COALESCE(f.flag_types, '[]')   AS flag_types,
+           f.razao_social
     FROM votes v
     LEFT JOIN cnpj_flags f ON f.cnpj = v.cnpj
     GROUP BY v.cnpj
@@ -98,7 +101,8 @@ function getLeaderboard(limit = 40): LeaderboardEntry[] {
 function getTopFlagged(limit = 20): LeaderboardEntry[] {
   return communityDb.query(`
     SELECT f.cnpj, 0 AS score, f.flag_count,
-           COALESCE(f.flag_types, '[]') AS flag_types
+           COALESCE(f.flag_types, '[]') AS flag_types,
+           f.razao_social
     FROM cnpj_flags f
     WHERE f.cnpj NOT IN (SELECT DISTINCT cnpj FROM votes)
     ORDER BY f.flag_count DESC
@@ -1459,12 +1463,12 @@ function renderGraphLanding(): string {
   const parseTypes = (raw: string): string[] => { try { return JSON.parse(raw) as string[]; } catch { return []; } };
 
   for (const entry of leaderboard) {
-    feedItems.push({ cnpj: entry.cnpj, name: entry.cnpj, porte: "", score: entry.score, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
+    feedItems.push({ cnpj: entry.cnpj, name: entry.razao_social ?? entry.cnpj, porte: "", score: entry.score, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
   }
   for (const entry of topFlagged) {
     if (!seenCnpjs.has(entry.cnpj)) {
       seenCnpjs.add(entry.cnpj);
-      feedItems.push({ cnpj: entry.cnpj, name: entry.cnpj, porte: "", score: 0, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
+      feedItems.push({ cnpj: entry.cnpj, name: entry.razao_social ?? entry.cnpj, porte: "", score: 0, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
     }
   }
 
