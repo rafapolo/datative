@@ -1449,30 +1449,22 @@ function trackBytes(bytes: number) {
 
 // --- / landing page ---
 function renderGraphLanding(): string {
-  // Build community feed: voted CNPJs first (by score), then top-flagged unvoted, then seed list
+  // Build community feed: voted CNPJs first (by score), then top-flagged unvoted
   const leaderboard  = getLeaderboard(40);
   const topFlagged   = getTopFlagged(20);
   const seenCnpjs    = new Set(leaderboard.map((e) => e.cnpj));
-  const seedMap      = new Map(cnpjsInteresse.map((c) => [c.cnpj_basico, c]));
 
   const feedItems: Array<{ cnpj: string; name: string; porte: string; score: number; flagCount: number; flagTypes: string[] }> = [];
 
   const parseTypes = (raw: string): string[] => { try { return JSON.parse(raw) as string[]; } catch { return []; } };
 
   for (const entry of leaderboard) {
-    const seed = seedMap.get(entry.cnpj);
-    feedItems.push({ cnpj: entry.cnpj, name: seed?.razao_social ?? entry.cnpj, porte: seed?.porte ?? "", score: entry.score, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
+    feedItems.push({ cnpj: entry.cnpj, name: entry.cnpj, porte: "", score: entry.score, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
   }
   for (const entry of topFlagged) {
     if (!seenCnpjs.has(entry.cnpj)) {
       seenCnpjs.add(entry.cnpj);
-      const seed = seedMap.get(entry.cnpj);
-      feedItems.push({ cnpj: entry.cnpj, name: seed?.razao_social ?? entry.cnpj, porte: seed?.porte ?? "", score: 0, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
-    }
-  }
-  for (const c of cnpjsInteresse) {
-    if (!seenCnpjs.has(c.cnpj_basico)) {
-      feedItems.push({ cnpj: c.cnpj_basico, name: c.razao_social, porte: c.porte, score: 0, flagCount: 0, flagTypes: [] });
+      feedItems.push({ cnpj: entry.cnpj, name: entry.cnpj, porte: "", score: 0, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
     }
   }
 

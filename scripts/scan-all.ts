@@ -3,13 +3,15 @@
  * database in ~8 BigQuery jobs (instead of N_cnpjs × 8 jobs).
  *
  * Usage:
- *   GCP_PROJECT_ID=xxx bun run scripts/scan-all.ts [--ano 2023] [--out results.json]
+ *   GCP_PROJECT_ID=xxx bun run scripts/scan-all.ts [--ano 2023] [--out results.json] [--import /path/to/community.db]
  *
  * Outputs a ranked table to stdout and optionally writes JSON to --out.
+ * --import writes results into community.db cnpj_flags table (upsert).
  * Each row: { cnpj_basico, flags: string[], score: number }
  */
 import { BigQuery } from "@google-cloud/bigquery";
 import { writeFileSync } from "fs";
+import { Database } from "bun:sqlite";
 
 const PROJECT_ID = process.env.GCP_PROJECT_ID ?? "";
 const KEY_FILE   = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -22,8 +24,21 @@ const getArg = (flag: string, fallback: string) => {
   const i = args.indexOf(flag);
   return i !== -1 && args[i + 1] ? args[i + 1] : fallback;
 };
-const ANO      = Number(getArg("--ano", "2023"));
-const OUT_FILE = getArg("--out", "");
+const ANO        = Number(getArg("--ano", "2023"));
+const OUT_FILE   = getArg("--out", "");
+const IMPORT_DB  = getArg("--import", "");
+
+// Maps flag prefix (from addFlag messages) → pattern key matching PATTERN_LABELS in index.ts
+const PREFIX_TO_PATTERN: Record<string, string> = {
+  SPLIT:  "split_contracts_below_threshold",
+  CONC:   "contract_concentration",
+  INEXIG: "inexigibility_recurrence",
+  SOLO:   "single_bidder",
+  WINNER: "always_winner",
+  AMEND:  "amendment_inflation",
+  NEWBRN: "newborn_company",
+  SURGE:  "sudden_surge",
+};
 
 // ── thresholds ─────────────────────────────────────────────────────────────────
 const SPLIT_THRESHOLD_BRL          = 17_600;
@@ -405,4 +420,35 @@ console.log(`${ranked.length} CNPJs com alertas (ano=${ANO})`);
 if (OUT_FILE) {
   writeFileSync(OUT_FILE, JSON.stringify(ranked, null, 2));
   console.error(`\nJSON written to ${OUT_FILE}`);
+}
+
+if (IMPORT_DB) {
+  const db = new Database(IMPORT_DB, { create: true });
+  db.run(`CREATE TABLE IF NOT EXISTS cnpj_flags (
+    cnpj TEXT PRIMARY KEY,
+    flag_count INTEGER NOT NULL DEFAULT 0,
+    flag_types TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
+  )`);
+  const upsert = db.prepare(
+    `INSERT INTO cnpj_flags(cnpj, flag_count, flag_types, updated_at)
+     VALUES(?, ?, ?, datetime('now'))
+     ON CONFLICT(cnpj) DO UPDATE SET
+       flag_count = excluded.flag_count,
+       flag_types = excluded.flag_types,
+       updated_at = excluded.updated_at`
+  );
+  let imported = 0;
+  for (const { cnpj, flags } of ranked) {
+    const patterns = [...new Set(
+      flags.map((f) => {
+        const prefix = f.split(/\s+/)[0];
+        return PREFIX_TO_PATTERN[prefix] ?? prefix.toLowerCase();
+      })
+    )];
+    upsert.run(cnpj, patterns.length, JSON.stringify(patterns));
+    imported++;
+  }
+  db.close();
+  console.error(`\nImported ${imported} CNPJs into ${IMPORT_DB}`);
 }
