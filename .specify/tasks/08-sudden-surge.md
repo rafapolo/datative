@@ -1,8 +1,8 @@
 # Task: Sudden Contract Surge
-**Status:** TODO
+**Status:** DONE
 **Priority:** P2
 **Pattern ID:** `sudden_surge`
-**Cache key:** `patterns_sudden_surge_{cnpj}`
+**Cache key:** `patterns_sudden_surge_{cnpj}_{year}`
 
 ---
 
@@ -31,7 +31,7 @@ SELECT
   COUNT(*)                   AS contract_count,
   COUNT(DISTINCT id_orgao_superior) AS agency_count
 FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra`
-WHERE cpf_cnpj_contratado = @cnpj
+WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\D', ''), @cnpj)
   AND ano BETWEEN @ano - 4 AND @ano   -- 5-year window
 GROUP BY ano
 ORDER BY ano
@@ -40,9 +40,12 @@ ORDER BY ano
 Then in application code, compute year-over-year ratios and flag when:
 ```
 surge_ratio = value[year_N] / value[year_N-1] >= SURGE_RATIO_THRESHOLD
+AND year_N - year_N_minus_1 === 1      -- MUST be consecutive calendar years; gap years are excluded
 AND value[year_N] >= SURGE_MIN_ABSOLUTE_VALUE
 AND value[year_N-1] > 0  -- had prior activity (not a first-year company)
 ```
+
+**Consecutive-year guard is critical:** The result set may have gaps (company dormant in some years). Comparing any two adjacent rows in sorted order would give a false positive for a company dormant from 2019 to 2023. Only flag when `year_N === year_N_minus_1 + 1`.
 
 ---
 
@@ -82,10 +85,11 @@ interface SuddenSurgeFlag {
 
 ## Acceptance Criteria
 
-- [ ] Requires prior-year value > 0 — does not flag companies in their first year of contracting (covered by `newborn_company`)
-- [ ] Uses `@ano` as the reference year (current query year); looks back `SURGE_LOOKBACK_YEARS`
-- [ ] `history` array returned for all years in window so UI can render trend
-- [ ] Minimum absolute value threshold prevents flagging companies that went from R$ 1k to R$ 10k (technically 10×, but irrelevant)
-- [ ] `surgeYearAgencies` surfaced — a surge concentrated in one agency is more suspicious than one spread across many
-- [ ] Not partition-filtered below year level — `WHERE ano BETWEEN X AND Y` is the entire filter
-- [ ] Integrated into `runPatterns()` via `Promise.allSettled`
+- [x] Requires prior-year value > 0 — does not flag companies in their first year of contracting (covered by `newborn_company`)
+- [x] Consecutive-year guard: `year_N - year_N_minus_1 === 1` — dormant years in between do not produce a false YoY comparison
+- [x] Uses `@ano` as the reference year (current query year); looks back `SURGE_LOOKBACK_YEARS`
+- [x] `history` array returned for all years in window so UI can render trend
+- [x] Minimum absolute value threshold prevents flagging companies that went from R$ 1k to R$ 10k (technically 10×, but irrelevant)
+- [x] `surgeYearAgencies` surfaced — a surge concentrated in one agency is more suspicious than one spread across many
+- [x] Not partition-filtered below year level — `WHERE ano BETWEEN X AND Y` is the entire filter
+- [x] Integrated into `runPatterns()` via `Promise.allSettled`

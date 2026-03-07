@@ -1,5 +1,5 @@
 # Task: Single Bidder
-**Status:** TODO
+**Status:** DONE
 **Priority:** P1
 **Pattern ID:** `single_bidder`
 **Cache key:** `patterns_single_bidder_{cnpj}_{year}`
@@ -28,8 +28,8 @@ WITH participantes AS (
   SELECT
     id_licitacao,
     COUNT(*)                                          AS total_participantes,
-    COUNTIF(cpf_cnpj_participante = @cnpj)            AS cnpj_participated,
-    COUNTIF(cpf_cnpj_participante = @cnpj AND vencedor) AS cnpj_won
+    COUNTIF(STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_participante, r'\D', ''), @cnpj))            AS cnpj_participated,
+    COUNTIF(STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_participante, r'\D', ''), @cnpj) AND vencedor) AS cnpj_won
   FROM `basedosdados.br_cgu_licitacao_contrato.licitacao_participante`
   GROUP BY id_licitacao
 )
@@ -82,7 +82,8 @@ interface SingleBidderFlag {
 
 ## Acceptance Criteria
 
-- [ ] Only flags tenders where `total_participantes = 1` AND this CNPJ won
-- [ ] Requires at least 2 occurrences to suppress noise
-- [ ] Partition filter `ano` on `licitacao` table
-- [ ] Integrated into `runPatterns()` via `Promise.allSettled`
+- [x] Only flags tenders where `total_participantes = 1` AND this CNPJ won
+- [x] Requires at least 2 occurrences to suppress noise
+- [x] Partition filter `ano` on `licitacao` table
+- [x] Integrated into `runPatterns()` via `Promise.allSettled`
+- Note: batch scanner excludes CPF participants (`LENGTH = 14`) before counting bidders; per-CNPJ counts all participants. Minor divergence — documented in patterns-audit.md.

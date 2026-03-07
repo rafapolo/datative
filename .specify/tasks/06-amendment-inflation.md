@@ -1,5 +1,5 @@
 # Task: Contract Amendment Inflation
-**Status:** TODO
+**Status:** DONE
 **Priority:** P1
 **Pattern ID:** `amendment_inflation`
 **Cache key:** `patterns_amendment_inflation_{cnpj}_{year}`
@@ -40,10 +40,11 @@ SELECT
   COALESCE(a.aditivo_count, 0)                             AS aditivo_count
 FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra` c
 LEFT JOIN aditivos a USING (id_contrato)
-WHERE c.cpf_cnpj_contratado = @cnpj
+WHERE STARTS_WITH(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\D', ''), @cnpj)
   AND c.ano = @ano
-  AND c.valor_inicial_compra > 0
+  AND c.valor_inicial_compra >= @min_original_value   -- excludes trivially small contracts
   AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >= @inflation_threshold
+  AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) <= @max_ratio  -- cap at 10× to exclude data entry errors
 ORDER BY inflation_ratio DESC
 ```
 
@@ -54,6 +55,7 @@ ORDER BY inflation_ratio DESC
 ```typescript
 const AMENDMENT_INFLATION_THRESHOLD = 1.25; // 25% above original = legal ceiling (Lei 14.133/2021)
 const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000; // BRL — ignore trivially small contracts
+const AMENDMENT_MAX_INFLATION_RATIO = 10.0;  // ratios above 10× are almost certainly data entry errors
 ```
 
 ---
@@ -84,9 +86,10 @@ interface AmendmentInflationFlag {
 
 ## Acceptance Criteria
 
-- [ ] Guards against division by zero with `NULLIF(valor_inicial_compra, 0)`
-- [ ] Skips contracts with `valor_inicial_compra < R$ 10.000` to avoid noise
-- [ ] Counts `aditivo_count` from join — a contract at 130% with 0 amendments is more suspicious than one with 5 amendments (price revision)
-- [ ] `excessValue` surfaced in UI so users understand the BRL impact
-- [ ] Partition filters `ano`, `mes` on `contrato_compra`
-- [ ] Integrated into `runPatterns()` via `Promise.allSettled`
+- [x] Guards against division by zero with `NULLIF(valor_inicial_compra, 0)`
+- [x] Skips contracts with `valor_inicial_compra < R$ 10.000` to avoid noise
+- [x] Caps `inflation_ratio` at 10× — ratios above this are almost certainly data entry errors and would distort `excess_value` totals
+- [x] Counts `aditivo_count` from join — a contract at 130% with 0 amendments is more suspicious than one with 5 amendments (price revision)
+- [x] `excessValue` surfaced in UI so users understand the BRL impact
+- [x] Partition filters `ano`, `mes` on `contrato_compra`
+- [x] Integrated into `runPatterns()` via `Promise.allSettled`
