@@ -3,6 +3,108 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { CNPJ_DATASETS, RELATED_DATASETS, buildCnpjWhere } from "./cnpj-datasets";
 import { getCache, setCache } from "./cache";
+import { Database } from "bun:sqlite";
+
+// --- Community DB (votes + investigation notes + cached flag counts) ---
+const communityDb = new Database(resolve(import.meta.dir, "community.db"), { create: true });
+communityDb.run(`CREATE TABLE IF NOT EXISTS votes (
+  cnpj       TEXT NOT NULL,
+  ip         TEXT NOT NULL,
+  direction  INTEGER NOT NULL DEFAULT 1,  -- 1 = upvote, -1 = downvote
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (cnpj, ip)
+)`);
+// Migrate: add direction column to existing DBs that pre-date this schema
+try { communityDb.run("ALTER TABLE votes ADD COLUMN direction INTEGER NOT NULL DEFAULT 1"); } catch {}
+communityDb.run(`CREATE TABLE IF NOT EXISTS notes (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  cnpj       TEXT NOT NULL,
+  author     TEXT DEFAULT 'anônimo',
+  body       TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+)`);
+// Cache of flag counts populated by /api/patterns/:cnpj responses
+communityDb.run(`CREATE TABLE IF NOT EXISTS cnpj_flags (
+  cnpj       TEXT PRIMARY KEY,
+  flag_count INTEGER NOT NULL DEFAULT 0,
+  flag_types TEXT,           -- JSON array of pattern names
+  updated_at TEXT DEFAULT (datetime('now'))
+)`);
+communityDb.run(`CREATE INDEX IF NOT EXISTS notes_cnpj ON notes(cnpj)`);
+communityDb.run(`CREATE INDEX IF NOT EXISTS votes_cnpj ON votes(cnpj)`);
+
+interface CommunityNote   { id: number; cnpj: string; author: string; body: string; created_at: string }
+interface LeaderboardEntry { cnpj: string; score: number; flag_count: number; flag_types: string }
+
+const PATTERN_LABELS: Record<string, string> = {
+  split_contracts_below_threshold: "Fracionamento",
+  contract_concentration:          "Concentração",
+  inexigibility_recurrence:        "Inexigibilidade",
+  single_bidder:                   "Único participante",
+  always_winner:                   "Sempre vence",
+  amendment_inflation:             "Superfaturamento",
+  newborn_company:                 "Empresa nova",
+  sudden_surge:                    "Crescimento súbito",
+};
+
+function getScore(cnpj: string): number {
+  return (communityDb.query("SELECT COALESCE(SUM(direction),0) AS s FROM votes WHERE cnpj=?").get(cnpj) as any)?.s ?? 0;
+}
+function getUserVote(cnpj: string, ip: string): number | null {
+  const row = communityDb.query("SELECT direction FROM votes WHERE cnpj=? AND ip=?").get(cnpj, ip) as any;
+  return row ? row.direction : null;
+}
+function castVote(cnpj: string, ip: string, direction: 1 | -1): { score: number; userVote: number } {
+  communityDb.run(
+    "INSERT INTO votes(cnpj,ip,direction) VALUES(?,?,?) ON CONFLICT(cnpj,ip) DO UPDATE SET direction=excluded.direction, created_at=datetime('now')",
+    [cnpj, ip, direction]
+  );
+  return { score: getScore(cnpj), userVote: direction };
+}
+function addNote(cnpj: string, body: string, author: string): CommunityNote {
+  const sanitizedBody   = body.slice(0, 800).trim();
+  const sanitizedAuthor = author.slice(0, 60).trim() || "anônimo";
+  if (!sanitizedBody) throw new Error("body vazio");
+  const stmt = communityDb.run(
+    "INSERT INTO notes(cnpj,body,author) VALUES(?,?,?)",
+    [cnpj, sanitizedBody, sanitizedAuthor]
+  );
+  return communityDb.query("SELECT * FROM notes WHERE id=?").get(stmt.lastInsertRowid) as CommunityNote;
+}
+function getNotesForCnpj(cnpj: string): CommunityNote[] {
+  return communityDb.query(
+    "SELECT * FROM notes WHERE cnpj=? ORDER BY created_at DESC LIMIT 50"
+  ).all(cnpj) as CommunityNote[];
+}
+function cacheFlagCount(cnpj: string, flagCount: number, flagTypes: string[]): void {
+  communityDb.run(
+    "INSERT INTO cnpj_flags(cnpj,flag_count,flag_types,updated_at) VALUES(?,?,?,datetime('now')) ON CONFLICT(cnpj) DO UPDATE SET flag_count=excluded.flag_count, flag_types=excluded.flag_types, updated_at=excluded.updated_at",
+    [cnpj, flagCount, JSON.stringify(flagTypes)]
+  );
+}
+function getLeaderboard(limit = 40): LeaderboardEntry[] {
+  return communityDb.query(`
+    SELECT v.cnpj,
+           COALESCE(SUM(v.direction), 0)  AS score,
+           COALESCE(f.flag_count, 0)      AS flag_count,
+           COALESCE(f.flag_types, '[]')   AS flag_types
+    FROM votes v
+    LEFT JOIN cnpj_flags f ON f.cnpj = v.cnpj
+    GROUP BY v.cnpj
+    ORDER BY score DESC, flag_count DESC
+    LIMIT ?
+  `).all(limit) as LeaderboardEntry[];
+}
+function getTopFlagged(limit = 20): LeaderboardEntry[] {
+  return communityDb.query(`
+    SELECT f.cnpj, 0 AS score, f.flag_count,
+           COALESCE(f.flag_types, '[]') AS flag_types
+    FROM cnpj_flags f
+    WHERE f.cnpj NOT IN (SELECT DISTINCT cnpj FROM votes)
+    ORDER BY f.flag_count DESC
+    LIMIT ?
+  `).all(limit) as LeaderboardEntry[];
+}
 
 // --- CNPJs de Interesse ---
 interface CnpjInteresse { cnpj_basico: string; razao_social: string; porte: string }
@@ -1347,15 +1449,60 @@ function trackBytes(bytes: number) {
 
 // --- / landing page ---
 function renderGraphLanding(): string {
-  const companyRows = cnpjsInteresse
-    .map(
-      (c) =>
-        `<a href="/?cnpj=${escHtml(c.cnpj_basico)}" class="ci-row">` +
-        `<span class="ci-cnpj">${escHtml(c.cnpj_basico)}</span>` +
-        `<span class="ci-name">${escHtml(c.razao_social)}</span>` +
-        `<span class="ci-porte">${escHtml(c.porte)}</span>` +
-        `</a>`
-    )
+  // Build community feed: voted CNPJs first (by score), then top-flagged unvoted, then seed list
+  const leaderboard  = getLeaderboard(40);
+  const topFlagged   = getTopFlagged(20);
+  const seenCnpjs    = new Set(leaderboard.map((e) => e.cnpj));
+  const seedMap      = new Map(cnpjsInteresse.map((c) => [c.cnpj_basico, c]));
+
+  const feedItems: Array<{ cnpj: string; name: string; porte: string; score: number; flagCount: number; flagTypes: string[] }> = [];
+
+  const parseTypes = (raw: string): string[] => { try { return JSON.parse(raw) as string[]; } catch { return []; } };
+
+  for (const entry of leaderboard) {
+    const seed = seedMap.get(entry.cnpj);
+    feedItems.push({ cnpj: entry.cnpj, name: seed?.razao_social ?? entry.cnpj, porte: seed?.porte ?? "", score: entry.score, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
+  }
+  for (const entry of topFlagged) {
+    if (!seenCnpjs.has(entry.cnpj)) {
+      seenCnpjs.add(entry.cnpj);
+      const seed = seedMap.get(entry.cnpj);
+      feedItems.push({ cnpj: entry.cnpj, name: seed?.razao_social ?? entry.cnpj, porte: seed?.porte ?? "", score: 0, flagCount: entry.flag_count, flagTypes: parseTypes(entry.flag_types) });
+    }
+  }
+  for (const c of cnpjsInteresse) {
+    if (!seenCnpjs.has(c.cnpj_basico)) {
+      feedItems.push({ cnpj: c.cnpj_basico, name: c.razao_social, porte: c.porte, score: 0, flagCount: 0, flagTypes: [] });
+    }
+  }
+
+  const companyRows = feedItems
+    .map((c) => {
+      const scoreLabel = c.score > 0 ? `+${c.score}` : c.score < 0 ? `${c.score}` : "0";
+      const chips = c.flagTypes
+        .map((p) => PATTERN_LABELS[p] ?? p)
+        .map((label) => `<span class="ci-chip">${escHtml(label)}</span>`)
+        .join("");
+      const reasonRow = chips
+        ? `<div class="ci-reasons">${chips}</div>`
+        : "";
+      return (
+        `<div class="ci-row">` +
+        `<div class="ci-vote-col">` +
+        `<button class="ci-vote-btn ci-up" data-cnpj="${escHtml(c.cnpj)}" data-dir="1" title="Suspeito">&#9650;</button>` +
+        `<span class="ci-score" data-cnpj="${escHtml(c.cnpj)}">${scoreLabel}</span>` +
+        `<button class="ci-vote-btn ci-dn" data-cnpj="${escHtml(c.cnpj)}" data-dir="-1" title="Sem evidência">&#9660;</button>` +
+        `</div>` +
+        `<a href="/?cnpj=${escHtml(c.cnpj)}" class="ci-link">` +
+        `<div class="ci-main">` +
+        `<span class="ci-cnpj">${escHtml(c.cnpj)}</span>` +
+        `<span class="ci-name">${escHtml(c.name)}</span>` +
+        `</div>` +
+        reasonRow +
+        `</a>` +
+        `</div>`
+      );
+    })
     .join("");
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1538,6 +1685,19 @@ function renderGraphLanding(): string {
       max-width: 580px;
       min-width: 420px;
     }
+    @media (max-width: 700px) {
+      html, body { height: auto; overflow: auto; }
+      .layout { flex-direction: column; overflow: visible; }
+      nav { padding: 0.85rem 1.25rem; }
+      main { min-width: 0; max-width: 100%; padding: 1.5rem 1.25rem 1rem; justify-content: flex-start; }
+      .wordmark { font-size: clamp(3.5rem, 18vw, 5rem); }
+      .tagline { margin-bottom: 1.5rem; }
+      .search-row { max-width: 100%; }
+      .ci-panel { border-left: none; border-top: 1px solid var(--border); max-height: 50vh; }
+      footer { padding: 0.75rem 1.25rem; }
+      .ci-note-row { padding: 0.5rem 0.9rem; }
+      .ci-link { padding: 0.45rem 0.9rem; }
+    }
     /* companies panel */
     .ci-panel {
       flex: 1;
@@ -1606,6 +1766,116 @@ function renderGraphLanding(): string {
       color: #2e2e50;
       flex-shrink: 0;
     }
+    .ci-row {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #0d0d1e;
+    }
+    .ci-vote-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.3rem 0.4rem 0.3rem 0.6rem;
+      flex-shrink: 0;
+      gap: 0.05rem;
+    }
+    .ci-vote-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.6rem;
+      line-height: 1;
+      padding: 0.1rem 0.25rem;
+      color: #2a2a44;
+      transition: color 0.12s;
+    }
+    .ci-vote-btn:hover { color: var(--gold); }
+    .ci-vote-btn.active-up  { color: var(--gold); }
+    .ci-vote-btn.active-dn  { color: #6868aa; }
+    .ci-score {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      color: #4a4a70;
+      min-width: 1.6rem;
+      text-align: center;
+    }
+    .ci-score.pos { color: var(--gold); }
+    .ci-score.neg { color: #6868aa; }
+    .ci-link {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.45rem 0.9rem 0.45rem 0.3rem;
+      text-decoration: none;
+      transition: background 0.1s;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .ci-link:hover { background: #0f0f28; }
+    .ci-main {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      overflow: hidden;
+    }
+    .ci-reasons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+    .ci-chip {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.5rem;
+      letter-spacing: 0.04em;
+      color: #e8b84b;
+      background: rgba(232,184,75,0.07);
+      border: 1px solid rgba(232,184,75,0.18);
+      border-radius: 3px;
+      padding: 0.06rem 0.35rem;
+      white-space: nowrap;
+    }
+    .ci-panel-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 0.6rem;
+    }
+    .ci-tab {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      color: #2e2e50;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.4rem 0.5rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      background: none;
+      border-top: none; border-left: none; border-right: none;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .ci-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .ci-note-row {
+      padding: 0.5rem 1.2rem;
+      border-bottom: 1px solid #0d0d1e;
+    }
+    .ci-note-body {
+      font-size: 0.75rem;
+      color: #9090c0;
+      line-height: 1.5;
+      margin-bottom: 0.2rem;
+    }
+    .ci-note-meta {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.56rem;
+      color: #2e2e50;
+    }
+    .ci-note-cnpj {
+      color: var(--gold);
+      text-decoration: none;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.56rem;
+    }
+    .ci-note-cnpj:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -1631,11 +1901,17 @@ function renderGraphLanding(): string {
     </main>
     <aside class="ci-panel">
       <div class="ci-panel-header">
-        <span class="ci-panel-label">[ cnpjs de interesse ]</span>
-        <span class="ci-panel-count">${cnpjsInteresse.length} empresas</span>
+        <span class="ci-panel-label">[ investigações ]</span>
+        <div class="ci-panel-tabs">
+          <button class="ci-tab active" data-tab="casos">CASOS</button>
+          <button class="ci-tab" data-tab="notas">NOTAS</button>
+        </div>
       </div>
-      <div class="ci-scroll">
+      <div class="ci-scroll" id="tab-casos">
         ${companyRows}
+      </div>
+      <div class="ci-scroll" id="tab-notas" style="display:none">
+        <div id="notes-feed"><span style="font-family:'Space Mono',monospace;font-size:0.62rem;color:#2e2e50;padding:1rem;display:block">Nenhuma nota ainda.</span></div>
       </div>
     </aside>
   </div>
@@ -1643,6 +1919,77 @@ function renderGraphLanding(): string {
     <span class="footer-copy">DATATIVE · CNPJ GRAPH · BASE DOS DADOS</span>
     <span class="footer-status"><span class="status-dot"></span> SISTEMA ATIVO</span>
   </footer>
+  <script>
+  (function() {
+    // Tab switch
+    document.querySelectorAll('.ci-tab').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.ci-tab').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        var tab = btn.dataset.tab;
+        document.getElementById('tab-casos').style.display = tab === 'casos' ? '' : 'none';
+        document.getElementById('tab-notas').style.display = tab === 'notas' ? '' : 'none';
+        if (tab === 'notas') loadNotesFeed();
+      });
+    });
+
+    // Vote buttons on landing (▲ up / ▼ down)
+    document.querySelectorAll('.ci-vote-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var cnpj = btn.dataset.cnpj;
+        var dir  = parseInt(btn.dataset.dir, 10);
+        fetch('/api/vote/' + cnpj, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ direction: dir }),
+        })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            // Update score label
+            var scoreEl = document.querySelector('.ci-score[data-cnpj="' + cnpj + '"]');
+            if (scoreEl) {
+              var s = d.score;
+              scoreEl.textContent = s > 0 ? '+' + s : String(s);
+              scoreEl.className = 'ci-score' + (s > 0 ? ' pos' : s < 0 ? ' neg' : '');
+            }
+            // Highlight active button, clear sibling
+            var col = btn.closest('.ci-vote-col');
+            if (col) {
+              col.querySelectorAll('.ci-vote-btn').forEach(function(b) {
+                b.classList.remove('active-up', 'active-dn');
+              });
+            }
+            btn.classList.add(dir === 1 ? 'active-up' : 'active-dn');
+          });
+      });
+    });
+
+    // Notes feed (global recent notes)
+    function loadNotesFeed() {
+      fetch('/api/notes/recent')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var feed = document.getElementById('notes-feed');
+          if (!data.notes || !data.notes.length) {
+            feed.innerHTML = '<span style="font-family:\\'Space Mono\\',monospace;font-size:0.62rem;color:#2e2e50;padding:1rem;display:block">Nenhuma nota ainda.</span>';
+            return;
+          }
+          feed.innerHTML = data.notes.map(function(n) {
+            return '<div class="ci-note-row">' +
+              '<div class="ci-note-body">' + escHtml(n.body) + '</div>' +
+              '<div class="ci-note-meta">' +
+              '<a class="ci-note-cnpj" href="/?cnpj=' + n.cnpj + '">' + n.cnpj + '</a>' +
+              ' · ' + (n.author || 'anônimo') + ' · ' + n.created_at.slice(0, 16) +
+              '</div></div>';
+          }).join('');
+        });
+    }
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  })();
+  </script>
 </body>
 </html>`;
 }
@@ -1892,6 +2239,156 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
     .alerta-meta span { color: #8080b0; font-size: 0.68rem; line-height: 1.4; }
     .alerta-source { color: #30304a; font-size: 0.58rem; margin-top: 0.25rem; }
     .alerta-empty { color: #3a3a60; font-family: 'Space Mono', monospace; font-size: 0.65rem; padding: 0.4rem; }
+    @media (max-width: 640px) {
+      header { padding: 0 0.75rem; gap: 0.6rem; flex-wrap: wrap; height: auto; min-height: 44px; padding-top: 0.4rem; padding-bottom: 0.4rem; }
+      .h-brand { font-size: 1rem; }
+      .breadcrumb { font-size: 0.55rem; }
+      .control-label { display: none; }
+      .layout-select, .query-limit-select { font-size: 0.7rem; padding: 0.2rem 0.3rem; }
+      #alertas-panel {
+        right: 0.5rem; bottom: 2.5rem;
+        width: calc(100vw - 1rem); max-height: 40vh;
+      }
+      #community-panel {
+        left: 0.5rem; bottom: 2.5rem;
+        width: calc(100vw - 1rem); max-height: 40vh;
+        display: none; /* hidden by default on mobile; user taps to open */
+      }
+      footer { font-size: 0.6rem; padding: 0 0.75rem; gap: 0.4rem; }
+    }
+    /* community panel */
+    #community-panel {
+      position: absolute;
+      bottom: 2.8rem;
+      left: 1rem;
+      width: 260px;
+      max-height: 420px;
+      background: rgba(9,9,22,0.96);
+      border: 1px solid #1c1c38;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      font-size: 0.78rem;
+      backdrop-filter: blur(6px);
+      z-index: 50;
+    }
+    .comm-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid #1c1c38;
+      flex-shrink: 0;
+    }
+    .comm-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.56rem;
+      color: var(--gold);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    #comm-toggle {
+      background: none; border: none; color: #6868aa;
+      cursor: pointer; font-size: 1rem; line-height: 1; padding: 0;
+    }
+    #comm-toggle:hover { color: var(--gold); }
+    #comm-body { overflow-y: auto; flex: 1; }
+    #comm-body.collapsed { display: none; }
+    #comm-body::-webkit-scrollbar { width: 3px; }
+    #comm-body::-webkit-scrollbar-thumb { background: #1c1c38; }
+    .comm-vote-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid #0d0d1e;
+    }
+    .comm-vote-row { gap: 0.4rem; flex-wrap: wrap; }
+    .comm-vote-dir {
+      background: none;
+      border: 1px solid #2a2a44;
+      border-radius: 4px;
+      color: #6868aa;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      padding: 0.28rem 0.55rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .comm-vote-dir:hover { border-color: var(--gold); color: var(--gold); }
+    .comm-vote-dir.active-up { border-color: var(--gold); color: var(--gold); background: rgba(232,184,75,0.1); }
+    .comm-vote-dir.active-dn { border-color: #6868aa; color: #6868aa; background: rgba(104,104,170,0.1); }
+    #vote-score {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      color: #4a4a70;
+      min-width: 1.5rem;
+      text-align: center;
+    }
+    #vote-score.pos { color: var(--gold); }
+    #vote-score.neg { color: #6868aa; }
+    .comm-notes {
+      padding: 0.4rem 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .comm-note {
+      background: rgba(255,255,255,0.02);
+      border-radius: 4px;
+      padding: 0.4rem 0.5rem;
+      border-left: 2px solid #1c1c38;
+    }
+    .comm-note-body { color: #9090c0; font-size: 0.72rem; line-height: 1.45; margin-bottom: 0.2rem; }
+    .comm-note-meta { font-family: 'Space Mono', monospace; font-size: 0.54rem; color: #30304a; }
+    .comm-note-empty { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: #2a2a44; padding: 0.4rem 0.5rem; }
+    .comm-form {
+      border-top: 1px solid #0d0d1e;
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      flex-shrink: 0;
+    }
+    .comm-form textarea {
+      background: transparent;
+      border: 1px solid #1c1c38;
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.72rem;
+      padding: 0.4rem 0.5rem;
+      resize: none;
+      height: 60px;
+      outline: none;
+    }
+    .comm-form textarea:focus { border-color: var(--gold); }
+    .comm-form input {
+      background: transparent;
+      border: 1px solid #1c1c38;
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      padding: 0.3rem 0.5rem;
+      outline: none;
+    }
+    .comm-form input:focus { border-color: var(--gold); }
+    .comm-submit {
+      align-self: flex-end;
+      background: none;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      padding: 0.25rem 0.8rem;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.15s;
+    }
+    .comm-submit:hover { background: rgba(232,184,75,0.1); }
   </style>
 </head>
 <body>
@@ -1939,10 +2436,32 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
         <span class="alertas-loading">Verificando padr&#245;es&#8230;</span>
       </div>
     </div>
+    <div id="community-panel">
+      <div class="comm-header">
+        <span class="comm-title">[ investigação coletiva ]</span>
+        <button id="comm-toggle" title="Minimizar">&#8722;</button>
+      </div>
+      <div id="comm-body">
+        <div class="comm-vote-row">
+          <button class="comm-vote-dir" id="vote-up" data-dir="1" title="Suspeito">&#9650; Suspeito</button>
+          <span id="vote-score">…</span>
+          <button class="comm-vote-dir" id="vote-dn" data-dir="-1" title="Sem evidência">&#9660; Sem evidência</button>
+        </div>
+        <div class="comm-notes" id="comm-notes-list">
+          <span class="comm-note-empty">Carregando…</span>
+        </div>
+        <form class="comm-form" id="comm-note-form">
+          <textarea name="body" placeholder="Adicione uma nota de investigação…" maxlength="800"></textarea>
+          <input name="author" type="text" placeholder="Seu nome (opcional)" maxlength="60">
+          <button type="submit" class="comm-submit">PUBLICAR</button>
+        </form>
+      </div>
+    </div>
   </div>
   <footer>
     <span id="status">Carregando…</span>
     <div class="footer-meta">
+      <button id="mobile-comm-btn" style="display:none;background:none;border:1px solid #1c1c38;color:#6868aa;font-family:'Space Mono',monospace;font-size:0.6rem;padding:0.2rem 0.5rem;cursor:pointer;border-radius:3px" onclick="var p=document.getElementById('community-panel');p.style.display=p.style.display==='none'?'flex':'none'">&#9650; NOTAS</button>
       <span>BQ ${escHtml(usageData.month)}</span>
       <span>${gbUsed} GB</span>
       <span>${pct}% do 1 TB free</span>
@@ -1982,6 +2501,94 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
           body.innerHTML = '<span class="alertas-loading">Erro ao carregar alertas.</span>';
         });
     })();
+  </script>
+  <script>
+  (function() {
+    var CNPJ = '${escHtml(cnpj)}';
+    if (window.innerWidth <= 640) {
+      document.getElementById('mobile-comm-btn').style.display = 'inline-block';
+    }
+    var commToggle = document.getElementById('comm-toggle');
+    var commBody   = document.getElementById('comm-body');
+    commToggle.addEventListener('click', function() {
+      commBody.classList.toggle('collapsed');
+      commToggle.innerHTML = commBody.classList.contains('collapsed') ? '&#43;' : '&#8722;';
+    });
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function renderNotes(notes) {
+      var list = document.getElementById('comm-notes-list');
+      if (!notes || !notes.length) {
+        list.innerHTML = '<span class="comm-note-empty">Nenhuma nota. Seja o primeiro a investigar.</span>';
+        return;
+      }
+      list.innerHTML = notes.map(function(n) {
+        return '<div class="comm-note">' +
+          '<div class="comm-note-body">' + escHtml(n.body) + '</div>' +
+          '<div class="comm-note-meta">' + escHtml(n.author || 'anônimo') + ' · ' + n.created_at.slice(0,16) + '</div>' +
+          '</div>';
+      }).join('');
+    }
+
+    function updateScore(score, userVote) {
+      var scoreEl = document.getElementById('vote-score');
+      scoreEl.textContent = score > 0 ? '+' + score : String(score);
+      scoreEl.className = score > 0 ? 'pos' : score < 0 ? 'neg' : '';
+      document.getElementById('vote-up').className = 'comm-vote-dir' + (userVote === 1 ? ' active-up' : '');
+      document.getElementById('vote-dn').className = 'comm-vote-dir' + (userVote === -1 ? ' active-dn' : '');
+    }
+
+    // Load community data
+    fetch('/api/community/' + CNPJ)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        updateScore(d.score, d.userVote);
+        renderNotes(d.notes);
+      });
+
+    // Vote buttons ▲ / ▼
+    document.querySelectorAll('.comm-vote-dir').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var dir = parseInt(btn.dataset.dir, 10);
+        fetch('/api/vote/' + CNPJ, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ direction: dir }),
+        })
+          .then(function(r) { return r.json(); })
+          .then(function(d) { updateScore(d.score, d.userVote); });
+      });
+    });
+
+    // Add note
+    document.getElementById('comm-note-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var body   = this.querySelector('textarea[name=body]').value.trim();
+      var author = this.querySelector('input[name=author]').value.trim();
+      if (!body) return;
+      fetch('/api/notes/' + CNPJ, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: body, author: author }),
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.note) {
+            var list = document.getElementById('comm-notes-list');
+            var div = document.createElement('div');
+            div.className = 'comm-note';
+            div.innerHTML = '<div class="comm-note-body">' + escHtml(d.note.body) + '</div>' +
+              '<div class="comm-note-meta">' + escHtml(d.note.author || 'anônimo') + ' · agora</div>';
+            list.prepend(div);
+            var empty = list.querySelector('.comm-note-empty');
+            if (empty) empty.remove();
+          }
+          document.querySelector('#comm-note-form textarea').value = '';
+        });
+    });
+  })();
   </script>
 </body>
 </html>`;
@@ -2098,6 +2705,8 @@ Bun.serve({
       try {
         const result = await runPatterns(cnpj, DEFAULT_YEAR);
         const html = renderAlertasHtml(result);
+        // Persist flag count so landing page can highlight this CNPJ
+        try { cacheFlagCount(cnpj, result.flags.length, result.flags.map((f) => f.pattern)); } catch {}
         return new Response(JSON.stringify({ cnpj, flags: result.flags.length, html }), {
           headers: { "Content-Type": "application/json; charset=utf-8" },
         });
@@ -2110,6 +2719,53 @@ Bun.serve({
       }
     }
 
+
+    // Community — vote (up or down)
+    const voteMatch = url.pathname.match(/^\/api\/vote\/([^/]+)$/);
+    if (voteMatch && req.method === "POST") {
+      const cnpj = voteMatch[1].slice(0, 14).replace(/\D/g, "");
+      if (!cnpj) return new Response(JSON.stringify({ error: "invalid cnpj" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+      let direction: 1 | -1 = 1;
+      try { const body = await req.json() as any; if (body.direction === -1) direction = -1; } catch {}
+      const result = castVote(cnpj, ip, direction);
+      return new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
+    }
+
+    // Community — add note
+    const notesPostMatch = url.pathname.match(/^\/api\/notes\/([^/]+)$/);
+    if (notesPostMatch && req.method === "POST") {
+      const cnpj = notesPostMatch[1].slice(0, 14).replace(/\D/g, "");
+      if (!cnpj) return new Response(JSON.stringify({ error: "invalid cnpj" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      try {
+        const payload = await req.json() as { body?: string; author?: string };
+        const note = addNote(cnpj, payload.body ?? "", payload.author ?? "");
+        return new Response(JSON.stringify({ ok: true, note }), { headers: { "Content-Type": "application/json" } });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+    }
+
+    // Community — get score + notes for a CNPJ
+    const communityMatch = url.pathname.match(/^\/api\/community\/([^/]+)$/);
+    if (communityMatch) {
+      const cnpj = communityMatch[1].slice(0, 14).replace(/\D/g, "");
+      const ip   = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+      return new Response(JSON.stringify({
+        cnpj,
+        score:    getScore(cnpj),
+        userVote: getUserVote(cnpj, ip),
+        notes:    getNotesForCnpj(cnpj),
+      }), { headers: { "Content-Type": "application/json" } });
+    }
+
+    // Community — recent notes feed (landing page)
+    if (url.pathname === "/api/notes/recent") {
+      const notes = communityDb.query(
+        "SELECT * FROM notes ORDER BY created_at DESC LIMIT 50"
+      ).all() as CommunityNote[];
+      return new Response(JSON.stringify({ notes }), { headers: { "Content-Type": "application/json" } });
+    }
 
     // Graph JSON API
     const graphMatch = url.pathname.match(/^\/api\/graph\/([^/]+)$/);

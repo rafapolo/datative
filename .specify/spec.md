@@ -1,13 +1,33 @@
-# Datative — Suspicious Pattern Detection
-## Feature Specification
+# DATATIVE — Investigation Recommendation System
+## Product Constitution
 
 ---
 
-## Overview
+## Mission
 
-Given a company CNPJ, detect suspicious procurement patterns using data already available in basedosdados. Results appear as risk flags on the company detail page. No external APIs required.
+DATATIVE is an **investigation recommendation system** for Brazilian public procurement. It helps journalists, researchers, and civil society decide *where to look next* by combining automated statistical analysis with community intelligence.
 
-**In scope:** 8 patterns across 3 BigQuery datasets.
+The system answers the question: **"Which companies are worth investigating, and why?"**
+
+---
+
+## Core Principle
+
+> A recommendation is not a verdict. Every signal — automated or community-sourced — is a starting point for investigation, not a conclusion.
+
+DATATIVE surfaces companies that are statistically anomalous in public procurement data AND/OR flagged by the investigative community. It explains *why* each company appears in the feed (specific pattern names visible on every card), so investigators can immediately understand the nature of the potential risk before opening a case.
+
+---
+
+## What DATATIVE Does
+
+1. **Detects** — runs 8 SQL-based risk patterns against federal procurement data (CGU, Receita Federal) for every CNPJ that has public contracts
+2. **Explains** — shows the specific reason(s) why a company is flagged (e.g., "Fracionamento · Sempre vence") directly on the landing feed and on the company page
+3. **Ranks** — merges automated signals (flag count) with community votes (▲ suspeito / ▼ sem evidência, Reddit-style) into a prioritized investigation queue
+4. **Crowdsources** — lets investigators add text notes to any CNPJ, creating a shared investigative thread visible to all users
+5. **Deep-dives** — on the company graph page, shows corporate network (owners, subsidiaries), related datasets (contracts, donations, exports), and the full alert breakdown
+
+**In scope:** 8 patterns across 3 BigQuery datasets. Community voting. Investigation notes.
 **Out of scope:** sanction registries (CEIS/CNEP), PGFN debt, IBAMA embargoes — all require external APIs or inaccessible tables.
 
 ---
@@ -133,6 +153,21 @@ Given a company CNPJ, detect suspicious procurement patterns using data already 
 - Zero full-table scans — every query filters by `ano`
 - All thresholds are named constants with comments citing legal basis or source
 - No external API dependency for any of the 8 patterns
+
+---
+
+## Signal Architecture
+
+DATATIVE merges two complementary signals into a single ranked feed:
+
+| Signal | Source | Strength | Limitation |
+|--------|--------|----------|------------|
+| **Automated flags** | SQL patterns on BigQuery | Objective, reproducible, runs at scale | Cannot assess sector context or intent |
+| **Community votes** | ▲/▼ per IP, changeable | Captures journalistic leads and local knowledge | Subjective, can be gamed |
+
+**Feed ranking:** score (▲ − ▼) DESC → flag_count DESC → seed list. Companies that are both statistically anomalous and community-flagged rise highest.
+
+**Reason transparency:** every card in the feed shows the specific pattern chips (e.g. `Fracionamento · Sempre vence`) so investigators understand the signal before clicking through. No black boxes.
 
 ---
 
