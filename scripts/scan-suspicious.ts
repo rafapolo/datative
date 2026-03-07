@@ -182,7 +182,7 @@ async function checkSurge(cnpj: string, ano: number) {
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
     WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado,r'\\D',''),@cnpj)
       AND ano BETWEEN @min AND @max GROUP BY ano ORDER BY ano`,
-    { cnpj, ano_min: ano - SURGE_LOOKBACK_YEARS, min: ano - SURGE_LOOKBACK_YEARS, max: ano });
+    { cnpj, min: ano - SURGE_LOOKBACK_YEARS, max: ano });
   const hist = rows.map(r => ({ ano: Number(r.ano), v: Number(r.v) }));
   for (let i = 1; i < hist.length; i++) {
     const prev = hist[i-1], curr = hist[i];
