@@ -2735,7 +2735,14 @@ Bun.serve({
     // Pattern detection API
     const patternsMatch = url.pathname.match(/^\/api\/patterns\/([^/]+)$/);
     if (patternsMatch) {
-      const cnpj = patternsMatch[1];
+      // Normalise to 8-digit cnpj_basico — the root used across all pattern queries.
+      // A user may pass a full 14-digit CNPJ ("12345678000100") or a formatted string
+      // ("12.345.678/0001-00"). patternNewbornCompany uses cnpj_basico = @cnpj directly,
+      // so passing 14 digits would produce no results.
+      const cnpj = patternsMatch[1].replace(/\D/g, "").slice(0, 8);
+      if (cnpj.length < 8) {
+        return new Response(JSON.stringify({ error: "CNPJ inválido" }), { status: 400 });
+      }
       try {
         const result = await runPatterns(cnpj, DEFAULT_YEAR);
         const html = renderAlertasHtml(result);
