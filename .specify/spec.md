@@ -52,9 +52,10 @@ DATATIVE surfaces companies that are statistically anomalous in public procureme
 **So that** I can identify possible favoritism or lack of competition.
 
 **Acceptance scenarios:**
-- Given a CNPJ holding ≥ 40% of an agency's total contract spend for the year, and the agency's total exceeds R$ 50.000 → flag shown with agency name, supplier share %, and both spend figures
+- Given a CNPJ holding ≥ 40% of an agency's total contract spend for the year, the agency's total exceeds R$ 50.000, AND the supplier's own spend at that agency exceeds R$ 10.000 → flag shown with agency name, supplier share %, and both spend figures
 - Given concentration below 40% in all agencies → no flag
 - Given agency total below R$ 50.000 → excluded from analysis (avoid noise from micro-units)
+- Given supplier spend at the agency below R$ 10.000 → excluded (avoids flagging e.g. R$21k/R$50k = 42% where both values are trivially small)
 
 ---
 
@@ -64,9 +65,10 @@ DATATIVE surfaces companies that are statistically anomalous in public procureme
 **So that** I can identify possible abuse of the sole-source exemption.
 
 **Acceptance scenarios:**
-- Given a CNPJ with ≥ 3 contracts where `fundamento_legal` contains "inexigibilidade" (case-insensitive), all from the same `id_unidade_gestora` → flag shown with unit name, count, total value, and date range
+- Given a CNPJ with ≥ 3 contracts where `fundamento_legal` contains "inexigibilidade" (case-insensitive), all from the same `id_unidade_gestora`, each with `valor_inicial_compra ≥ R$ 1.000` → flag shown with unit name, unit ID, count, and total value
 - Given inexigibilidade contracts spread across different units → no flag
 - Given fewer than 3 occurrences per unit → no flag
+- Given only micro-value contracts (< R$ 1.000 each) → excluded (de minimis purchases are not meaningful abuse indicators)
 
 ---
 
