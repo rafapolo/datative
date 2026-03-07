@@ -187,6 +187,15 @@ No specific prohibition, but:
 ### Per-CNPJ vs batch consistency
 ✅ Equivalent. Both use `MIN(data_inicio_atividade)` across establishments with `ano=2023 AND mes=12`.
 
+⚠️ **Known necessary full-table scan**: The `first_contract` CTE in `batchNewborn` (`scan-all.ts`) intentionally omits an `ano` filter on `contrato_compra`:
+```sql
+FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra`
+WHERE LENGTH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\D', '')) = 14
+  AND valor_final_compra >= <MIN_VALUE>
+GROUP BY cnpj_basico
+```
+This is a deliberate exception to the "zero full-table scans" rule from the spec. The pattern asks: *"did this company win its very first contract within 180 days of founding?"* Restricting to `ano = ANO` would miss the true first contract if it occurred in an earlier year — producing a false negative. The `founding` CTE correctly filters `e.ano = ANO AND est.ano = ANO AND est.mes = 12`. Only `first_contract` scans all years, but the `LENGTH = 14` CPF exclusion and `valor_final_compra >= R$ 50k` filter significantly reduce bytes scanned.
+
 ---
 
 ## US8 — Sudden Surge (`sudden_surge`)
