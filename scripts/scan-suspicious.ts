@@ -140,10 +140,9 @@ async function checkAlwaysWinner(cnpj: string, ano: number) {
 
 async function checkAmendment(cnpj: string, ano: number) {
   const rows = await query(`
-    WITH a AS (SELECT id_contrato, COUNT(*) AS n FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_termo_aditivo\` GROUP BY id_contrato)
     SELECT COUNT(*) AS n, MAX(c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)) AS maxr,
       SUM(c.valor_final_compra-c.valor_inicial_compra) AS excess
-    FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\` c LEFT JOIN a USING(id_contrato)
+    FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\` c
     WHERE STARTS_WITH(REGEXP_REPLACE(c.cpf_cnpj_contratado,r'\\D',''),@cnpj) AND c.ano=@ano
       AND c.valor_inicial_compra>=@min AND c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)>=@thr
       AND c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)<=@max_ratio`,

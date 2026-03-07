@@ -89,7 +89,7 @@ interface AmendmentInflationFlag {
 - [x] Guards against division by zero with `NULLIF(valor_inicial_compra, 0)`
 - [x] Skips contracts with `valor_inicial_compra < R$ 10.000` to avoid noise
 - [x] Caps `inflation_ratio` at 10× — ratios above this are almost certainly data entry errors and would distort `excess_value` totals
-- [x] Counts `aditivo_count` from join — a contract at 130% with 0 amendments is more suspicious than one with 5 amendments (price revision)
+- [ ] `aditivo_count` surfaced per contract — a contract at 130% with 0 amendments is more suspicious than one with 5 amendments (price revision). Currently NOT implemented: the `contrato_termo_aditivo` join was removed as dead code (it was joined but the count was never used). Deferred: requires adding `aditivo_count` to `AmendmentInflationFlag` and UI rendering.
 - [x] `excessValue` surfaced in UI so users understand the BRL impact
 - [x] Partition filters `ano`, `mes` on `contrato_compra`
 - [x] Integrated into `runPatterns()` via `Promise.allSettled`

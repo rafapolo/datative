@@ -283,18 +283,12 @@ async function batchAlwaysWinner() {
 // ── 6. AMENDMENT INFLATION — contracts ballooning via additive terms ──────────
 async function batchAmendment() {
   const rows = await runQuery("AMENDMENT", `
-    WITH aditivos AS (
-      SELECT id_contrato, COUNT(1) AS n_aditivos
-      FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_termo_aditivo\`
-      GROUP BY 1
-    )
     SELECT
       SUBSTR(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\\D', ''), 1, 8) AS cnpj_basico,
       COUNT(1) AS n_inflated,
       MAX(c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0)) AS max_ratio,
       SUM(c.valor_final_compra - c.valor_inicial_compra)             AS total_excess
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\` c
-    LEFT JOIN aditivos a USING(id_contrato)
     WHERE c.ano = ${ANO}
       AND LENGTH(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\\D', '')) = 14
       AND c.valor_inicial_compra >= ${AMENDMENT_MIN_ORIGINAL_VALUE}
