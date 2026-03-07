@@ -168,7 +168,7 @@ Lei 14.133/2021 art.125 §1º allows 50% amendments for engineering works vs 25%
 **Conclusion:** Differentiating construction from goods/services would require text parsing of the `objeto` field for keywords like "obra", "construção", "reforma", "engenharia" — an inherently fragile approach. **This improvement is deferred.** Current 25% threshold is conservative and correct for the majority of contracts (goods/services); it may produce some false positives for large engineering works, which analysts should evaluate in context.
 
 ### Per-CNPJ vs batch consistency
-✅ Identical logic.
+⚠️ Minor divergence (accepted): `index.ts` now includes the aditivos CTE to surface `zeroAmendmentCount`. The batch scanners (`scan-all.ts`, `scan-suspicious.ts`) do NOT include this join — a full scan of `contrato_termo_aditivo` for every batch run would be prohibitively expensive. The `zeroAmendmentCount` field is only available in the web UI's per-CNPJ output.
 
 ---
 

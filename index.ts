@@ -282,6 +282,7 @@ interface AmendmentInflationFlag {
   totalFinalValue: number;
   excessValue: number;
   worstAgency: string;
+  zeroAmendmentCount: number; // inflated contracts with 0 contrato_termo_aditivo records — most suspicious
 }
 
 interface NewbornCompanyFlag {
@@ -977,12 +978,21 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
   if (cached !== undefined) return cached ?? null;
 
   const sql = `
+    WITH aditivos AS (
+      -- Full scan of contrato_termo_aditivo (no partition column available).
+      -- Acceptable cost for per-CNPJ queries; not used in batch scanners.
+      SELECT id_contrato, COUNT(*) AS aditivo_count
+      FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_termo_aditivo\`
+      GROUP BY id_contrato
+    )
     SELECT
       c.nome_unidade_gestora,
       c.valor_inicial_compra,
       c.valor_final_compra,
-      c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) AS inflation_ratio
+      c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) AS inflation_ratio,
+      COALESCE(a.aditivo_count, 0)                             AS aditivo_count
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\` c
+    LEFT JOIN aditivos a USING (id_contrato)
     WHERE STARTS_WITH(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\\D', ''), @cnpj)
       AND c.ano = @ano
       AND c.valor_inicial_compra >= @min_original
@@ -1001,6 +1011,7 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
   const totalOriginal = typed.reduce((s, r) => s + Number(r.valor_inicial_compra ?? 0), 0);
   const totalFinal = typed.reduce((s, r) => s + Number(r.valor_final_compra ?? 0), 0);
   const maxRatio = Math.max(...typed.map((r) => Number(r.inflation_ratio ?? 0)));
+  const zeroAmendmentCount = typed.filter((r) => Number(r.aditivo_count ?? 0) === 0).length;
   const flag: AmendmentInflationFlag = {
     pattern: "amendment_inflation",
     contractCount: rows.length,
@@ -1009,6 +1020,7 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
     totalFinalValue: totalFinal,
     excessValue: totalFinal - totalOriginal,
     worstAgency: String(typed[0].nome_unidade_gestora ?? ""),
+    zeroAmendmentCount,
   };
   setCache(cacheKey, flag);
   return flag;
@@ -1256,11 +1268,14 @@ function renderAlertasHtml(result: PatternResult): string {
       case "amendment_inflation": {
         const maxPct = ((flag.maxInflationRatio - 1) * 100).toFixed(0);
         const sev = flag.maxInflationRatio >= 2.0 ? "red" : "orange";
+        const zeroAmendNote = flag.zeroAmendmentCount > 0
+          ? `<span>⚠ ${flag.zeroAmendmentCount} sem termos aditivos registrados</span>` : "";
         return `<div class="alerta-card ${sev}">
           <div class="alerta-title">Superfaturamento via Aditivos Contratuais</div>
           <div class="alerta-meta">
             <span>${flag.contractCount} contratos acima do limite legal · excesso ${brl.format(flag.excessValue)}</span>
             <span>Maior índice: +${maxPct}% · ${escHtml(flag.worstAgency)}</span>
+            ${zeroAmendNote}
           </div>
           <div class="alerta-source">CGU · contrato_compra · Lei 14.133/2021 art.125</div>
         </div>`;

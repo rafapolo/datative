@@ -89,7 +89,7 @@ interface AmendmentInflationFlag {
 - [x] Guards against division by zero with `NULLIF(valor_inicial_compra, 0)`
 - [x] Skips contracts with `valor_inicial_compra < R$ 10.000` to avoid noise
 - [x] Caps `inflation_ratio` at 10× — ratios above this are almost certainly data entry errors and would distort `excess_value` totals
-- [ ] `aditivo_count` surfaced per contract — a contract at 130% with 0 amendments is more suspicious than one with 5 amendments (price revision). Currently NOT implemented: the `contrato_termo_aditivo` join was removed as dead code (it was joined but the count was never used). Deferred: requires adding `aditivo_count` to `AmendmentInflationFlag` and UI rendering.
+- [x] `zeroAmendmentCount` surfaced in UI — `AmendmentInflationFlag.zeroAmendmentCount` counts inflated contracts with 0 `contrato_termo_aditivo` records. These are the most suspicious (price grew without formal amendment documentation). The aditivos CTE is back in `patternAmendmentInflation` in `index.ts` (full scan of `contrato_termo_aditivo` — acceptable cost for per-CNPJ queries, not added to batch scanners). UI shows "⚠ N sem termos aditivos registrados" when count > 0.
 - [x] `excessValue` surfaced in UI so users understand the BRL impact
 - [x] Partition filters `ano`, `mes` on `contrato_compra`
 - [x] Integrated into `runPatterns()` via `Promise.allSettled`
