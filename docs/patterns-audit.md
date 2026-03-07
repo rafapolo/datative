@@ -230,8 +230,8 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 
 ## Summary Table
 
-| Pattern | FP Risk | Legal Basis | Iteration 2 Fix |
-|---------|---------|------------|-----------------|
+| Pattern | FP Risk | Legal Basis | Fixes Applied |
+|---------|---------|------------|---------------|
 | US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 | Added NULL date guard to prevent spurious null-month bucket |
 | US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations |
 | US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations |
