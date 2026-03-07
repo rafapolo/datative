@@ -30,9 +30,12 @@ const INEXIGIBILITY_MIN_VALUE      = 1_000;   // R$1k — excludes micro-value c
 const SINGLE_BIDDER_MIN_OCCURRENCES = 2;
 const WIN_RATE_THRESHOLD            = 0.80;   // raised from 0.60; Q3 in practice = 1.0 (bimodal dataset)
 const WIN_RATE_MIN_SAMPLE           = 10;     // raised from 5 to match scan-all (statistical significance)
-const AMENDMENT_INFLATION_THRESHOLD = 1.25;
+const AMENDMENT_INFLATION_THRESHOLD              = 1.25;  // goods/services: Lei 14.133/2021 art.125 §1º, I
+const AMENDMENT_CONSTRUCTION_INFLATION_THRESHOLD = 1.50;  // construction/engineering: art.125 §1º, II
 const AMENDMENT_MAX_INFLATION_RATIO = 10.0;  // cap — ratios above 10× are almost certainly data entry errors
 const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000;
+// RE2 regex for construction/engineering keyword detection in 'objeto' free-text field
+const CONSTRUCTION_KEYWORDS_RE = `r'obra|constru|reform|engenhari|paviment|demoli'`;
 const NEWBORN_MAX_DAYS_TO_CONTRACT  = 180;
 const NEWBORN_MIN_CONTRACT_VALUE    = 50_000;
 const SURGE_RATIO_THRESHOLD         = 5.0;
@@ -145,9 +148,13 @@ async function checkAmendment(cnpj: string, ano: number) {
       SUM(c.valor_final_compra-c.valor_inicial_compra) AS excess
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\` c
     WHERE STARTS_WITH(REGEXP_REPLACE(c.cpf_cnpj_contratado,r'\\D',''),@cnpj) AND c.ano=@ano
-      AND c.valor_inicial_compra>=@min AND c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)>=@thr
+      AND c.valor_inicial_compra>=@min
+      AND c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)>=
+          IF(REGEXP_CONTAINS(LOWER(IFNULL(c.objeto,'')),${CONSTRUCTION_KEYWORDS_RE}),
+             @construction_thr, @thr)
       AND c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)<=@max_ratio`,
-    { cnpj, ano, min: AMENDMENT_MIN_ORIGINAL_VALUE, thr: AMENDMENT_INFLATION_THRESHOLD, max_ratio: AMENDMENT_MAX_INFLATION_RATIO });
+    { cnpj, ano, min: AMENDMENT_MIN_ORIGINAL_VALUE, thr: AMENDMENT_INFLATION_THRESHOLD,
+      construction_thr: AMENDMENT_CONSTRUCTION_INFLATION_THRESHOLD, max_ratio: AMENDMENT_MAX_INFLATION_RATIO });
   const n = Number(rows[0]?.n ?? 0);
   if (!n) return [];
   const maxr = Number(rows[0]?.maxr ?? 0);

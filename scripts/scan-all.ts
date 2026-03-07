@@ -57,10 +57,13 @@ const INEXIGIBILITY_MIN_VALUE       = 1_000;
 const SINGLE_BIDDER_MIN_OCCURRENCES = 2;
 // US5: OCDE 2021 — competitive auctions only (≥2 bidders); Q3 of win-rate distribution
 const WIN_RATE_MIN_COMPETITIVE_BIDS = 10; // min participations in auctions with ≥2 bidders
-// US6: Lei 14.133/2021 art.125 §1º — legal ceiling = 25% above original for goods/services
-const AMENDMENT_INFLATION_THRESHOLD = 1.25;
+// US6: Lei 14.133/2021 art.125 §1º — legal ceiling = 25% above original for goods/services (50% for construction)
+const AMENDMENT_INFLATION_THRESHOLD              = 1.25;  // goods/services: art.125 §1º, I
+const AMENDMENT_CONSTRUCTION_INFLATION_THRESHOLD = 1.50;  // construction/engineering: art.125 §1º, II
 const AMENDMENT_MAX_INFLATION_RATIO = 10.0;  // cap — ratios above 10× are almost certainly data entry errors
 const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000;
+// RE2 regex for construction/engineering keyword detection in 'objeto' free-text field
+const CONSTRUCTION_KEYWORDS_RE = `r'obra|constru|reform|engenhari|paviment|demoli'`;
 // US7: 180 days = practical minimum for legitimate operational readiness
 const NEWBORN_MAX_DAYS_TO_CONTRACT  = 180;
 const NEWBORN_MIN_CONTRACT_VALUE    = 50_000;
@@ -107,6 +110,7 @@ async function batchSplit() {
   const rows = await runQuery("SPLIT", `
     SELECT
       SUBSTR(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), 1, 8) AS cnpj_basico,
+      id_orgao_superior,
       nome_orgao_superior,
       FORMAT_DATE('%Y-%m', data_assinatura_contrato) AS mes,
       COUNT(1)                     AS n,
@@ -117,7 +121,7 @@ async function batchSplit() {
       AND valor_inicial_compra > 0
       AND valor_inicial_compra < ${SPLIT_THRESHOLD_BRL}
       AND data_assinatura_contrato IS NOT NULL
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2, 3, 4
     HAVING COUNT(1) >= ${SPLIT_MIN_COUNT}
       AND SUM(valor_inicial_compra) > ${SPLIT_THRESHOLD_BRL}
   `);
@@ -196,13 +200,17 @@ async function batchInexig() {
 async function batchSingleBidder() {
   const rows = await runQuery("SINGLE_BIDDER", `
     WITH auction_stats AS (
-      -- For each auction: total bidders, and which cnpj_basico won (if sole bidder)
+      -- For each auction: total bidders (ALL participants including CPF individuals),
+      -- and which cnpj_basico won (extracted from CNPJ-14 format only — corporate winner).
+      -- Counting CPF bidders keeps this consistent with the per-CNPJ implementation in
+      -- index.ts (patternSingleBidder uses COUNT(*) across all participant types).
+      -- A CPF individual IS a real competitor even if rarely wins large contracts.
       SELECT
         id_licitacao,
         COUNT(1) AS total_bidders,
-        MAX(IF(vencedor, SUBSTR(REGEXP_REPLACE(cpf_cnpj_participante, r'\\D', ''), 1, 8), NULL)) AS winner_cnpj
+        MAX(IF(vencedor AND LENGTH(REGEXP_REPLACE(cpf_cnpj_participante, r'\\D', '')) = 14,
+               SUBSTR(REGEXP_REPLACE(cpf_cnpj_participante, r'\\D', ''), 1, 8), NULL)) AS winner_cnpj
       FROM \`basedosdados.br_cgu_licitacao_contrato.licitacao_participante\`
-      WHERE LENGTH(REGEXP_REPLACE(cpf_cnpj_participante, r'\\D', '')) = 14
       GROUP BY 1
     )
     SELECT
@@ -294,7 +302,9 @@ async function batchAmendment() {
     WHERE c.ano = ${ANO}
       AND LENGTH(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\\D', '')) = 14
       AND c.valor_inicial_compra >= ${AMENDMENT_MIN_ORIGINAL_VALUE}
-      AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >= ${AMENDMENT_INFLATION_THRESHOLD}
+      AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >=
+            IF(REGEXP_CONTAINS(LOWER(IFNULL(c.objeto, '')), ${CONSTRUCTION_KEYWORDS_RE}),
+               ${AMENDMENT_CONSTRUCTION_INFLATION_THRESHOLD}, ${AMENDMENT_INFLATION_THRESHOLD})
       AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) <= ${AMENDMENT_MAX_INFLATION_RATIO}
     GROUP BY 1
     ORDER BY total_excess DESC

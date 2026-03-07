@@ -210,11 +210,17 @@ const WIN_RATE_THRESHOLD            = 0.80;    // raised from 0.60 to reduce fal
 const WIN_RATE_MIN_SAMPLE           = 10;      // raised from 5; aligns with batch scanner
 
 // US6 AMENDMENT INFLATION: Lei 14.133/2021 art.125 §1º — legal ceiling for contract amendments
-// is 25% of original value for goods/services (50% for construction). Inflation ≥ 1.25 means
-// the contract reached or exceeded its legal ceiling and may have done so illegally.
-const AMENDMENT_INFLATION_THRESHOLD = 1.25;
+// is 25% of original value for goods/services (50% for construction/engineering works).
+// Inflation ≥ applicable threshold means the contract reached or exceeded its legal ceiling.
+const AMENDMENT_INFLATION_THRESHOLD              = 1.25;  // goods/services: art.125 §1º, I
+const AMENDMENT_CONSTRUCTION_INFLATION_THRESHOLD = 1.50;  // construction/engineering: art.125 §1º, II
 const AMENDMENT_MAX_INFLATION_RATIO = 10.0;  // hard cap — ratios above 10× are almost certainly data entry errors; excluded from total_excess
 const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000; // BRL — exclude micro-contracts (< R$10k)
+// RE2 regex matching construction/engineering keywords in the 'objeto' free-text field.
+// No dedicated contract-category column exists in br_cgu_licitacao_contrato schema.
+// Matches: obra(s), construção/construir, reforma(s/r), engenharia/engenheiro,
+//          pavimentação/pavimento, demolição/demolir
+const CONSTRUCTION_KEYWORDS_RE = `r'obra|constru|reform|engenhari|paviment|demoli'`;
 
 // US7 NEWBORN: 6 months (180 days) = practical minimum for a legitimate company to be
 // fully operational and win a non-trivial public contract. Min R$50k excludes training contracts.
@@ -996,13 +1002,15 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
     WHERE STARTS_WITH(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\\D', ''), @cnpj)
       AND c.ano = @ano
       AND c.valor_inicial_compra >= @min_original
-      AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >= @threshold
+      AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >=
+            IF(REGEXP_CONTAINS(LOWER(IFNULL(c.objeto, '')), ${CONSTRUCTION_KEYWORDS_RE}),
+               @construction_threshold, @threshold)
       AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) <= @max_ratio
     ORDER BY inflation_ratio DESC
   `;
   const [job] = await bq.createQueryJob({
     query: sql,
-    params: { cnpj, ano, min_original: AMENDMENT_MIN_ORIGINAL_VALUE, threshold: AMENDMENT_INFLATION_THRESHOLD, max_ratio: AMENDMENT_MAX_INFLATION_RATIO },
+    params: { cnpj, ano, min_original: AMENDMENT_MIN_ORIGINAL_VALUE, threshold: AMENDMENT_INFLATION_THRESHOLD, construction_threshold: AMENDMENT_CONSTRUCTION_INFLATION_THRESHOLD, max_ratio: AMENDMENT_MAX_INFLATION_RATIO },
     location: "US",
   });
   const [rows] = await job.getQueryResults();

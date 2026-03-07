@@ -36,7 +36,7 @@ For 2023 data many contracts still ran under Lei 8.666/93 (both laws co-existed)
 - Added `AND data_assinatura_contrato IS NOT NULL` to WHERE clause in all three implementations to prevent NULL-date contracts from being grouped into a spurious `mes = NULL` bucket.
 
 ### Per-CNPJ vs batch consistency
-⚠️ Minor: `index.ts` and `scan-suspicious.ts` group by `(id_orgao_superior, nome_orgao_superior, mes)`. `scan-all.ts` groups by `(cnpj_basico, nome_orgao_superior, mes)` — no `id_orgao_superior`. Two ministries with the same name would be merged in the batch (theoretical; no such collision exists at `orgao_superior` level). All three implementations have the same NULL guard and thresholds.
+✅ Fixed (iteration 8): `scan-all.ts` now includes `id_orgao_superior` in both SELECT and GROUP BY, matching `index.ts` and `scan-suspicious.ts`. Prevents theoretical merging of two distinct ministries sharing the same name.
 
 ---
 
@@ -110,12 +110,10 @@ Not inherently illegal, but flagged by:
 
 ### SQL robustness notes
 - Per-CNPJ: uses `STARTS_WITH(REGEXP_REPLACE(...), @cnpj)` — this matches any CNPJ where the base 8 digits match, including subsidiaries/branches. This is intentional: a corporate group that operates through multiple CNPJs should still surface.
-- Batch: uses `MAX(IF(vencedor, SUBSTR(...), NULL))` to extract the winner's CNPJ from the `auction_stats` CTE. If two rows have `vencedor=true` for the same auction (data quality issue), `MAX` picks lexicographically last — acceptable for batch purposes.
+- Batch: uses `MAX(IF(vencedor AND LENGTH(...) = 14, SUBSTR(...), NULL))` to extract the winner's CNPJ from the `auction_stats` CTE. The `LENGTH = 14` guard in the `IF` condition ensures CPF winners don't produce invalid 8-digit keys. If two CNPJ rows have `vencedor=true` for the same auction (data quality issue), `MAX` picks lexicographically last — acceptable for batch purposes.
 
 ### Per-CNPJ vs batch consistency
-⚠️ Minor inconsistency: **batch filters CPF participants** (`LENGTH(REGEXP_REPLACE(cpf_cnpj_participante, r'\D', '')) = 14`) before counting bidders, so an auction with 1 CNPJ + 1 CPF bidder has `total_bidders = 1` in the batch (flagged). **Per-CNPJ implementations** (`index.ts`, `scan-suspicious.ts`) count ALL participants with `COUNT(*)` and require `total_participantes = 1`, so the same auction has `total_participantes = 2` (not flagged).
-
-The per-CNPJ behavior is arguably more correct — a CPF bidder IS a real participant even if individuals rarely win procurement contracts. The batch produces slightly more flags (less conservative). This is a known acceptable divergence documented for transparency.
+✅ Fixed (iteration 8): **batch now counts ALL participants** (CPF + CNPJ) for `total_bidders`, matching per-CNPJ behavior. Previously, `LENGTH = 14` excluded CPF individuals from the count, causing the batch to over-flag auctions where a CPF participant was present. The `LENGTH = 14` guard is now applied only inside the `winner_cnpj` extraction `IF()` condition — not to the overall participant count.
 
 ---
 
@@ -161,11 +159,24 @@ The `licitacao_participante` dataset is **strongly bimodal**: approximately 33% 
 - **Cap `inflation_ratio` at 10×** (`AMENDMENT_MAX_INFLATION_RATIO = 10.0`): ratios above this threshold are almost certainly data entry errors (e.g., `valor_final_compra` entered in a different unit) and would distort `total_excess` reporting. Applied to all three implementations via `AND ... <= @max_ratio` filter in SQL. Applied in `index.ts`, `scan-all.ts`, `scan-suspicious.ts`.
 
 ### Schema verification: construction vs goods/services threshold
-Lei 14.133/2021 art.125 §1º allows 50% amendments for engineering works vs 25% for goods/services. Applying the stricter 25% to everything is **conservative and safe** — it may over-flag construction contracts but will never under-flag goods contracts.
+Lei 14.133/2021 art.125 §1º allows 50% amendments for engineering works vs 25% for goods/services.
 
-**Column verified (schema dump):** `contrato_compra` has `id_modalidade_licitacao` (code) and `modalidade_licitacao` (name). However, this column encodes **bidding modality** (Concorrência, Pregão Eletrônico, Tomada de Preços, etc.) — not contract category (obras vs bens/serviços). Modalidade "Concorrência" is used for both large construction and large goods contracts; "Pregão Eletrônico" is almost exclusively goods/services. There is no `tipo_contrato` or `categoria` column in the accessible schema.
+**Column verified (schema dump):** `contrato_compra` has `id_modalidade_licitacao` (code) and `modalidade_licitacao` (name). However, this column encodes **bidding modality** (Concorrência, Pregão Eletrônico, Tomada de Preços, etc.) — not contract category (obras vs bens/serviços). There is no `tipo_contrato` or `categoria` column in the accessible schema.
 
-**Conclusion:** Differentiating construction from goods/services would require text parsing of the `objeto` field for keywords like "obra", "construção", "reforma", "engenharia" — an inherently fragile approach. **This improvement is deferred.** Current 25% threshold is conservative and correct for the majority of contracts (goods/services); it may produce some false positives for large engineering works, which analysts should evaluate in context.
+### Improvements applied (iteration 8): construction keyword detection
+All three implementations now apply `IF(REGEXP_CONTAINS(LOWER(IFNULL(objeto, '')), r'obra|constru|reform|engenhari|paviment|demoli'), 1.50, 1.25)` to select the applicable legal threshold per contract. This reduces false positives for legitimate construction/engineering amendments that fall between 1.25× and 1.50×.
+
+**Keywords and rationale:**
+| Keyword | Matches | Rationale |
+|---------|---------|-----------|
+| `obra` | obra, obras | General construction work |
+| `constru` | construção, construir | Building/construction |
+| `reform` | reforma, reformar, reformas | Renovation/remodeling |
+| `engenhari` | engenharia, engenheiro | Engineering services |
+| `paviment` | pavimentação, pavimento | Road/floor paving |
+| `demoli` | demolição, demolir | Demolition |
+
+**Known limitations:** The `objeto` field is free-text entered by procurement officers. Some construction contracts may use generic descriptions ("serviços de manutenção") and be missed by this detection — applying the 1.25× threshold is safe for those (conservative false positive vs missed construction exemption).
 
 ### Per-CNPJ vs batch consistency
 ⚠️ Minor divergence (accepted): `index.ts` now includes the aditivos CTE to surface `zeroAmendmentCount`. The batch scanners (`scan-all.ts`, `scan-suspicious.ts`) do NOT include this join — a full scan of `contrato_termo_aditivo` for every batch run would be prohibitively expensive. The `zeroAmendmentCount` field is only available in the web UI's per-CNPJ output.
@@ -275,11 +286,11 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 
 | Pattern | FP Risk | Legal Basis | Fixes Applied |
 |---------|---------|------------|---------------|
-| US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 / Decreto 11.871/2024 | NULL date guard; year-dependent threshold (R$17.600 ≤2023, R$57.912 2024+); falsy cache check fixed |
+| US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 / Decreto 11.871/2024 | NULL date guard; year-dependent threshold (R$17.600 ≤2023, R$57.912 2024+); falsy cache check fixed; **batch GROUP BY now includes id_orgao_superior** |
 | US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations; **falsy cache check fixed** |
 | US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations; **falsy cache check fixed** |
-| US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | **cache.ts bug fixed** (getCache null-vs-undefined); CPF-counting inconsistency documented |
+| US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | **cache.ts bug fixed** (getCache null-vs-undefined); **batch now counts all participants (CPF+CNPJ)** — consistent with per-CNPJ |
 | US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds; **cache.ts bug fixed** |
-| US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× inflation cap; **cache.ts bug fixed**; construction 50% ceiling deferred |
+| US6 Amendment | Medium — inflation clauses | Lei 14.133/2021 art.125 | Added 10× inflation cap; **cache.ts bug fixed**; **construction keyword detection: 1.50× threshold for obras/construção/reforma/etc.** |
 | US7 Newborn | High — spinoffs, restructurings | CGU 2021 guide | **cache.ts bug fixed** (was never querying BigQuery on cache miss) |
 | US8 Surge | Medium — framework agreements, budget cycles | UNODC 2013 | Added consecutive-year guard; **cache.ts bug fixed** |
