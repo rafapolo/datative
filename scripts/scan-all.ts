@@ -328,6 +328,9 @@ async function batchNewborn() {
       GROUP BY e.cnpj_basico, e.porte
     ),
     first_contract AS (
+      -- No ano filter intentional: must find the very first contract ever across all years.
+      -- Restricting to ano=ANO would miss earlier contracts, producing false negatives for US7.
+      -- Cost bounded by: LENGTH=14 CPF exclusion + valor_final_compra >= R$50k filter.
       SELECT
         SUBSTR(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), 1, 8) AS cnpj_basico,
         MIN(data_assinatura_contrato) AS first_contract_date,

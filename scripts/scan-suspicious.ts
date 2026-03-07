@@ -163,6 +163,7 @@ async function checkNewborn(cnpj: string) {
         ON est.cnpj_basico = e.cnpj_basico AND est.ano=@ano AND est.mes=12
       WHERE e.cnpj_basico=@cnpj AND e.ano=@ano AND e.mes=12
       GROUP BY e.porte LIMIT 1),
+    -- No ano filter intentional: must find the very first contract ever across all years.
     c AS (
       SELECT MIN(data_assinatura_contrato) AS first, SUM(valor_final_compra) AS total
       FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`

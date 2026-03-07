@@ -1035,6 +1035,9 @@ async function patternNewbornCompany(cnpj: string): Promise<NewbornCompanyFlag |
       GROUP BY e.cnpj_basico, e.porte
     ),
     contratos AS (
+      -- No ano filter intentional: must find the very first contract ever across all years.
+      -- Restricting to ano=N would miss earlier contracts, producing false negatives for US7.
+      -- Cost bounded by: SUBSTR match (8-digit basico) + valor_final_compra >= R$50k filter.
       SELECT
         MIN(data_assinatura_contrato) AS first_contract_date,
         COUNT(*)                      AS contract_count,
