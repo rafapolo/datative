@@ -72,6 +72,124 @@ const DEFAULT_YEAR = 2023;
 const DEFAULT_LIMIT = 25;
 const LOOKUP_LIMIT_DEFAULT = 10;
 
+// --- Pattern Detection Thresholds ---
+// Split threshold: Lei 8.666/93 art.23 §1º II-a (dispensa de licitação para serviços até R$17.600)
+const SPLIT_THRESHOLD_BRL          = 17_600;
+const SPLIT_MIN_COUNT              = 3;
+// Concentration: 40% share = prima facie dominance
+const CONCENTRATION_THRESHOLD      = 0.40;
+const CONCENTRATION_MIN_SPEND      = 50_000;  // BRL — filter micro-units
+// Inexigibility: 3+ sole-source contracts from same managing unit = recurrent pattern
+const INEXIGIBILITY_MIN_COUNT      = 3;
+// Single bidder: Open Contracting Partnership "73 Red Flags" (2024), Flag #1
+const SINGLE_BIDDER_MIN_OCCURRENCES = 2;
+// Win rate: 60%+ across ≥5 tenders anomalous in competitive markets (Cadernos de Finanças Públicas, 2024)
+const WIN_RATE_THRESHOLD            = 0.60;
+const WIN_RATE_MIN_SAMPLE           = 5;
+// Amendment inflation: Lei 14.133/2021 art.125 §1º — legal ceiling = 25% above original
+const AMENDMENT_INFLATION_THRESHOLD = 1.25;
+const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000; // BRL
+// Newborn company: 6 months = typical minimum for legitimate operational readiness
+const NEWBORN_MAX_DAYS_TO_CONTRACT  = 180;
+const NEWBORN_MIN_CONTRACT_VALUE    = 50_000; // BRL
+// Sudden surge: 5× year-over-year growth + R$1M minimum
+const SURGE_RATIO_THRESHOLD         = 5.0;
+const SURGE_MIN_ABSOLUTE_VALUE      = 1_000_000; // BRL
+const SURGE_LOOKBACK_YEARS          = 4;
+
+// --- Pattern Interfaces ---
+interface SplitContractFlag {
+  pattern: "split_contracts_below_threshold";
+  agencyName: string;
+  agencyId: string;
+  month: string;
+  contractCount: number;
+  combinedValue: number;
+  maxSingleValue: number;
+}
+
+interface ConcentrationFlag {
+  pattern: "contract_concentration";
+  agencyName: string;
+  agencyId: string;
+  supplierShare: number;
+  supplierSpend: number;
+  agencyTotalSpend: number;
+  year: number;
+}
+
+interface InexigibilityFlag {
+  pattern: "inexigibility_recurrence";
+  agencyUnit: string;
+  agencyUnitId: string;
+  contractCount: number;
+  totalValue: number;
+  firstDate: string;
+  lastDate: string;
+}
+
+interface SingleBidderFlag {
+  pattern: "single_bidder";
+  occurrences: number;
+  totalValue: number;
+  agencies: string[];
+  sampleObjects: string[];
+}
+
+interface AlwaysWinnerFlag {
+  pattern: "always_winner";
+  totalParticipations: number;
+  totalWins: number;
+  winRate: number;
+  totalValueCompeted: number;
+}
+
+interface AmendmentInflationFlag {
+  pattern: "amendment_inflation";
+  contractCount: number;
+  maxInflationRatio: number;
+  totalOriginalValue: number;
+  totalFinalValue: number;
+  excessValue: number;
+  worstAgency: string;
+}
+
+interface NewbornCompanyFlag {
+  pattern: "newborn_company";
+  foundingDate: string;
+  firstContractDate: string;
+  daysToFirstContract: number;
+  companySize: string;
+  totalContractValue: number;
+}
+
+interface SuddenSurgeFlag {
+  pattern: "sudden_surge";
+  surgeYear: number;
+  priorYearValue: number;
+  surgeYearValue: number;
+  surgeRatio: number;
+  surgeYearAgencies: number;
+  history: Array<{ ano: number; value: number; contracts: number }>;
+}
+
+type PatternFlag =
+  | SplitContractFlag
+  | ConcentrationFlag
+  | InexigibilityFlag
+  | SingleBidderFlag
+  | AlwaysWinnerFlag
+  | AmendmentInflationFlag
+  | NewbornCompanyFlag
+  | SuddenSurgeFlag;
+
+interface PatternResult {
+  cnpj: string;
+  detectedAt: string;
+  flags: PatternFlag[];
+}
+
+
 interface SchemaColumn {
   name: string;
   type?: string;
@@ -488,6 +606,413 @@ async function queryByField(
   }
 }
 
+
+// --- Pattern Detection Functions ---
+
+async function patternSplitContracts(cnpj: string, ano: number): Promise<SplitContractFlag[]> {
+  const cacheKey = `patterns_split_${cnpj}_${ano}`;
+  const cached = getCache<SplitContractFlag[]>(cacheKey);
+  if (cached) return cached;
+
+  const sql = `
+    SELECT
+      id_orgao_superior,
+      nome_orgao_superior,
+      FORMAT_DATE('%Y-%m', data_assinatura_contrato) AS mes,
+      COUNT(*)                   AS contrato_count,
+      SUM(valor_inicial_compra)  AS combined_value,
+      MAX(valor_inicial_compra)  AS max_single_value
+    FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
+    WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
+      AND ano = @ano
+      AND valor_inicial_compra > 0
+      AND valor_inicial_compra < @threshold
+    GROUP BY id_orgao_superior, nome_orgao_superior, mes
+    HAVING COUNT(*) >= @min_count
+       AND SUM(valor_inicial_compra) > @threshold
+  `;
+  const [job] = await bq.createQueryJob({
+    query: sql,
+    params: { cnpj, ano, threshold: SPLIT_THRESHOLD_BRL, min_count: SPLIT_MIN_COUNT },
+    location: "US",
+  });
+  const [rows] = await job.getQueryResults();
+  const flags = (rows as Array<Record<string, unknown>>).map((r) => ({
+    pattern: "split_contracts_below_threshold" as const,
+    agencyName: String(r.nome_orgao_superior ?? ""),
+    agencyId: String(r.id_orgao_superior ?? ""),
+    month: String(r.mes ?? ""),
+    contractCount: Number(r.contrato_count ?? 0),
+    combinedValue: Number(r.combined_value ?? 0),
+    maxSingleValue: Number(r.max_single_value ?? 0),
+  }));
+  setCache(cacheKey, flags);
+  return flags;
+}
+
+async function patternConcentration(cnpj: string, ano: number): Promise<ConcentrationFlag[]> {
+  const cacheKey = `patterns_concentration_${cnpj}_${ano}`;
+  const cached = getCache<ConcentrationFlag[]>(cacheKey);
+  if (cached) return cached;
+
+  const sql = `
+    SELECT
+      id_orgao_superior,
+      nome_orgao_superior,
+      SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
+               THEN valor_final_compra ELSE 0 END) AS supplier_spend,
+      SUM(valor_final_compra) AS agency_total
+    FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
+    WHERE ano = @ano
+      AND id_orgao_superior IN (
+        SELECT DISTINCT id_orgao_superior
+        FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
+        WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
+          AND ano = @ano
+      )
+    GROUP BY id_orgao_superior, nome_orgao_superior
+    HAVING SUM(valor_final_compra) >= @min_agency_spend
+       AND SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
+                    THEN valor_final_compra ELSE 0 END)
+           / NULLIF(SUM(valor_final_compra), 0) >= @threshold
+  `;
+  const [job] = await bq.createQueryJob({
+    query: sql,
+    params: { cnpj, ano, threshold: CONCENTRATION_THRESHOLD, min_agency_spend: CONCENTRATION_MIN_SPEND },
+    location: "US",
+  });
+  const [rows] = await job.getQueryResults();
+  const flags = (rows as Array<Record<string, unknown>>).map((r) => {
+    const supplierSpend = Number(r.supplier_spend ?? 0);
+    const agencyTotal = Number(r.agency_total ?? 0);
+    return {
+      pattern: "contract_concentration" as const,
+      agencyName: String(r.nome_orgao_superior ?? ""),
+      agencyId: String(r.id_orgao_superior ?? ""),
+      supplierShare: agencyTotal > 0 ? supplierSpend / agencyTotal : 0,
+      supplierSpend,
+      agencyTotalSpend: agencyTotal,
+      year: ano,
+    };
+  });
+  setCache(cacheKey, flags);
+  return flags;
+}
+
+async function patternInexigibility(cnpj: string, ano: number): Promise<InexigibilityFlag[]> {
+  const cacheKey = `patterns_inexigibility_${cnpj}_${ano}`;
+  const cached = getCache<InexigibilityFlag[]>(cacheKey);
+  if (cached) return cached;
+
+  const sql = `
+    SELECT
+      id_unidade_gestora,
+      nome_unidade_gestora,
+      COUNT(*)                   AS contrato_count,
+      SUM(valor_inicial_compra)  AS total_value,
+      MIN(data_assinatura_contrato) AS first_date,
+      MAX(data_assinatura_contrato) AS last_date
+    FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
+    WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
+      AND ano = @ano
+      AND UPPER(fundamento_legal) LIKE '%INEXIGIBILIDADE%'
+    GROUP BY id_unidade_gestora, nome_unidade_gestora
+    HAVING COUNT(*) >= @min_count
+  `;
+  const [job] = await bq.createQueryJob({
+    query: sql,
+    params: { cnpj, ano, min_count: INEXIGIBILITY_MIN_COUNT },
+    location: "US",
+  });
+  const [rows] = await job.getQueryResults();
+  const flags = (rows as Array<Record<string, unknown>>).map((r) => ({
+    pattern: "inexigibility_recurrence" as const,
+    agencyUnit: String(r.nome_unidade_gestora ?? ""),
+    agencyUnitId: String(r.id_unidade_gestora ?? ""),
+    contractCount: Number(r.contrato_count ?? 0),
+    totalValue: Number(r.total_value ?? 0),
+    firstDate: r.first_date ? String(r.first_date) : "",
+    lastDate: r.last_date ? String(r.last_date) : "",
+  }));
+  setCache(cacheKey, flags);
+  return flags;
+}
+
+async function patternSingleBidder(cnpj: string, ano: number): Promise<SingleBidderFlag | null> {
+  const cacheKey = `patterns_single_bidder_${cnpj}_${ano}`;
+  const cached = getCache<SingleBidderFlag | null>(cacheKey);
+  if (cached !== undefined) return cached ?? null;
+
+  const sql = `
+    WITH participantes AS (
+      SELECT
+        id_licitacao,
+        COUNT(*) AS total_participantes,
+        COUNTIF(STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_participante, r'\\D', ''), @cnpj)) AS cnpj_participated,
+        COUNTIF(STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_participante, r'\\D', ''), @cnpj) AND vencedor) AS cnpj_won
+      FROM \`basedosdados.br_cgu_licitacao_contrato.licitacao_participante\`
+      GROUP BY id_licitacao
+    )
+    SELECT
+      l.id_orgao_superior,
+      l.nome_orgao_superior,
+      l.objeto,
+      l.valor_licitacao
+    FROM participantes p
+    JOIN \`basedosdados.br_cgu_licitacao_contrato.licitacao\` l USING (id_licitacao)
+    WHERE l.ano = @ano
+      AND p.cnpj_participated = 1
+      AND p.cnpj_won = 1
+      AND p.total_participantes = 1
+  `;
+  const [job] = await bq.createQueryJob({
+    query: sql,
+    params: { cnpj, ano },
+    location: "US",
+  });
+  const [rows] = await job.getQueryResults();
+  if (rows.length < SINGLE_BIDDER_MIN_OCCURRENCES) {
+    setCache(cacheKey, null);
+    return null;
+  }
+  const typed = rows as Array<Record<string, unknown>>;
+  const agencies = [...new Set(typed.map((r) => String(r.nome_orgao_superior ?? "")).filter(Boolean))];
+  const totalValue = typed.reduce((s, r) => s + Number(r.valor_licitacao ?? 0), 0);
+  const sampleObjects = typed.slice(0, 3).map((r) => String(r.objeto ?? "")).filter(Boolean);
+  const flag: SingleBidderFlag = { pattern: "single_bidder", occurrences: rows.length, totalValue, agencies, sampleObjects };
+  setCache(cacheKey, flag);
+  return flag;
+}
+
+async function patternAlwaysWinner(cnpj: string, ano: number): Promise<AlwaysWinnerFlag | null> {
+  const cacheKey = `patterns_always_winner_${cnpj}_${ano}`;
+  const cached = getCache<AlwaysWinnerFlag | null>(cacheKey);
+  if (cached !== undefined) return cached ?? null;
+
+  const sql = `
+    WITH participacoes AS (
+      SELECT p.id_licitacao, p.vencedor, l.valor_licitacao
+      FROM \`basedosdados.br_cgu_licitacao_contrato.licitacao_participante\` p
+      JOIN \`basedosdados.br_cgu_licitacao_contrato.licitacao\` l USING (id_licitacao)
+      WHERE STARTS_WITH(REGEXP_REPLACE(p.cpf_cnpj_participante, r'\\D', ''), @cnpj)
+        AND l.ano = @ano
+    )
+    SELECT
+      COUNT(*)                AS total_participacoes,
+      COUNTIF(vencedor)       AS total_vitorias,
+      SUM(valor_licitacao)    AS total_value_competed
+    FROM participacoes
+    HAVING COUNT(*) >= @min_sample
+       AND COUNTIF(vencedor) / NULLIF(COUNT(*), 0) >= @win_rate_threshold
+  `;
+  const [job] = await bq.createQueryJob({
+    query: sql,
+    params: { cnpj, ano, min_sample: WIN_RATE_MIN_SAMPLE, win_rate_threshold: WIN_RATE_THRESHOLD },
+    location: "US",
+  });
+  const [rows] = await job.getQueryResults();
+  if (rows.length === 0) { setCache(cacheKey, null); return null; }
+  const r = rows[0] as Record<string, unknown>;
+  const total = Number(r.total_participacoes ?? 0);
+  const wins = Number(r.total_vitorias ?? 0);
+  const flag: AlwaysWinnerFlag = {
+    pattern: "always_winner",
+    totalParticipations: total,
+    totalWins: wins,
+    winRate: total > 0 ? wins / total : 0,
+    totalValueCompeted: Number(r.total_value_competed ?? 0),
+  };
+  setCache(cacheKey, flag);
+  return flag;
+}
+
+async function patternAmendmentInflation(cnpj: string, ano: number): Promise<AmendmentInflationFlag | null> {
+  const cacheKey = `patterns_amendment_inflation_${cnpj}_${ano}`;
+  const cached = getCache<AmendmentInflationFlag | null>(cacheKey);
+  if (cached !== undefined) return cached ?? null;
+
+  const sql = `
+    WITH aditivos AS (
+      SELECT id_contrato, COUNT(*) AS aditivo_count
+      FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_termo_aditivo\`
+      GROUP BY id_contrato
+    )
+    SELECT
+      c.nome_unidade_gestora,
+      c.valor_inicial_compra,
+      c.valor_final_compra,
+      c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) AS inflation_ratio,
+      COALESCE(a.aditivo_count, 0) AS aditivo_count
+    FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\` c
+    LEFT JOIN aditivos a USING (id_contrato)
+    WHERE STARTS_WITH(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\\D', ''), @cnpj)
+      AND c.ano = @ano
+      AND c.valor_inicial_compra >= @min_original
+      AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >= @threshold
+    ORDER BY inflation_ratio DESC
+  `;
+  const [job] = await bq.createQueryJob({
+    query: sql,
+    params: { cnpj, ano, min_original: AMENDMENT_MIN_ORIGINAL_VALUE, threshold: AMENDMENT_INFLATION_THRESHOLD },
+    location: "US",
+  });
+  const [rows] = await job.getQueryResults();
+  if (rows.length === 0) { setCache(cacheKey, null); return null; }
+  const typed = rows as Array<Record<string, unknown>>;
+  const totalOriginal = typed.reduce((s, r) => s + Number(r.valor_inicial_compra ?? 0), 0);
+  const totalFinal = typed.reduce((s, r) => s + Number(r.valor_final_compra ?? 0), 0);
+  const maxRatio = Math.max(...typed.map((r) => Number(r.inflation_ratio ?? 0)));
+  const flag: AmendmentInflationFlag = {
+    pattern: "amendment_inflation",
+    contractCount: rows.length,
+    maxInflationRatio: maxRatio,
+    totalOriginalValue: totalOriginal,
+    totalFinalValue: totalFinal,
+    excessValue: totalFinal - totalOriginal,
+    worstAgency: String(typed[0].nome_unidade_gestora ?? ""),
+  };
+  setCache(cacheKey, flag);
+  return flag;
+}
+
+async function patternNewbornCompany(cnpj: string): Promise<NewbornCompanyFlag | null> {
+  const cacheKey = `patterns_newborn_company_${cnpj}`;
+  const cached = getCache<NewbornCompanyFlag | null>(cacheKey);
+  if (cached !== undefined) return cached ?? null;
+
+  const sql = `
+    WITH empresa AS (
+      SELECT cnpj_basico, data_inicio_atividade, porte
+      FROM \`basedosdados.br_me_cnpj.empresas\`
+      WHERE cnpj_basico = @cnpj
+        AND ano = @empresa_ano AND mes = @empresa_mes
+      LIMIT 1
+    ),
+    contratos AS (
+      SELECT
+        MIN(data_assinatura_contrato) AS first_contract_date,
+        COUNT(*)                      AS contract_count,
+        SUM(valor_final_compra)       AS total_value
+      FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
+      WHERE SUBSTR(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), 1, 8) = @cnpj
+        AND valor_final_compra >= @min_value
+    )
+    SELECT
+      e.data_inicio_atividade,
+      e.porte,
+      c.first_contract_date,
+      DATE_DIFF(c.first_contract_date, e.data_inicio_atividade, DAY) AS days_to_first_contract,
+      c.contract_count,
+      c.total_value
+    FROM empresa e, contratos c
+    WHERE e.data_inicio_atividade IS NOT NULL
+      AND c.first_contract_date IS NOT NULL
+      AND DATE_DIFF(c.first_contract_date, e.data_inicio_atividade, DAY) BETWEEN 0 AND @max_days
+      AND c.total_value >= @min_value
+  `;
+  const [job] = await bq.createQueryJob({
+    query: sql,
+    params: { cnpj, empresa_ano: DEFAULT_YEAR, empresa_mes: 12, min_value: NEWBORN_MIN_CONTRACT_VALUE, max_days: NEWBORN_MAX_DAYS_TO_CONTRACT },
+    location: "US",
+  });
+  const [rows] = await job.getQueryResults();
+  if (rows.length === 0) { setCache(cacheKey, null); return null; }
+  const r = rows[0] as Record<string, unknown>;
+  const flag: NewbornCompanyFlag = {
+    pattern: "newborn_company",
+    foundingDate: String(r.data_inicio_atividade ?? ""),
+    firstContractDate: String(r.first_contract_date ?? ""),
+    daysToFirstContract: Number(r.days_to_first_contract ?? 0),
+    companySize: String(r.porte ?? ""),
+    totalContractValue: Number(r.total_value ?? 0),
+  };
+  setCache(cacheKey, flag);
+  return flag;
+}
+
+async function patternSuddenSurge(cnpj: string, ano: number): Promise<SuddenSurgeFlag | null> {
+  const cacheKey = `patterns_sudden_surge_${cnpj}`;
+  const cached = getCache<SuddenSurgeFlag | null>(cacheKey);
+  if (cached !== undefined) return cached ?? null;
+
+  const sql = `
+    SELECT
+      ano,
+      SUM(valor_final_compra)           AS annual_value,
+      COUNT(*)                          AS contract_count,
+      COUNT(DISTINCT id_orgao_superior) AS agency_count
+    FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
+    WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
+      AND ano BETWEEN @ano_min AND @ano_max
+    GROUP BY ano
+    ORDER BY ano
+  `;
+  const [job] = await bq.createQueryJob({
+    query: sql,
+    params: { cnpj, ano_min: ano - SURGE_LOOKBACK_YEARS, ano_max: ano },
+    location: "US",
+  });
+  const [rawRows] = await job.getQueryResults();
+  const typed = rawRows as Array<Record<string, unknown>>;
+  const history = typed.map((r) => ({
+    ano: Number(r.ano),
+    value: Number(r.annual_value ?? 0),
+    contracts: Number(r.contract_count ?? 0),
+  }));
+
+  let surgeFlag: SuddenSurgeFlag | null = null;
+  for (let i = 1; i < history.length; i++) {
+    const prev = history[i - 1];
+    const curr = history[i];
+    if (prev.value > 0 && curr.value >= SURGE_MIN_ABSOLUTE_VALUE && curr.value / prev.value >= SURGE_RATIO_THRESHOLD) {
+      surgeFlag = {
+        pattern: "sudden_surge",
+        surgeYear: curr.ano,
+        priorYearValue: prev.value,
+        surgeYearValue: curr.value,
+        surgeRatio: curr.value / prev.value,
+        surgeYearAgencies: Number(typed[i]?.agency_count ?? 0),
+        history,
+      };
+      break;
+    }
+  }
+  setCache(cacheKey, surgeFlag);
+  return surgeFlag;
+}
+
+async function runPatterns(cnpj: string, ano: number): Promise<PatternResult> {
+  const cacheKey = `patterns_${cnpj}_${ano}`;
+  const cached = getCache<PatternResult>(cacheKey);
+  if (cached) return cached;
+
+  const settled = await Promise.allSettled([
+    patternSplitContracts(cnpj, ano),
+    patternConcentration(cnpj, ano),
+    patternInexigibility(cnpj, ano),
+    patternSingleBidder(cnpj, ano),
+    patternAlwaysWinner(cnpj, ano),
+    patternAmendmentInflation(cnpj, ano),
+    patternNewbornCompany(cnpj),
+    patternSuddenSurge(cnpj, ano),
+  ]);
+
+  const flags: PatternFlag[] = [];
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      const val = result.value;
+      if (Array.isArray(val)) flags.push(...(val as PatternFlag[]));
+      else if (val !== null) flags.push(val as PatternFlag);
+    } else {
+      console.error("[patterns] pattern failed:", result.reason);
+    }
+  }
+
+  const patternResult: PatternResult = { cnpj, detectedAt: new Date().toISOString(), flags };
+  setCache(cacheKey, patternResult);
+  return patternResult;
+}
+
 function classifyError(err: unknown): { kind: "auth" | "billing" | "other"; message: string } {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("401") || msg.includes("UNAUTHENTICATED") || msg.includes("credentials")) {
@@ -513,6 +1038,112 @@ function parseLookupLimit(value: string | null): number {
     return normalized;
   }
   return LOOKUP_LIMIT_DEFAULT;
+}
+
+
+function renderAlertasHtml(result: PatternResult): string {
+  if (result.flags.length === 0) {
+    return `<div class="alerta-empty">Nenhum alerta identificado para este CNPJ.</div>`;
+  }
+  return result.flags.map((flag) => {
+    switch (flag.pattern) {
+      case "split_contracts_below_threshold": {
+        const sev = flag.contractCount >= 5 ? "red" : "orange";
+        return `<div class="alerta-card ${sev}">
+          <div class="alerta-title">Possível Fracionamento de Licitação</div>
+          <div class="alerta-meta">
+            <span>${escHtml(flag.agencyName)}</span>
+            <span>${escHtml(flag.month)} · ${flag.contractCount} contratos · total ${brl.format(flag.combinedValue)}</span>
+            <span>Máx. individual: ${brl.format(flag.maxSingleValue)}</span>
+          </div>
+          <div class="alerta-source">CGU · contrato_compra · Lei 8.666/93 art.23</div>
+        </div>`;
+      }
+      case "contract_concentration": {
+        const pct = (flag.supplierShare * 100).toFixed(1);
+        const sev = flag.supplierShare > 0.60 ? "red" : "orange";
+        return `<div class="alerta-card ${sev}">
+          <div class="alerta-title">Alta Concentração de Contratos</div>
+          <div class="alerta-meta">
+            <span>${escHtml(flag.agencyName)} · ${pct}% do total · ano ${flag.year}</span>
+            <span>Fornecedor: ${brl.format(flag.supplierSpend)} · Agência: ${brl.format(flag.agencyTotalSpend)}</span>
+          </div>
+          <div class="alerta-source">CGU · contrato_compra</div>
+        </div>`;
+      }
+      case "inexigibility_recurrence": {
+        const sev = flag.contractCount >= 10 ? "red" : flag.contractCount >= 6 ? "orange" : "yellow";
+        return `<div class="alerta-card ${sev}">
+          <div class="alerta-title">Recorrência de Inexigibilidade</div>
+          <div class="alerta-meta">
+            <span>${escHtml(flag.agencyUnit)}</span>
+            <span>${flag.contractCount} contratos · ${brl.format(flag.totalValue)}</span>
+            <span>${escHtml(flag.firstDate)} — ${escHtml(flag.lastDate)}</span>
+          </div>
+          <div class="alerta-source">CGU · contrato_compra</div>
+        </div>`;
+      }
+      case "single_bidder": {
+        const sev = flag.occurrences >= 10 ? "red" : flag.occurrences >= 5 ? "orange" : "yellow";
+        return `<div class="alerta-card ${sev}">
+          <div class="alerta-title">Vencedor Único em Licitações</div>
+          <div class="alerta-meta">
+            <span>${flag.occurrences} licitações sem concorrência · ${brl.format(flag.totalValue)}</span>
+            <span>${flag.agencies.slice(0, 3).map(escHtml).join(", ")}${flag.agencies.length > 3 ? ` +${flag.agencies.length - 3}` : ""}</span>
+          </div>
+          <div class="alerta-source">CGU · licitacao_participante · OCP Red Flags #1</div>
+        </div>`;
+      }
+      case "always_winner": {
+        const pct = (flag.winRate * 100).toFixed(1);
+        const sev = flag.winRate >= 0.90 ? "red" : flag.winRate >= 0.75 ? "orange" : "yellow";
+        return `<div class="alerta-card ${sev}">
+          <div class="alerta-title">Taxa de Vitória Anômala em Licitações</div>
+          <div class="alerta-meta">
+            <span>${pct}% de vitórias · ${flag.totalWins} de ${flag.totalParticipations} licitações</span>
+            <span>Valor total disputado: ${brl.format(flag.totalValueCompeted)}</span>
+          </div>
+          <div class="alerta-source">CGU · licitacao_participante</div>
+        </div>`;
+      }
+      case "amendment_inflation": {
+        const maxPct = ((flag.maxInflationRatio - 1) * 100).toFixed(0);
+        const sev = flag.maxInflationRatio >= 2.0 ? "red" : "orange";
+        return `<div class="alerta-card ${sev}">
+          <div class="alerta-title">Superfaturamento via Aditivos Contratuais</div>
+          <div class="alerta-meta">
+            <span>${flag.contractCount} contratos acima do limite legal · excesso ${brl.format(flag.excessValue)}</span>
+            <span>Maior índice: +${maxPct}% · ${escHtml(flag.worstAgency)}</span>
+          </div>
+          <div class="alerta-source">CGU · contrato_compra · Lei 14.133/2021 art.125</div>
+        </div>`;
+      }
+      case "newborn_company": {
+        const months = Math.round(flag.daysToFirstContract / 30);
+        const sev = flag.daysToFirstContract < 30 ? "red" : flag.daysToFirstContract < 90 ? "orange" : "yellow";
+        return `<div class="alerta-card ${sev}">
+          <div class="alerta-title">Empresa Recém-Constituída com Contratos Públicos</div>
+          <div class="alerta-meta">
+            <span>Fundada ${escHtml(flag.foundingDate)} · primeiro contrato ${escHtml(flag.firstContractDate)} (${months < 1 ? "< 1 mês" : months + " mês(es)"})</span>
+            <span>Porte: ${escHtml(flag.companySize)} · total ${brl.format(flag.totalContractValue)}</span>
+          </div>
+          <div class="alerta-source">Receita Federal + CGU</div>
+        </div>`;
+      }
+      case "sudden_surge": {
+        const multiple = flag.surgeRatio.toFixed(1);
+        const sev = flag.surgeRatio >= 10 ? "red" : "orange";
+        return `<div class="alerta-card ${sev}">
+          <div class="alerta-title">Crescimento Explosivo de Contratos Públicos</div>
+          <div class="alerta-meta">
+            <span>${flag.surgeYear}: ${multiple}× · ${brl.format(flag.priorYearValue)} → ${brl.format(flag.surgeYearValue)}</span>
+            <span>${flag.surgeYearAgencies} órgão(s) no ano do salto</span>
+          </div>
+          <div class="alerta-source">CGU · contrato_compra</div>
+        </div>`;
+      }
+    }
+  }).join("");
 }
 
 // --- HTML renderer ---
@@ -1189,6 +1820,76 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       letter-spacing: 0.15em;
       text-transform: uppercase;
     }
+
+    /* --- Alertas de Risco panel --- */
+    #alertas-panel {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      width: 370px;
+      max-height: 55vh;
+      background: rgba(13,13,32,0.96);
+      border: 1px solid #1c1c38;
+      border-radius: 6px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(4px);
+    }
+    .alertas-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid #1c1c38;
+      flex-shrink: 0;
+    }
+    .alertas-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.56rem;
+      color: var(--gold);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    #alertas-toggle {
+      background: none;
+      border: none;
+      color: #6868aa;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0;
+    }
+    #alertas-toggle:hover { color: var(--gold); }
+    #alertas-body {
+      overflow-y: auto;
+      flex: 1;
+      padding: 0.4rem 0.5rem;
+    }
+    #alertas-body.collapsed { display: none; }
+    #alertas-body::-webkit-scrollbar { width: 3px; }
+    #alertas-body::-webkit-scrollbar-thumb { background: #1c1c38; }
+    .alertas-loading {
+      display: block;
+      padding: 0.4rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      color: #4a4a70;
+    }
+    .alerta-card {
+      border-left: 3px solid;
+      padding: 0.45rem 0.55rem;
+      margin-bottom: 0.4rem;
+      border-radius: 0 4px 4px 0;
+    }
+    .alerta-card.red    { border-color: #ef4444; background: rgba(239,68,68,0.07); }
+    .alerta-card.orange { border-color: #f97316; background: rgba(249,115,22,0.07); }
+    .alerta-card.yellow { border-color: #eab308; background: rgba(234,179,8,0.07); }
+    .alerta-title { font-weight: 600; color: #e4e4f0; font-size: 0.75rem; margin-bottom: 0.25rem; }
+    .alerta-meta { display: flex; flex-direction: column; gap: 0.1rem; }
+    .alerta-meta span { color: #8080b0; font-size: 0.68rem; line-height: 1.4; }
+    .alerta-source { color: #30304a; font-size: 0.58rem; margin-top: 0.25rem; }
+    .alerta-empty { color: #3a3a60; font-family: 'Space Mono', monospace; font-size: 0.65rem; padding: 0.4rem; }
   </style>
 </head>
 <body>
@@ -1227,6 +1928,15 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       <div class="spinner"></div>
       <span class="loading-text">consultando bigquery</span>
     </div>
+    <div id="alertas-panel">
+      <div class="alertas-header">
+        <span class="alertas-title">[ alertas de risco ]</span>
+        <button id="alertas-toggle" title="Minimizar">&#8722;</button>
+      </div>
+      <div id="alertas-body">
+        <span class="alertas-loading">Verificando padr&#245;es&#8230;</span>
+      </div>
+    </div>
   </div>
   <footer>
     <span id="status">Carregando…</span>
@@ -1253,6 +1963,24 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
     )};
   </script>
   <script src="/graph.js"></script>
+  <script>
+    (function() {
+      var toggle = document.getElementById('alertas-toggle');
+      var body = document.getElementById('alertas-body');
+      toggle.addEventListener('click', function() {
+        body.classList.toggle('collapsed');
+        toggle.innerHTML = body.classList.contains('collapsed') ? '&#43;' : '&#8722;';
+      });
+      fetch('/api/patterns/${escHtml(cnpj)}')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          body.innerHTML = data.html || '<span class="alertas-loading">Nenhum dado.</span>';
+        })
+        .catch(function() {
+          body.innerHTML = '<span class="alertas-loading">Erro ao carregar alertas.</span>';
+        });
+    })();
+  </script>
 </body>
 </html>`;
 }
@@ -1360,6 +2088,26 @@ Bun.serve({
         });
       }
     }
+
+    // Pattern detection API
+    const patternsMatch = url.pathname.match(/^\/api\/patterns\/([^/]+)$/);
+    if (patternsMatch) {
+      const cnpj = patternsMatch[1];
+      try {
+        const result = await runPatterns(cnpj, DEFAULT_YEAR);
+        const html = renderAlertasHtml(result);
+        return new Response(JSON.stringify({ cnpj, flags: result.flags.length, html }), {
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+        });
+      } catch (err) {
+        const e = classifyError(err);
+        return new Response(JSON.stringify({ error: e.message, html: '<span class="alertas-loading">Erro ao calcular alertas.</span>' }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
 
     // Graph JSON API
     const graphMatch = url.pathname.match(/^\/api\/graph\/([^/]+)$/);
