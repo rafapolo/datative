@@ -2,8 +2,6 @@ import Graph from "graphology";
 import Sigma from "sigma";
 import { createEdgeCurveProgram } from "@sigma/edge-curve";
 import { drawDiscNodeLabel, drawDiscNodeHover } from "sigma/rendering";
-import { NodeSquareProgram, NodeDiamondProgram } from "./node-shape-programs";
-import circular from "graphology-layout/circular";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 
 interface GraphNode {
@@ -88,12 +86,17 @@ const nodeTypeMap = new Map<string, string>();
 const nodeDetailsMap = new Map<string, NodeDetailEntry[]>();
 const knownNodeDetailKeys = new Set<string>();
 const queriedDatasetKeys = new Set<string>();
+const rowSignatureToNodeIds = new Map<string, Set<string>>();
 let renderer: Sigma | null = null;
 let isExpanding = false;
 let hoveredNode: string | null = null;
 let selectedNode: string | null = null;
 let layoutRootId = "";
-let currentLayout: "radial" | "circular" | "forceatlas2" = "radial";
+let currentLayout: "radial" | "forceatlas2" | "collapsible-tree" | "pack" =
+  "radial";
+let currentLookupLimit = 10;
+let currentGraph: Graph | null = null;
+const LOOKUP_LIMIT_OPTIONS = new Set([10, 20, 30, 40]);
 
 // Dataset colors injected server-side via window.__DATASET_COLORS
 const DATASET_COLORS: Record<string, string> =
@@ -181,6 +184,56 @@ function debugLog(...args: unknown[]) {
   console.log("[lookup-debug]", ...args);
 }
 
+function rowSignature(datasetId: string, row: Record<string, unknown>): string {
+  return `${datasetId}|${JSON.stringify(row)}`;
+}
+
+function lookupLimitParam(): string {
+  return String(currentLookupLimit);
+}
+
+function sanitizeLookupLimit(raw: string | null | undefined): number {
+  const parsed = Number(raw ?? "");
+  if (!Number.isFinite(parsed)) return 10;
+  return LOOKUP_LIMIT_OPTIONS.has(parsed) ? parsed : 10;
+}
+
+function selectedRowSignatures(): Set<string> {
+  const signatures = new Set<string>();
+  if (!selectedNode) return signatures;
+
+  const graph = currentGraph;
+  const nodeType = nodeTypeMap.get(selectedNode);
+  const details: NodeDetailEntry[] = [];
+
+  if (nodeType === "group" && graph?.hasNode(selectedNode)) {
+    for (const neighbor of graph.neighbors(selectedNode)) {
+      const neighborType = nodeTypeMap.get(neighbor);
+      if (neighborType === "group") continue;
+      details.push(...(nodeDetailsMap.get(neighbor) ?? []));
+    }
+  } else {
+    details.push(...(nodeDetailsMap.get(selectedNode) ?? []));
+  }
+
+  for (const detail of details) {
+    signatures.add(rowSignature(detail.datasetId, detail.attributes));
+  }
+  return signatures;
+}
+
+function syncLookupRowHighlight() {
+  const selectedSignatures = selectedRowSignatures();
+  const rows = document.querySelectorAll<HTMLTableRowElement>(
+    ".lookup-table tbody tr[data-row-signature]",
+  );
+  for (const row of rows) {
+    const signature = row.dataset.rowSignature;
+    const isLinked = !!signature && selectedSignatures.has(signature);
+    row.classList.toggle("linked", isLinked);
+  }
+}
+
 async function fetchGraph(cnpj: string): Promise<GraphData> {
   debugLog("GET /api/graph", { cnpj });
   const res = await fetch(`/api/graph/${cnpj}`);
@@ -193,9 +246,13 @@ async function fetchLookupDataset(
   cnpj: string,
   datasetId: string,
 ): Promise<LookupResult> {
-  debugLog("GET /api/lookup/:cnpj/dataset/:datasetId", { cnpj, datasetId });
+  debugLog("GET /api/lookup/:cnpj/dataset/:datasetId", {
+    cnpj,
+    datasetId,
+    limit: currentLookupLimit,
+  });
   const res = await fetch(
-    `/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1`,
+    `/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1&limit=${lookupLimitParam()}`,
   );
   if (!res.ok) throw new Error(`Lookup dataset API error ${res.status}`);
   const payload = (await res.json()) as LookupDatasetResponse;
@@ -226,19 +283,12 @@ function lighten(hex: string): string {
   return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
-function nodeShapeType(type: string): string {
-  if (type === "empresa") return "square";
-  if (type === "socio") return "diamond";
-  return "circle";
-}
-
 function nodeAttrs(
   type: string,
   label: string,
   opts?: string | { datasetId?: string; empresaId?: string; isRoot?: boolean },
 ) {
   const o = typeof opts === "string" ? { empresaId: opts } : (opts ?? {});
-  const shapeType = nodeShapeType(type);
   // Leaf dataset nodes — smaller, labeled only on hover
   if (o.datasetId) {
     const color = DATASET_COLORS[o.datasetId] ?? NODE_COLORS[type] ?? "#888888";
@@ -247,7 +297,7 @@ function nodeAttrs(
       fullLabel: label,
       size: 9,
       color,
-      type: shapeType,
+      type: "circle",
       x: Math.random() * 10,
       y: Math.random() * 10,
     };
@@ -268,7 +318,7 @@ function nodeAttrs(
     size,
     isRoot: o.isRoot ?? false,
     color: type === "empresa" ? baseColor : lighten(baseColor),
-    type: shapeType,
+    type: "circle",
     x: Math.random() * 10,
     y: Math.random() * 10,
   };
@@ -306,52 +356,31 @@ function drawLabelInsideNode(
   data: Parameters<typeof drawDiscNodeLabel>[1],
   settings: Parameters<typeof drawDiscNodeLabel>[2],
 ): void {
-  const d = data as Record<string, unknown>;
-  const nodeType = d.type as string | undefined;
-  if (nodeType === "square" || nodeType === "diamond") {
-    if (!data.label) return;
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    ctx.font = `${weight} ${size}px ${font}`;
-
-    const hs = data.size * 0.7; // half-side estimate
-
-    if (d.isRoot) {
-      // Root: full name shown as caption below — skip the inside label
-      drawNodeLabelPill(ctx, data.label, data.x, data.y + hs + 5, size, "#e8b84b");
-    } else {
-      // Non-root: truncate to fit inside, draw centered
-      const maxW = hs * 1.7;
-      let label = data.label;
-      if (ctx.measureText(label).width > maxW) {
-        while (label.length > 1 && ctx.measureText(label + "…").width > maxW)
-          label = label.slice(0, -1);
-        label += "…";
-      }
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.strokeText(label, data.x, data.y);
-      ctx.fillStyle = "#fff";
-      ctx.fillText(label, data.x, data.y);
-    }
-  } else {
-    if (!data.label) return;
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    const color = (settings.labelColor as { color?: string }).color ?? "#000";
-    const tx = data.x + data.size + 3;
-    const ty = data.y + size / 3;
-    ctx.font = `${weight} ${size}px ${font}`;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "#000";
-    ctx.strokeText(data.label, tx, ty);
-    ctx.fillStyle = color;
-    ctx.fillText(data.label, tx, ty);
+  if (!data.label) return;
+  const size = settings.labelSize ?? 12;
+  const font = settings.labelFont ?? "sans-serif";
+  const weight = settings.labelWeight ?? "500";
+  const color = (settings.labelColor as { color?: string }).color ?? "#000";
+  const tx = data.x + data.size + 3;
+  const ty = data.y + size / 3;
+  ctx.font = `${weight} ${size}px ${font}`;
+  if (currentLayout === "collapsible-tree") {
+    const text = String(data.label);
+    const metrics = ctx.measureText(text);
+    const padX = 4;
+    const padY = 2;
+    const boxX = tx - padX;
+    const boxY = ty - size + 1 - padY;
+    const boxW = metrics.width + padX * 2;
+    const boxH = size + padY * 2;
+    ctx.fillStyle = "rgba(6, 8, 18, 0.86)";
+    ctx.fillRect(boxX, boxY, boxW, boxH);
   }
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#000";
+  ctx.strokeText(data.label, tx, ty);
+  ctx.fillStyle = color;
+  ctx.fillText(data.label, tx, ty);
 }
 
 function drawHoverInsideNode(
@@ -359,17 +388,10 @@ function drawHoverInsideNode(
   data: Parameters<typeof drawDiscNodeHover>[1],
   settings: Parameters<typeof drawDiscNodeHover>[2],
 ): void {
-  const d = data as Record<string, unknown>;
-  const nodeType = d.type as string | undefined;
-  if (nodeType === "square" || nodeType === "diamond") {
-    if (!data.label || d.isRoot) return; // root caption always visible; nothing extra needed
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    ctx.font = `${weight} ${size}px ${font}`;
-    drawNodeLabelPill(ctx, data.label, data.x, data.y + data.size * 0.7 + 5, size);
-  }
-  // circles: label already drawn by drawLabelInsideNode; nodeReducer enlarges on hover — no extra rendering needed
+  // Labels are already drawn by drawLabelInsideNode; keep hover rendering minimal.
+  void ctx;
+  void data;
+  void settings;
 }
 
 function edgeAttrs() {
@@ -506,13 +528,261 @@ function radialLayout(graph: Graph) {
   });
 }
 
+interface RootedTree {
+  children: Map<string, string[]>;
+  depth: Map<string, number>;
+  visited: Set<string>;
+}
+
+function buildRootedTree(graph: Graph, root: string): RootedTree {
+  const children = new Map<string, string[]>();
+  const depth = new Map<string, number>([[root, 0]]);
+  const visited = new Set<string>([root]);
+  const queue: string[] = [root];
+
+  const sortNodes = (a: string, b: string) => {
+    const aType = String(nodeTypeMap.get(a) ?? "");
+    const bType = String(nodeTypeMap.get(b) ?? "");
+    if (aType !== bType) return aType.localeCompare(bType);
+    const aLabel = String(
+      graph.getNodeAttribute(a, "fullLabel") ??
+        graph.getNodeAttribute(a, "label") ??
+        a,
+    );
+    const bLabel = String(
+      graph.getNodeAttribute(b, "fullLabel") ??
+        graph.getNodeAttribute(b, "label") ??
+        b,
+    );
+    return aLabel.localeCompare(bLabel);
+  };
+
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    const nodeDepth = depth.get(node) ?? 0;
+    const nodeChildren: string[] = [];
+    const neighbors = graph
+      .neighbors(node)
+      .filter((n) => graph.hasNode(n))
+      .sort(sortNodes);
+
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor)) continue;
+      visited.add(neighbor);
+      depth.set(neighbor, nodeDepth + 1);
+      nodeChildren.push(neighbor);
+      queue.push(neighbor);
+    }
+
+    children.set(node, nodeChildren);
+  }
+
+  return { children, depth, visited };
+}
+
+function collapsibleTreeLayout(graph: Graph) {
+  const root = layoutRootId;
+  if (!root || !graph.hasNode(root)) return;
+  const { children, depth, visited } = buildRootedTree(graph, root);
+
+  const rowOrder = new Map<string, number>();
+  let nextRow = 0;
+  const assignRows = (node: string): number => {
+    const nodeChildren = children.get(node) ?? [];
+    if (nodeChildren.length === 0) {
+      const row = nextRow++;
+      rowOrder.set(node, row);
+      return row;
+    }
+    const childRows = nodeChildren.map(assignRows);
+    const row = (childRows[0] + childRows[childRows.length - 1]) / 2;
+    rowOrder.set(node, row);
+    return row;
+  };
+  assignRows(root);
+
+  const maxDepth = Math.max(...depth.values(), 0);
+  const leaves = Math.max(nextRow, 1);
+  const maxLabelChars = Math.max(
+    ...[...visited].map((node) =>
+      String(
+        graph.getNodeAttribute(node, "fullLabel") ??
+          graph.getNodeAttribute(node, "label") ??
+          "",
+      ).length,
+    ),
+    0,
+  );
+  const labelFactor = Math.max(1, Math.min(1.8, maxLabelChars / 24));
+  const rowSpacing = Math.max(
+    84,
+    Math.min(220, (2600 / leaves) * labelFactor),
+  );
+  const depthSpacing = Math.max(
+    360,
+    Math.min(760, (5200 / (maxDepth + 1)) * Math.min(1.7, labelFactor)),
+  );
+  const rootRow = rowOrder.get(root) ?? 0;
+  const depthCenterOffset = ((maxDepth + 1) * depthSpacing) / 2;
+
+  for (const node of visited) {
+    const d = depth.get(node) ?? 0;
+    const row = rowOrder.get(node) ?? 0;
+    const nodeType = String(nodeTypeMap.get(node) ?? "");
+    const typeOffset =
+      nodeType === "group"
+        ? 18
+        : nodeType === "empresa"
+          ? -12
+          : nodeType === "socio"
+            ? 12
+            : 0;
+    graph.setNodeAttribute(node, "x", d * depthSpacing - depthCenterOffset + typeOffset);
+    graph.setNodeAttribute(node, "y", (row - rootRow) * rowSpacing);
+  }
+
+  const detached = graph.nodes().filter((n) => !visited.has(n));
+  if (detached.length === 0) return;
+
+  const ringRadius = Math.max(220, detached.length * 24);
+  detached.forEach((node, index) => {
+    const angle = (index / detached.length) * 2 * Math.PI;
+    graph.setNodeAttribute(node, "x", -depthSpacing);
+    graph.setNodeAttribute(node, "y", ringRadius * Math.sin(angle));
+  });
+}
+
+function packLayout(graph: Graph) {
+  const root = layoutRootId;
+  if (!root || !graph.hasNode(root)) return;
+  const { children, visited } = buildRootedTree(graph, root);
+
+  const subtreeWeight = new Map<string, number>();
+  const calcWeight = (node: string): number => {
+    const nodeChildren = children.get(node) ?? [];
+    const weight = 1 + nodeChildren.reduce((sum, child) => sum + calcWeight(child), 0);
+    subtreeWeight.set(node, weight);
+    return weight;
+  };
+  const totalWeight = calcWeight(root);
+  const rootRadius = Math.max(180, Math.sqrt(totalWeight) * 30);
+
+  type PackedCircle = {
+    id: string;
+    x: number;
+    y: number;
+    radius: number;
+  };
+
+  const collides = (
+    x: number,
+    y: number,
+    radius: number,
+    circles: PackedCircle[],
+    padding: number,
+  ) => {
+    for (const circle of circles) {
+      const minDistance = radius + circle.radius + padding;
+      if (Math.hypot(x - circle.x, y - circle.y) < minDistance) return true;
+    }
+    return false;
+  };
+
+  const packSiblings = (ids: string[]) => {
+    const sorted = [...ids].sort(
+      (a, b) => (subtreeWeight.get(b) ?? 1) - (subtreeWeight.get(a) ?? 1),
+    );
+    const circles: PackedCircle[] = [];
+
+    const baseRadius = (id: string) => Math.max(1, Math.sqrt(subtreeWeight.get(id) ?? 1));
+    const spiralStep = 0.35;
+    const radialFactor = 0.95;
+    const padding = 0.18;
+
+    for (const id of sorted) {
+      const radius = baseRadius(id);
+      let best: PackedCircle | null = null;
+
+      for (let t = 0; t <= 2200; t += spiralStep) {
+        const radial = Math.max(
+          radius + 0.25,
+          radialFactor * Math.sqrt(t) + radius + 0.12,
+        );
+        const x = Math.cos(t) * radial;
+        const y = Math.sin(t) * radial;
+        if (collides(x, y, radius, circles, padding)) continue;
+        best = { id, x, y, radius };
+        break;
+      }
+
+      if (!best) {
+        const fallbackX = (circles.length + 1) * (radius * 2.2 + padding);
+        best = { id, x: fallbackX, y: 0, radius };
+      }
+      circles.push(best);
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let farthest = 1;
+    for (const circle of circles) {
+      minX = Math.min(minX, circle.x - circle.radius);
+      maxX = Math.max(maxX, circle.x + circle.radius);
+      minY = Math.min(minY, circle.y - circle.radius);
+      maxY = Math.max(maxY, circle.y + circle.radius);
+    }
+
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    for (const circle of circles) {
+      circle.x -= cx;
+      circle.y -= cy;
+      farthest = Math.max(farthest, Math.hypot(circle.x, circle.y) + circle.radius);
+    }
+
+    return { circles, extentRadius: farthest };
+  };
+
+  const place = (node: string, x: number, y: number, radius: number) => {
+    graph.setNodeAttribute(node, "x", x);
+    graph.setNodeAttribute(node, "y", y);
+
+    const nodeChildren = children.get(node) ?? [];
+    if (nodeChildren.length === 0) return;
+
+    const { circles, extentRadius } = packSiblings(nodeChildren);
+    const usableRadius = Math.max(radius * 0.86, 28);
+    const scale = usableRadius / extentRadius;
+
+    for (const child of circles) {
+      const childRadius = child.radius * scale;
+      place(child.id, x + child.x * scale, y + child.y * scale, childRadius);
+    }
+  };
+
+  place(root, 0, 0, rootRadius);
+
+  const detached = graph.nodes().filter((n) => !visited.has(n));
+  if (detached.length === 0) return;
+  const detachedRadius = Math.max(220, detached.length * 24);
+  detached.forEach((node, index) => {
+    const angle = (index / detached.length) * 2 * Math.PI;
+    graph.setNodeAttribute(node, "x", -rootRadius * 1.7);
+    graph.setNodeAttribute(node, "y", detachedRadius * Math.sin(angle));
+  });
+}
+
 function runLayout(graph: Graph, _iterations: number, onDone?: () => void) {
   requestAnimationFrame(() => {
-    if (currentLayout === "circular") {
-      circular.assign(graph);
-    } else if (currentLayout === "forceatlas2") {
+    if (currentLayout === "forceatlas2") {
       const settings = forceAtlas2.inferSettings(graph);
       forceAtlas2.assign(graph, { iterations: 150, settings });
+    } else if (currentLayout === "pack") {
+      packLayout(graph);
+    } else if (currentLayout === "collapsible-tree") {
+      collapsibleTreeLayout(graph);
     } else {
       radialLayout(graph);
     }
@@ -534,7 +804,8 @@ async function expandRelatedDatasets(nodeId: string, graph: Graph) {
       expandedRelatedKeys.add(expandKey);
       try {
         const url = `/api/lookup/related?datasetId=${encodeURIComponent(rel.datasetId)}&foreignKey=${encodeURIComponent(rel.foreignKey)}&value=${encodeURIComponent(String(value))}`;
-        const res = await fetch(url);
+        const urlWithLimit = `${url}&limit=${lookupLimitParam()}`;
+        const res = await fetch(urlWithLimit);
         if (!res.ok) continue;
         const { result } = (await res.json()) as { result: LookupResult };
         if (result.rows.length > 0) addResultsToGraph(result, nodeId, graph);
@@ -771,6 +1042,11 @@ function injectPanelStyles() {
     .lookup-table tbody tr:nth-child(odd) td { background: #0a0f22; }
     .lookup-table tbody tr:nth-child(even) td { background: #0b132b; }
     .lookup-table tbody tr:hover td { background: #121a34; color: #dbeafe; }
+    .lookup-table tbody tr.linked td {
+      background: #1d2b52 !important;
+      color: #e6f0ff;
+      box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.45);
+    }
     .lookup-skeleton {
       padding: 1rem;
       color: #44446a;
@@ -1196,7 +1472,7 @@ function renderResultSections(
         <span style="color:${datasetColor};margin-right:0.3em;font-size:0.85em">⦿</span>${result.label}
       </span>
       <div class="lookup-section-actions">
-        ${hasHits ? `<span class="lookup-badge">${result.count}${result.count === 10 ? "+" : ""}</span>` : ""}
+        ${hasHits ? `<span class="lookup-badge">${result.count}</span>` : ""}
         ${actionsHtml}
         <span class="chevron">▶</span>
       </div>
@@ -1218,6 +1494,9 @@ function renderResultSections(
 
       for (const row of result.rows) {
         const tr = document.createElement("tr");
+        const signature = rowSignature(result.id, row);
+        tr.dataset.rowSignature = signature;
+        tr.dataset.datasetId = result.id;
         for (const col of cols) {
           const val = row[col];
           const text = val == null ? "—" : String(val);
@@ -1228,13 +1507,10 @@ function renderResultSections(
             const span = document.createElement("span");
             span.className = "cnpj-link";
             span.textContent = text;
-            span.addEventListener("click", () => {
+            span.addEventListener("click", (e) => {
+              e.stopPropagation();
               const basico = extractBasico(text);
-              lookupHistory.push({
-                cnpj: currentLookupCnpj,
-                label: currentLookupLabel,
-              });
-              openLookupPanel(basico, graph);
+              window.open(`/?cnpj=${encodeURIComponent(basico)}`, "_blank", "noopener,noreferrer");
             });
             td.appendChild(span);
           } else {
@@ -1242,6 +1518,16 @@ function renderResultSections(
           }
           tr.appendChild(td);
         }
+        tr.addEventListener("click", () => {
+          const nodeIds = rowSignatureToNodeIds.get(signature);
+          if (!nodeIds || nodeIds.size === 0 || !currentGraph) return;
+          const nodeId = [...nodeIds][0];
+          selectedNode = nodeId;
+          hoveredNode = null;
+          renderer?.refresh({ skipIndexation: true });
+          showNodeDetails(nodeId, currentGraph);
+          syncLookupRowHighlight();
+        });
         tbody.appendChild(tr);
       }
 
@@ -1249,7 +1535,7 @@ function renderResultSections(
     }
 
     // Toggle body on header click
-    const datasetKey = `${cnpj}:${result.id}`;
+    const datasetKey = `${cnpj}:${result.id}:${lookupLimitParam()}`;
     const queryAndAddDataset = async () => {
       if (!canAddToGraph || datasetAdded || queriedDatasetKeys.has(datasetKey))
         return;
@@ -1333,6 +1619,7 @@ function renderResultSections(
     section.appendChild(bodyDiv);
     body.appendChild(section);
   }
+  syncLookupRowHighlight();
 }
 
 function addResultsToGraph(
@@ -1362,6 +1649,11 @@ function addResultsToGraph(
     seenInBatch.add(nodeId);
 
     trackNodeDetail(nodeId, result.id, result.label, companyCnpj, row);
+    const signature = rowSignature(result.id, row);
+    if (!rowSignatureToNodeIds.has(signature)) {
+      rowSignatureToNodeIds.set(signature, new Set<string>());
+    }
+    rowSignatureToNodeIds.get(signature)!.add(nodeId);
     if (!knownNodeIds.has(nodeId)) {
       knownNodeIds.add(nodeId);
       nodeTypeMap.set(nodeId, nodeType);
@@ -1387,9 +1679,11 @@ function addResultsToGraph(
   if (newNodes.length > 0) {
     runLayout(graph, 100, () => {
       setStatus(`+${newNodes.length} nó(s) de "${result.label}" adicionado(s)`);
+      syncLookupRowHighlight();
     });
   } else {
     setStatus(`Nenhum nó novo para "${result.label}".`);
+    syncLookupRowHighlight();
   }
 }
 
@@ -1485,8 +1779,8 @@ async function openLookupPanel(
   }
 
   try {
-    debugLog("GET /api/lookup/:cnpj", { cnpj });
-    const res = await fetch(`/api/lookup/${cnpj}`);
+    debugLog("GET /api/lookup/:cnpj", { cnpj, limit: currentLookupLimit });
+    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as LookupResponse;
     debugLog("GET /api/lookup done", {
@@ -1504,6 +1798,7 @@ async function openLookupPanel(
 async function init() {
   const params = new URLSearchParams(location.search);
   const cnpj = params.get("cnpj");
+  currentLookupLimit = sanitizeLookupLimit(params.get("qlimit"));
   const container = document.getElementById(
     "graph-container",
   ) as HTMLDivElement;
@@ -1528,6 +1823,7 @@ async function init() {
   }
 
   const graph = new Graph();
+  currentGraph = graph;
 
   // The first empresa node is the root cnpj
   const rootNode = data.nodes.find((n) => n.type === "empresa");
@@ -1578,10 +1874,6 @@ async function init() {
     renderEdgeLabels: false,
     defaultEdgeType: "curved",
     edgeProgramClasses: { curved: createEdgeCurveProgram() },
-    nodeProgramClasses: {
-      square: NodeSquareProgram,
-      diamond: NodeDiamondProgram,
-    },
     defaultDrawNodeLabel: drawLabelInsideNode,
     defaultDrawNodeHover: drawHoverInsideNode,
     labelRenderedSizeThreshold: 8,
@@ -1591,6 +1883,10 @@ async function init() {
     labelColor: { color: "#c8d0e0" },
     nodeReducer: (node, data) => {
       const res = { ...data };
+      const alwaysShowLabels = currentLayout === "collapsible-tree";
+      if (alwaysShowLabels && res.fullLabel) {
+        res.label = res.fullLabel as string;
+      }
       // Restore label for leaf nodes on hover
       if (!res.label && res.fullLabel) {
         if (hoveredNode === node || selectedNode === node) {
@@ -1611,7 +1907,7 @@ async function init() {
           res.zIndex = 5;
         } else {
           res.color = COLOR_FADE_NODE;
-          res.label = "";
+          if (!alwaysShowLabels) res.label = "";
           res.zIndex = 0;
         }
       } else if (hoveredNode !== null) {
@@ -1625,17 +1921,22 @@ async function init() {
     edgeReducer: (edge, data) => {
       const res = { ...data };
       const g = renderer?.getGraph();
+      if (currentLayout === "collapsible-tree") {
+        res.type = "line";
+        res.size = 1;
+        res.color = "rgba(96,122,176,0.45)";
+      }
       if (selectedNode !== null) {
         const src = g?.source(edge);
         const tgt = g?.target(edge);
         const touchesSelected = src === selectedNode || tgt === selectedNode;
         if (touchesSelected) {
           res.color = COLOR_EDGE_HOVER;
-          res.size = 2;
+          res.size = currentLayout === "collapsible-tree" ? 1.5 : 2;
           res.zIndex = 5;
         } else {
           res.color = COLOR_FADE_EDGE;
-          res.size = 0.5;
+          res.size = currentLayout === "collapsible-tree" ? 0.25 : 0.5;
           res.zIndex = 0;
         }
       } else if (hoveredNode !== null) {
@@ -1643,10 +1944,10 @@ async function init() {
         const tgt = g?.target(edge);
         if (src === hoveredNode || tgt === hoveredNode) {
           res.color = COLOR_EDGE_HOVER;
-          res.size = 2;
+          res.size = currentLayout === "collapsible-tree" ? 1.5 : 2;
         } else {
           res.color = interpolateColor(COLOR_EDGE_BASE, COLOR_FADE_EDGE, 0.6);
-          res.size = 0.8;
+          res.size = currentLayout === "collapsible-tree" ? 0.5 : 0.8;
         }
       }
       return res;
@@ -1664,6 +1965,19 @@ async function init() {
       runLayout(graph, 200);
     });
   }
+  const queryLimitSelect = document.getElementById(
+    "query-limit-select",
+  ) as HTMLSelectElement | null;
+  if (queryLimitSelect) {
+    queryLimitSelect.value = lookupLimitParam();
+    queryLimitSelect.addEventListener("change", () => {
+      currentLookupLimit = sanitizeLookupLimit(queryLimitSelect.value);
+      queryLimitSelect.value = lookupLimitParam();
+      const next = new URL(location.href);
+      next.searchParams.set("qlimit", lookupLimitParam());
+      location.href = next.toString();
+    });
+  }
 
   // Auto-fetch all dataset lookups and populate graph with colored nodes
   const overlay = document.getElementById("loading-overlay");
@@ -1674,7 +1988,7 @@ async function init() {
   setStatus("Cruzando com bases de dados…");
   let lookupResults: LookupResult[] = [];
   try {
-    const res = await fetch(`/api/lookup/${cnpj}`);
+    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
     if (res.ok) {
       const payload = (await res.json()) as LookupResponse;
       lookupResults = payload.results;
@@ -1682,7 +1996,7 @@ async function init() {
         if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
           addResultsToGraph(result, cnpj, graph);
           autoAddedDatasets.add(result.id);
-          queriedDatasetKeys.add(`${cnpj}:${result.id}`);
+          queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
         }
       }
       const hits = lookupResults.filter((r) => r.count > 0).length;
@@ -1746,12 +2060,14 @@ async function init() {
   renderer.on("clickStage", () => {
     selectedNode = null;
     renderer!.refresh({ skipIndexation: true });
+    syncLookupRowHighlight();
   });
 
   renderer.on("clickNode", ({ node }) => {
     selectedNode = selectedNode === node ? null : node;
     hoveredNode = null;
     renderer!.refresh({ skipIndexation: true });
+    syncLookupRowHighlight();
 
     const nodeType = nodeTypeMap.get(node);
     if (nodeType === "group") {

@@ -35,6 +35,7 @@ const cnpjsInteresse = loadCnpjsInteresse();
 // --- Config ---
 const PROJECT_ID = process.env.GCP_PROJECT_ID ?? "";
 const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const KEY_JSON = process.env.GCP_SERVICE_ACCOUNT_JSON;
 const PORT = parseInt(process.env.PORT ?? "3003", 10);
 
 const TABLE = "basedosdados.br_me_cnpj.empresas";
@@ -69,6 +70,7 @@ function saveUsage(data: UsageData): void {
 let usage = loadUsage();
 const DEFAULT_YEAR = 2023;
 const DEFAULT_LIMIT = 25;
+const LOOKUP_LIMIT_DEFAULT = 10;
 
 interface SchemaColumn {
   name: string;
@@ -102,7 +104,15 @@ function getSchemaColumnsForTable(tableRef: string): SchemaColumn[] {
 function createClient(): BigQuery {
   const opts: ConstructorParameters<typeof BigQuery>[0] = { location: "US" };
   if (PROJECT_ID) opts.projectId = PROJECT_ID;
-  if (KEY_FILE) opts.keyFilename = KEY_FILE;
+  if (KEY_FILE) {
+    opts.keyFilename = KEY_FILE;
+  } else if (KEY_JSON) {
+    try {
+      opts.credentials = JSON.parse(KEY_JSON);
+    } catch (error) {
+      console.error("Invalid GCP_SERVICE_ACCOUNT_JSON:", error);
+    }
+  }
   return new BigQuery(opts);
 }
 
@@ -289,8 +299,8 @@ function inferLookupNodeFields(ds: (typeof CNPJ_DATASETS)[number]): {
 async function queryLookupDataset(
   cnpjBasico: string,
   datasetId: string,
-  year = 2023,
   forceFresh = false,
+  limit = LOOKUP_LIMIT_DEFAULT,
 ): Promise<{ result: LookupResult; bytes: number }> {
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
   const docDigits = cnpjBasico.replace(/\D/g, "");
@@ -303,37 +313,54 @@ async function queryLookupDataset(
   const ds = CNPJ_DATASETS.find((d) => d.id === datasetId);
   if (!ds) throw new Error(`Dataset not found: ${datasetId}`);
 
-  const dsKey = `lookup_${docDigits}_${year}_${ds.id}`;
+  const dsKey = `lookup_${docDigits}_${ds.id}_limit_${limit}`;
   if (!forceFresh) {
     const cachedDs = getCache<LookupResult>(dsKey);
     if (cachedDs) return { result: cachedDs, bytes: 0 };
   }
 
   const whereParts = ds.cnpjColumns.map((col) => buildCnpjWhere(col));
-  let whereClause =
+  const whereClause =
     whereParts.length === 1 ? whereParts[0] : `(${whereParts.join(" OR ")})`;
-  if (ds.yearField) {
-    whereClause += ` AND ${ds.yearField} = @year`;
-  }
 
   const fields = ds.displayFields.join(", ");
-  const sql = `SELECT ${fields} FROM \`${ds.table}\` WHERE ${whereClause} LIMIT 10`;
+  const sql = `
+    WITH matched AS (
+      SELECT ${fields}
+      FROM \`${ds.table}\`
+      WHERE ${whereClause}
+    )
+    SELECT
+      *,
+      COUNT(*) OVER() AS __total_count
+    FROM matched
+    LIMIT @limit
+  `;
   const inferredFields = inferLookupNodeFields(ds);
 
   try {
     const [job] = await bq.createQueryJob({
       query: sql,
-      params: { cnpj_root: cnpjRoot, doc_digits: docDigits, doc_len: docLen, year },
+      params: { cnpj_root: cnpjRoot, doc_digits: docDigits, doc_len: docLen, limit },
       location: "US",
     });
-    const [rows] = await job.getQueryResults();
+    const [rawRows] = await job.getQueryResults();
     const [meta] = await job.getMetadata();
     const bytes = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
+    const rowsWithCount = rawRows as Array<Record<string, unknown>>;
+    const totalCountRaw = rowsWithCount[0]?.__total_count;
+    const totalCount =
+      typeof totalCountRaw === "number"
+        ? totalCountRaw
+        : totalCountRaw != null
+          ? Number(totalCountRaw)
+          : 0;
+    const rows = rowsWithCount.map(({ __total_count: _ignored, ...row }) => row);
     const result: LookupResult = {
       id: ds.id,
       label: ds.label,
-      count: rows.length,
-      rows: rows as Record<string, unknown>[],
+      count: Number.isFinite(totalCount) ? totalCount : rows.length,
+      rows,
       cnpjColumnNames: ds.cnpjColumns.map((c) => c.name),
       nodeType: ds.nodeType,
       nodeIdField: ds.nodeIdField ?? inferredFields.nodeIdField,
@@ -360,19 +387,22 @@ async function queryLookupDataset(
   }
 }
 
-async function queryLookup(cnpjBasico: string, year = 2023): Promise<{ results: LookupResult[]; totalBytes: number }> {
+async function queryLookup(
+  cnpjBasico: string,
+  limit = LOOKUP_LIMIT_DEFAULT,
+): Promise<{ results: LookupResult[]; totalBytes: number }> {
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
   const docDigits = cnpjBasico.replace(/\D/g, "");
   if (docDigits.length < 8) {
     throw new Error("Lookup value must have at least 8 digits.");
   }
 
-  const topKey = `lookup_${docDigits}_${year}`;
+  const topKey = `lookup_${docDigits}_limit_${limit}`;
   const cachedAll = getCache<LookupResult[]>(topKey);
   if (cachedAll) return { results: cachedAll, totalBytes: 0 };
 
   const jobs = CNPJ_DATASETS.map((ds) =>
-    queryLookupDataset(cnpjBasico, ds.id, year),
+    queryLookupDataset(cnpjBasico, ds.id, false, limit),
   );
 
   const settled = await Promise.all(jobs);
@@ -387,6 +417,7 @@ async function queryByField(
   foreignKey: string,
   value: string,
   forceFresh = false,
+  limit = LOOKUP_LIMIT_DEFAULT,
 ): Promise<{ result: LookupResult; bytes: number }> {
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
@@ -397,24 +428,48 @@ async function queryByField(
   const ds = RELATED_DATASETS.find((d) => d.id === datasetId);
   if (!ds) throw new Error(`Related dataset not found: ${datasetId}`);
 
-  const cacheKey = `related_${datasetId}_${foreignKey}_${value}`;
+  const cacheKey = `related_${datasetId}_${foreignKey}_${value}_limit_${limit}`;
   if (!forceFresh) {
     const cached = getCache<LookupResult>(cacheKey);
     if (cached) return { result: cached, bytes: 0 };
   }
 
-  const sql = `SELECT ${ds.displayFields.join(", ")} FROM \`${ds.table}\` WHERE ${foreignKey} = @value LIMIT 10`;
+  const sql = `
+    WITH matched AS (
+      SELECT ${ds.displayFields.join(", ")}
+      FROM \`${ds.table}\`
+      WHERE ${foreignKey} = @value
+    )
+    SELECT
+      *,
+      COUNT(*) OVER() AS __total_count
+    FROM matched
+    LIMIT @limit
+  `;
 
   try {
-    const [job] = await bq.createQueryJob({ query: sql, params: { value }, location: "US" });
-    const [rows] = await job.getQueryResults();
+    const [job] = await bq.createQueryJob({
+      query: sql,
+      params: { value, limit },
+      location: "US",
+    });
+    const [rawRows] = await job.getQueryResults();
     const [meta] = await job.getMetadata();
     const bytes = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
+    const rowsWithCount = rawRows as Array<Record<string, unknown>>;
+    const totalCountRaw = rowsWithCount[0]?.__total_count;
+    const totalCount =
+      typeof totalCountRaw === "number"
+        ? totalCountRaw
+        : totalCountRaw != null
+          ? Number(totalCountRaw)
+          : 0;
+    const rows = rowsWithCount.map(({ __total_count: _ignored, ...row }) => row);
     const result: LookupResult = {
       id: ds.id,
       label: ds.label,
-      count: rows.length,
-      rows: rows as Record<string, unknown>[],
+      count: Number.isFinite(totalCount) ? totalCount : rows.length,
+      rows,
       cnpjColumnNames: [],
       nodeType: ds.nodeType,
       nodeIdField: ds.nodeIdField,
@@ -448,6 +503,16 @@ function classifyError(err: unknown): { kind: "auth" | "billing" | "other"; mess
     return { kind: "billing", message: msg };
   }
   return { kind: "other", message: msg };
+}
+
+function parseLookupLimit(value: string | null): number {
+  const parsed = Number(value ?? "");
+  if (!Number.isFinite(parsed)) return LOOKUP_LIMIT_DEFAULT;
+  const normalized = Math.trunc(parsed);
+  if (normalized === 10 || normalized === 20 || normalized === 30 || normalized === 40) {
+    return normalized;
+  }
+  return LOOKUP_LIMIT_DEFAULT;
 }
 
 // --- HTML renderer ---
@@ -530,7 +595,7 @@ function renderPage(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Investiga — CNPJ Browser</title>
+  <title>DATATIVE — CNPJ Browser</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #f5f7fa; color: #1a1a2e; }
@@ -567,7 +632,7 @@ function renderPage(
 </head>
 <body>
   <header>
-    <h1>Investiga</h1>
+    <h1>DATATIVE</h1>
     <span>CNPJ / Receita Federal · basedosdados.br_me_cnpj.empresas</span>
     <span style="margin-left:auto;font-size:0.8rem;opacity:0.85">
       BQ ${usageData.month} &nbsp;·&nbsp;
@@ -664,7 +729,7 @@ function renderGraphLanding(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Investiga</title>
+  <title>DATATIVE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap">
   <style>
@@ -703,6 +768,7 @@ function renderGraphLanding(): string {
       font-size: 1.35rem;
       letter-spacing: 0.12em;
       color: var(--gold);
+      text-decoration: none;
     }
     .nav-links { display: flex; gap: 1.5rem; }
     .nav-links a {
@@ -911,7 +977,7 @@ function renderGraphLanding(): string {
 </head>
 <body>
   <nav>
-    <span class="nav-brand">INV_</span>
+    <a class="nav-brand" href="/">DATA_</a>
     <div class="nav-links">
       <a href="/table">BASE DE DADOS →</a>
     </div>
@@ -920,7 +986,7 @@ function renderGraphLanding(): string {
     <main>
       <p class="eyebrow">// sistema de investigação · br</p>
       <h1 class="wordmark">
-        <span style="animation-delay:.04s">I</span><span style="animation-delay:.09s">N</span><span style="animation-delay:.14s">V</span><span style="animation-delay:.19s">E</span><span style="animation-delay:.24s">S</span><span style="animation-delay:.29s">T</span><span style="animation-delay:.34s">I</span><span style="animation-delay:.39s">G</span><span style="animation-delay:.44s">A</span>
+        <span style="animation-delay:.04s">D</span><span style="animation-delay:.09s">A</span><span style="animation-delay:.14s">T</span><span style="animation-delay:.19s">A</span><span style="animation-delay:.24s">T</span><span style="animation-delay:.29s">I</span><span style="animation-delay:.34s">V</span><span style="animation-delay:.39s">E</span>
       </h1>
       <div class="gold-rule"></div>
       <p class="tagline">Cruzamento de CNPJs com bases públicas federais — Receita Federal, CGU, TSE, SIAFI e mais.</p>
@@ -941,7 +1007,7 @@ function renderGraphLanding(): string {
     </aside>
   </div>
   <footer>
-    <span class="footer-copy">INVESTIGA · CNPJ GRAPH · BASE DOS DADOS</span>
+    <span class="footer-copy">DATATIVE · CNPJ GRAPH · BASE DOS DADOS</span>
     <span class="footer-status"><span class="status-dot"></span> SISTEMA ATIVO</span>
   </footer>
 </body>
@@ -958,7 +1024,7 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>INV_ ${escHtml(cnpj)}</title>
+  <title>DATA_ ${escHtml(cnpj)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap">
   <style>
@@ -1026,8 +1092,24 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    #layout-select {
+    .control-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
       margin-left: auto;
+    }
+    .control-group + .control-group {
+      margin-left: 0.6rem;
+    }
+    .control-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      color: var(--muted);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    #layout-select, #query-limit-select {
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--muted);
@@ -1038,8 +1120,9 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       cursor: pointer;
       outline: none;
     }
-    #layout-select:hover { border-color: var(--gold); color: var(--text); }
-    #layout-select option { background: #0d0d20; }
+    #query-limit-select { min-width: 56px; text-align: center; }
+    #layout-select:hover, #query-limit-select:hover { border-color: var(--gold); color: var(--text); }
+    #layout-select option, #query-limit-select option { background: #0d0d20; }
     #status {
       font-family: 'Space Mono', monospace;
       font-size: 0.6rem;
@@ -1063,16 +1146,22 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       height: 30px;
       display: flex;
       align-items: center;
-      gap: 0;
+      justify-content: space-between;
       flex-shrink: 0;
     }
     footer span {
       font-family: 'Space Mono', monospace;
       font-size: 0.58rem;
-      color: #2e2e50;
+      color: var(--muted);
       letter-spacing: 0.05em;
     }
-    footer span + span::before { content: " · "; color: #1e1e38; }
+    .footer-meta {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+    }
+    .footer-meta span + span::before { content: " | "; color: #2e2e50; }
     #loading-overlay {
       position: absolute;
       inset: 0;
@@ -1105,7 +1194,7 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
 <body>
   <div class="gold-bar"></div>
   <header>
-    <span class="h-brand">INV_</span>
+    <span class="h-brand">DATA_</span>
     <span class="h-divider"></span>
     <nav class="breadcrumb">
       <a href="/">INÍCIO</a>
@@ -1114,12 +1203,24 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       <span class="bc-sep">›</span>
       <span class="bc-current" id="bc-label">GRAFO</span>
     </nav>
-    <select id="layout-select">
-      <option value="radial">Radial</option>
-      <option value="circular">Circular</option>
-      <option value="forceatlas2">Force Atlas 2</option>
-    </select>
-    <span id="status">Carregando…</span>
+    <div class="control-group">
+      <label class="control-label" for="layout-select">Layout</label>
+      <select id="layout-select" class="layout-select">
+        <option value="radial">Radial</option>
+        <option value="collapsible-tree">Collapsible Tree</option>
+        <option value="pack">Pack</option>
+        <option value="forceatlas2">Force Atlas 2</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="query-limit-select">Limit</label>
+      <select id="query-limit-select" class="query-limit-select">
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="30">30</option>
+        <option value="40">40</option>
+      </select>
+    </div>
   </header>
   <div id="graph-container">
     <div id="loading-overlay">
@@ -1128,10 +1229,13 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
     </div>
   </div>
   <footer>
-    <span>BQ ${escHtml(usageData.month)}</span>
-    <span>${gbUsed} GB</span>
-    <span>${pct}% do 1 TB free</span>
-    <span>${gbLeft} GB restantes</span>
+    <span id="status">Carregando…</span>
+    <div class="footer-meta">
+      <span>BQ ${escHtml(usageData.month)}</span>
+      <span>${gbUsed} GB</span>
+      <span>${pct}% do 1 TB free</span>
+      <span>${gbLeft} GB restantes</span>
+    </div>
   </footer>
   <script>
     window.__DATASET_COLORS = ${JSON.stringify(
@@ -1188,13 +1292,14 @@ Bun.serve({
       const datasetId = url.searchParams.get("datasetId") ?? "";
       const foreignKey = url.searchParams.get("foreignKey") ?? "";
       const value = url.searchParams.get("value") ?? "";
+      const limit = parseLookupLimit(url.searchParams.get("limit"));
       if (!datasetId || !foreignKey || !value) {
         return new Response(JSON.stringify({ error: "Missing datasetId, foreignKey or value" }), {
           status: 400, headers: { "Content-Type": "application/json" },
         });
       }
       try {
-        const { result, bytes } = await queryByField(datasetId, foreignKey, value);
+        const { result, bytes } = await queryByField(datasetId, foreignKey, value, false, limit);
         trackBytes(bytes);
         return new Response(JSON.stringify({ result }), {
           headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -1214,12 +1319,13 @@ Bun.serve({
       const cnpj = lookupDatasetMatch[1];
       const datasetId = decodeURIComponent(lookupDatasetMatch[2]);
       const fresh = url.searchParams.get("fresh") === "1";
+      const limit = parseLookupLimit(url.searchParams.get("limit"));
       try {
         const { result, bytes } = await queryLookupDataset(
           cnpj,
           datasetId,
-          2023,
           fresh,
+          limit,
         );
         trackBytes(bytes);
         return new Response(JSON.stringify({ cnpj, result }), {
@@ -1239,8 +1345,9 @@ Bun.serve({
     const lookupMatch = url.pathname.match(/^\/api\/lookup\/([^/]+)$/);
     if (lookupMatch) {
       const cnpj = lookupMatch[1];
+      const limit = parseLookupLimit(url.searchParams.get("limit"));
       try {
-        const { results, totalBytes } = await queryLookup(cnpj);
+        const { results, totalBytes } = await queryLookup(cnpj, limit);
         trackBytes(totalBytes);
         return new Response(JSON.stringify({ cnpj, results }), {
           headers: { "Content-Type": "application/json; charset=utf-8" },

@@ -1,0 +1,18 @@
+name: datative
+server: haloy.datative.xn--2dk.digital
+domains:
+  - domain: datative.xn--2dk.digital
+port: 3003
+health_check_path: /
+env:
+  - name: NODE_ENV
+    value: production
+  - name: PORT
+    value: "3003"
+  - name: GCP_PROJECT_ID
+    from:
+      env: GCP_PROJECT_ID
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    value: /gcp-credentials.json
+volumes:
+  - "/opt/datative/gcp-credentials.json:/gcp-credentials.json:ro"

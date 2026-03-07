@@ -37,80 +37,6 @@ var require_is_graph = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/graphology-utils/defaults.js
-var require_defaults = __commonJS((exports, module) => {
-  function isLeaf(o2) {
-    return !o2 || typeof o2 !== "object" || typeof o2 === "function" || Array.isArray(o2) || o2 instanceof Set || o2 instanceof Map || o2 instanceof RegExp || o2 instanceof Date;
-  }
-  function resolveDefaults(target, defaults) {
-    target = target || {};
-    var output = {};
-    for (var k2 in defaults) {
-      var existing = target[k2];
-      var def = defaults[k2];
-      if (!isLeaf(def)) {
-        output[k2] = resolveDefaults(existing, def);
-        continue;
-      }
-      if (existing === undefined) {
-        output[k2] = def;
-      } else {
-        output[k2] = existing;
-      }
-    }
-    return output;
-  }
-  module.exports = resolveDefaults;
-});
-
-// node_modules/graphology-layout/circular.js
-var require_circular = __commonJS((exports, module) => {
-  var resolveDefaults = require_defaults();
-  var isGraph2 = require_is_graph();
-  var DEFAULTS2 = {
-    dimensions: ["x", "y"],
-    center: 0.5,
-    scale: 1
-  };
-  function genericCircularLayout(assign3, graph, options) {
-    if (!isGraph2(graph))
-      throw new Error("graphology-layout/random: the given graph is not a valid graphology instance.");
-    options = resolveDefaults(options, DEFAULTS2);
-    var dimensions = options.dimensions;
-    if (!Array.isArray(dimensions) || dimensions.length !== 2)
-      throw new Error("graphology-layout/random: given dimensions are invalid.");
-    var center = options.center;
-    var scale2 = options.scale;
-    var tau = Math.PI * 2;
-    var offset = (center - 0.5) * scale2;
-    var l2 = graph.order;
-    var x = dimensions[0];
-    var y = dimensions[1];
-    function assignPosition(i4, target) {
-      target[x] = scale2 * Math.cos(i4 * tau / l2) + offset;
-      target[y] = scale2 * Math.sin(i4 * tau / l2) + offset;
-      return target;
-    }
-    var i3 = 0;
-    if (!assign3) {
-      var positions = {};
-      graph.forEachNode(function(node) {
-        positions[node] = assignPosition(i3++, {});
-      });
-      return positions;
-    }
-    graph.updateEachNodeAttributes(function(_, attr) {
-      assignPosition(i3++, attr);
-      return attr;
-    }, {
-      attributes: dimensions
-    });
-  }
-  var circularLayout = genericCircularLayout.bind(null, false);
-  circularLayout.assign = genericCircularLayout.bind(null, true);
-  module.exports = circularLayout;
-});
-
 // node_modules/graphology-utils/getters.js
 var require_getters = __commonJS((exports) => {
   function coerceWeight(value) {
@@ -752,7 +678,7 @@ var require_helpers = __commonJS((exports) => {
 });
 
 // node_modules/graphology-layout-forceatlas2/defaults.js
-var require_defaults2 = __commonJS((exports, module) => {
+var require_defaults = __commonJS((exports, module) => {
   module.exports = {
     linLogMode: false,
     outboundAttractionDistribution: false,
@@ -773,7 +699,7 @@ var require_graphology_layout_forceatlas2 = __commonJS((exports, module) => {
   var createEdgeWeightGetter = require_getters().createEdgeWeightGetter;
   var iterate = require_iterate();
   var helpers = require_helpers();
-  var DEFAULT_SETTINGS2 = require_defaults2();
+  var DEFAULT_SETTINGS2 = require_defaults();
   function abstractSynchronousLayout(assign3, graph, params) {
     if (!isGraph2(graph))
       throw new Error("graphology-layout-forceatlas2: the given graph is not a valid graphology instance.");
@@ -9613,109 +9539,7 @@ var EdgeCurvedDoubleArrowProgram = createEdgeCurveProgram({
   })
 });
 
-// node-shape-programs.ts
-var { FLOAT: FLOAT4, UNSIGNED_BYTE: UNSIGNED_BYTE4 } = WebGLRenderingContext;
-var UNIFORMS2 = ["u_sizeRatio", "u_correctionRatio", "u_matrix"];
-var VERTEX_SHADER_SOURCE2 = `
-attribute vec4 a_id;
-attribute vec4 a_color;
-attribute vec2 a_position;
-attribute float a_size;
-attribute float a_angle;
-
-uniform mat3 u_matrix;
-uniform float u_sizeRatio;
-uniform float u_correctionRatio;
-
-varying vec4 v_color;
-
-const float bias = 255.0 / 254.0;
-
-void main() {
-  float size = a_size * u_correctionRatio / u_sizeRatio * 4.0;
-  vec2 diffVector = size * vec2(cos(a_angle), sin(a_angle));
-  vec2 position = a_position + diffVector;
-  gl_Position = vec4(
-    (u_matrix * vec3(position, 1)).xy,
-    0,
-    1
-  );
-
-  #ifdef PICKING_MODE
-  v_color = a_id;
-  #else
-  v_color = a_color;
-  #endif
-
-  v_color.a *= bias;
-}
-`;
-var FRAGMENT_SHADER_SOURCE2 = `
-precision mediump float;
-varying vec4 v_color;
-void main(void) {
-  gl_FragColor = v_color;
-}
-`;
-var ATTRIBUTES = [
-  { name: "a_position", size: 2, type: FLOAT4 },
-  { name: "a_size", size: 1, type: FLOAT4 },
-  { name: "a_color", size: 4, type: UNSIGNED_BYTE4, normalized: true },
-  { name: "a_id", size: 4, type: UNSIGNED_BYTE4, normalized: true }
-];
-var CONSTANT_ATTRIBUTES = [{ name: "a_angle", size: 1, type: FLOAT4 }];
-var SQUARE_CONSTANT_DATA = [
-  [Math.PI / 4],
-  [3 * Math.PI / 4],
-  [5 * Math.PI / 4],
-  [Math.PI / 4],
-  [5 * Math.PI / 4],
-  [7 * Math.PI / 4]
-];
-var DIAMOND_CONSTANT_DATA = [
-  [Math.PI / 2],
-  [0],
-  [3 * Math.PI / 2],
-  [Math.PI / 2],
-  [3 * Math.PI / 2],
-  [Math.PI]
-];
-function createShapeProgram(constantData) {
-  return class NodeShapeProgram extends NodeProgram {
-    getDefinition() {
-      return {
-        VERTICES: 6,
-        VERTEX_SHADER_SOURCE: VERTEX_SHADER_SOURCE2,
-        FRAGMENT_SHADER_SOURCE: FRAGMENT_SHADER_SOURCE2,
-        METHOD: WebGLRenderingContext.TRIANGLES,
-        UNIFORMS: UNIFORMS2,
-        ATTRIBUTES,
-        CONSTANT_ATTRIBUTES,
-        CONSTANT_DATA: constantData
-      };
-    }
-    processVisibleItem(nodeIndex, startIndex, data) {
-      const array = this.array;
-      const color = floatColor(data.color);
-      array[startIndex++] = data.x;
-      array[startIndex++] = data.y;
-      array[startIndex++] = data.size;
-      array[startIndex++] = color;
-      array[startIndex++] = nodeIndex;
-    }
-    setUniforms(params, { gl, uniformLocations }) {
-      const { u_sizeRatio, u_correctionRatio, u_matrix } = uniformLocations;
-      gl.uniform1f(u_correctionRatio, params.correctionRatio);
-      gl.uniform1f(u_sizeRatio, params.sizeRatio);
-      gl.uniformMatrix3fv(u_matrix, false, params.matrix);
-    }
-  };
-}
-var NodeSquareProgram = createShapeProgram(SQUARE_CONSTANT_DATA);
-var NodeDiamondProgram = createShapeProgram(DIAMOND_CONSTANT_DATA);
-
 // graph-client.ts
-var import_circular = __toESM(require_circular(), 1);
 var import_graphology_layout_forceatlas2 = __toESM(require_graphology_layout_forceatlas2(), 1);
 var EMPRESA_COLORS = [
   "#4a72a0",
@@ -9751,12 +9575,16 @@ var nodeTypeMap = new Map;
 var nodeDetailsMap = new Map;
 var knownNodeDetailKeys = new Set;
 var queriedDatasetKeys = new Set;
+var rowSignatureToNodeIds = new Map;
 var renderer = null;
 var isExpanding = false;
 var hoveredNode = null;
 var selectedNode = null;
 var layoutRootId = "";
 var currentLayout = "radial";
+var currentLookupLimit = 10;
+var currentGraph = null;
+var LOOKUP_LIMIT_OPTIONS = new Set([10, 20, 30, 40]);
 var DATASET_COLORS = window.__DATASET_COLORS ?? {};
 var DATASET_RELATIONS = window.__DATASET_RELATIONS ?? {};
 var expandedRelatedKeys = new Set;
@@ -9811,6 +9639,49 @@ function debugLog(...args) {
     return;
   console.log("[lookup-debug]", ...args);
 }
+function rowSignature(datasetId, row) {
+  return `${datasetId}|${JSON.stringify(row)}`;
+}
+function lookupLimitParam() {
+  return String(currentLookupLimit);
+}
+function sanitizeLookupLimit(raw) {
+  const parsed = Number(raw ?? "");
+  if (!Number.isFinite(parsed))
+    return 10;
+  return LOOKUP_LIMIT_OPTIONS.has(parsed) ? parsed : 10;
+}
+function selectedRowSignatures() {
+  const signatures = new Set;
+  if (!selectedNode)
+    return signatures;
+  const graph = currentGraph;
+  const nodeType = nodeTypeMap.get(selectedNode);
+  const details = [];
+  if (nodeType === "group" && graph?.hasNode(selectedNode)) {
+    for (const neighbor of graph.neighbors(selectedNode)) {
+      const neighborType = nodeTypeMap.get(neighbor);
+      if (neighborType === "group")
+        continue;
+      details.push(...nodeDetailsMap.get(neighbor) ?? []);
+    }
+  } else {
+    details.push(...nodeDetailsMap.get(selectedNode) ?? []);
+  }
+  for (const detail of details) {
+    signatures.add(rowSignature(detail.datasetId, detail.attributes));
+  }
+  return signatures;
+}
+function syncLookupRowHighlight() {
+  const selectedSignatures = selectedRowSignatures();
+  const rows = document.querySelectorAll(".lookup-table tbody tr[data-row-signature]");
+  for (const row of rows) {
+    const signature = row.dataset.rowSignature;
+    const isLinked = !!signature && selectedSignatures.has(signature);
+    row.classList.toggle("linked", isLinked);
+  }
+}
 async function fetchGraph(cnpj) {
   debugLog("GET /api/graph", { cnpj });
   const res = await fetch(`/api/graph/${cnpj}`);
@@ -9820,8 +9691,12 @@ async function fetchGraph(cnpj) {
   return res.json();
 }
 async function fetchLookupDataset(cnpj, datasetId) {
-  debugLog("GET /api/lookup/:cnpj/dataset/:datasetId", { cnpj, datasetId });
-  const res = await fetch(`/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1`);
+  debugLog("GET /api/lookup/:cnpj/dataset/:datasetId", {
+    cnpj,
+    datasetId,
+    limit: currentLookupLimit
+  });
+  const res = await fetch(`/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1&limit=${lookupLimitParam()}`);
   if (!res.ok)
     throw new Error(`Lookup dataset API error ${res.status}`);
   const payload = await res.json();
@@ -9849,16 +9724,8 @@ function lighten(hex) {
   const b3 = Math.min(255, (n2 & 255) + 80);
   return `#${r2.toString(16).padStart(2, "0")}${g2.toString(16).padStart(2, "0")}${b3.toString(16).padStart(2, "0")}`;
 }
-function nodeShapeType(type) {
-  if (type === "empresa")
-    return "square";
-  if (type === "socio")
-    return "diamond";
-  return "circle";
-}
 function nodeAttrs(type, label, opts) {
   const o2 = typeof opts === "string" ? { empresaId: opts } : opts ?? {};
-  const shapeType = nodeShapeType(type);
   if (o2.datasetId) {
     const color = DATASET_COLORS[o2.datasetId] ?? NODE_COLORS[type] ?? "#888888";
     return {
@@ -9866,7 +9733,7 @@ function nodeAttrs(type, label, opts) {
       fullLabel: label,
       size: 9,
       color,
-      type: shapeType,
+      type: "circle",
       x: Math.random() * 10,
       y: Math.random() * 10
     };
@@ -9886,82 +9753,40 @@ function nodeAttrs(type, label, opts) {
     size,
     isRoot: o2.isRoot ?? false,
     color: type === "empresa" ? baseColor : lighten(baseColor),
-    type: shapeType,
+    type: "circle",
     x: Math.random() * 10,
     y: Math.random() * 10
   };
 }
-function drawNodeLabelPill(ctx, text, cx, topY, size, color = "#fff", bg = "rgba(8,8,20,0.88)") {
-  const padding = 5;
-  const w2 = ctx.measureText(text).width;
-  ctx.fillStyle = bg;
-  ctx.beginPath();
-  ctx.roundRect(cx - w2 / 2 - padding, topY, w2 + padding * 2, size + padding * 2, 3);
-  ctx.fill();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = color;
-  ctx.fillText(text, cx, topY + padding);
-}
 function drawLabelInsideNode(ctx, data, settings) {
-  const d2 = data;
-  const nodeType = d2.type;
-  if (nodeType === "square" || nodeType === "diamond") {
-    if (!data.label)
-      return;
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    ctx.font = `${weight} ${size}px ${font}`;
-    const hs = data.size * 0.7;
-    if (d2.isRoot) {
-      drawNodeLabelPill(ctx, data.label, data.x, data.y + hs + 5, size, "#e8b84b");
-    } else {
-      const maxW = hs * 1.7;
-      let label = data.label;
-      if (ctx.measureText(label).width > maxW) {
-        while (label.length > 1 && ctx.measureText(label + "…").width > maxW)
-          label = label.slice(0, -1);
-        label += "…";
-      }
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.strokeText(label, data.x, data.y);
-      ctx.fillStyle = "#fff";
-      ctx.fillText(label, data.x, data.y);
-    }
-  } else {
-    if (!data.label)
-      return;
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    const color = settings.labelColor.color ?? "#000";
-    const tx = data.x + data.size + 3;
-    const ty = data.y + size / 3;
-    ctx.font = `${weight} ${size}px ${font}`;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "#000";
-    ctx.strokeText(data.label, tx, ty);
-    ctx.fillStyle = color;
-    ctx.fillText(data.label, tx, ty);
+  if (!data.label)
+    return;
+  const size = settings.labelSize ?? 12;
+  const font = settings.labelFont ?? "sans-serif";
+  const weight = settings.labelWeight ?? "500";
+  const color = settings.labelColor.color ?? "#000";
+  const tx = data.x + data.size + 3;
+  const ty = data.y + size / 3;
+  ctx.font = `${weight} ${size}px ${font}`;
+  if (currentLayout === "collapsible-tree") {
+    const text = String(data.label);
+    const metrics = ctx.measureText(text);
+    const padX = 4;
+    const padY = 2;
+    const boxX = tx - padX;
+    const boxY = ty - size + 1 - padY;
+    const boxW = metrics.width + padX * 2;
+    const boxH = size + padY * 2;
+    ctx.fillStyle = "rgba(6, 8, 18, 0.86)";
+    ctx.fillRect(boxX, boxY, boxW, boxH);
   }
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#000";
+  ctx.strokeText(data.label, tx, ty);
+  ctx.fillStyle = color;
+  ctx.fillText(data.label, tx, ty);
 }
-function drawHoverInsideNode(ctx, data, settings) {
-  const d2 = data;
-  const nodeType = d2.type;
-  if (nodeType === "square" || nodeType === "diamond") {
-    if (!data.label || d2.isRoot)
-      return;
-    const size = settings.labelSize ?? 12;
-    const font = settings.labelFont ?? "sans-serif";
-    const weight = settings.labelWeight ?? "500";
-    ctx.font = `${weight} ${size}px ${font}`;
-    drawNodeLabelPill(ctx, data.label, data.x, data.y + data.size * 0.7 + 5, size);
-  }
-}
+function drawHoverInsideNode(ctx, data, settings) {}
 function edgeAttrs() {
   return { type: "curved", color: COLOR_EDGE_BASE, size: 1.2, zIndex: 1 };
 }
@@ -10060,13 +9885,184 @@ function radialLayout(graph) {
     });
   });
 }
+function buildRootedTree(graph, root) {
+  const children = new Map;
+  const depth = new Map([[root, 0]]);
+  const visited = new Set([root]);
+  const queue = [root];
+  const sortNodes = (a3, b3) => {
+    const aType = String(nodeTypeMap.get(a3) ?? "");
+    const bType = String(nodeTypeMap.get(b3) ?? "");
+    if (aType !== bType)
+      return aType.localeCompare(bType);
+    const aLabel = String(graph.getNodeAttribute(a3, "fullLabel") ?? graph.getNodeAttribute(a3, "label") ?? a3);
+    const bLabel = String(graph.getNodeAttribute(b3, "fullLabel") ?? graph.getNodeAttribute(b3, "label") ?? b3);
+    return aLabel.localeCompare(bLabel);
+  };
+  while (queue.length > 0) {
+    const node = queue.shift();
+    const nodeDepth = depth.get(node) ?? 0;
+    const nodeChildren = [];
+    const neighbors = graph.neighbors(node).filter((n2) => graph.hasNode(n2)).sort(sortNodes);
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor))
+        continue;
+      visited.add(neighbor);
+      depth.set(neighbor, nodeDepth + 1);
+      nodeChildren.push(neighbor);
+      queue.push(neighbor);
+    }
+    children.set(node, nodeChildren);
+  }
+  return { children, depth, visited };
+}
+function collapsibleTreeLayout(graph) {
+  const root = layoutRootId;
+  if (!root || !graph.hasNode(root))
+    return;
+  const { children, depth, visited } = buildRootedTree(graph, root);
+  const rowOrder = new Map;
+  let nextRow = 0;
+  const assignRows = (node) => {
+    const nodeChildren = children.get(node) ?? [];
+    if (nodeChildren.length === 0) {
+      const row2 = nextRow++;
+      rowOrder.set(node, row2);
+      return row2;
+    }
+    const childRows = nodeChildren.map(assignRows);
+    const row = (childRows[0] + childRows[childRows.length - 1]) / 2;
+    rowOrder.set(node, row);
+    return row;
+  };
+  assignRows(root);
+  const maxDepth = Math.max(...depth.values(), 0);
+  const leaves = Math.max(nextRow, 1);
+  const maxLabelChars = Math.max(...[...visited].map((node) => String(graph.getNodeAttribute(node, "fullLabel") ?? graph.getNodeAttribute(node, "label") ?? "").length), 0);
+  const labelFactor = Math.max(1, Math.min(1.8, maxLabelChars / 24));
+  const rowSpacing = Math.max(84, Math.min(220, 2600 / leaves * labelFactor));
+  const depthSpacing = Math.max(360, Math.min(760, 5200 / (maxDepth + 1) * Math.min(1.7, labelFactor)));
+  const rootRow = rowOrder.get(root) ?? 0;
+  const depthCenterOffset = (maxDepth + 1) * depthSpacing / 2;
+  for (const node of visited) {
+    const d2 = depth.get(node) ?? 0;
+    const row = rowOrder.get(node) ?? 0;
+    const nodeType = String(nodeTypeMap.get(node) ?? "");
+    const typeOffset = nodeType === "group" ? 18 : nodeType === "empresa" ? -12 : nodeType === "socio" ? 12 : 0;
+    graph.setNodeAttribute(node, "x", d2 * depthSpacing - depthCenterOffset + typeOffset);
+    graph.setNodeAttribute(node, "y", (row - rootRow) * rowSpacing);
+  }
+  const detached = graph.nodes().filter((n2) => !visited.has(n2));
+  if (detached.length === 0)
+    return;
+  const ringRadius = Math.max(220, detached.length * 24);
+  detached.forEach((node, index) => {
+    const angle = index / detached.length * 2 * Math.PI;
+    graph.setNodeAttribute(node, "x", -depthSpacing);
+    graph.setNodeAttribute(node, "y", ringRadius * Math.sin(angle));
+  });
+}
+function packLayout(graph) {
+  const root = layoutRootId;
+  if (!root || !graph.hasNode(root))
+    return;
+  const { children, visited } = buildRootedTree(graph, root);
+  const subtreeWeight = new Map;
+  const calcWeight = (node) => {
+    const nodeChildren = children.get(node) ?? [];
+    const weight = 1 + nodeChildren.reduce((sum, child) => sum + calcWeight(child), 0);
+    subtreeWeight.set(node, weight);
+    return weight;
+  };
+  const totalWeight = calcWeight(root);
+  const rootRadius = Math.max(180, Math.sqrt(totalWeight) * 30);
+  const collides = (x, y, radius, circles, padding) => {
+    for (const circle of circles) {
+      const minDistance = radius + circle.radius + padding;
+      if (Math.hypot(x - circle.x, y - circle.y) < minDistance)
+        return true;
+    }
+    return false;
+  };
+  const packSiblings = (ids) => {
+    const sorted = [...ids].sort((a3, b3) => (subtreeWeight.get(b3) ?? 1) - (subtreeWeight.get(a3) ?? 1));
+    const circles = [];
+    const baseRadius = (id) => Math.max(1, Math.sqrt(subtreeWeight.get(id) ?? 1));
+    const spiralStep = 0.35;
+    const radialFactor = 0.95;
+    const padding = 0.18;
+    for (const id of sorted) {
+      const radius = baseRadius(id);
+      let best = null;
+      for (let t2 = 0;t2 <= 2200; t2 += spiralStep) {
+        const radial = Math.max(radius + 0.25, radialFactor * Math.sqrt(t2) + radius + 0.12);
+        const x = Math.cos(t2) * radial;
+        const y = Math.sin(t2) * radial;
+        if (collides(x, y, radius, circles, padding))
+          continue;
+        best = { id, x, y, radius };
+        break;
+      }
+      if (!best) {
+        const fallbackX = (circles.length + 1) * (radius * 2.2 + padding);
+        best = { id, x: fallbackX, y: 0, radius };
+      }
+      circles.push(best);
+    }
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let farthest = 1;
+    for (const circle of circles) {
+      minX = Math.min(minX, circle.x - circle.radius);
+      maxX = Math.max(maxX, circle.x + circle.radius);
+      minY = Math.min(minY, circle.y - circle.radius);
+      maxY = Math.max(maxY, circle.y + circle.radius);
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    for (const circle of circles) {
+      circle.x -= cx;
+      circle.y -= cy;
+      farthest = Math.max(farthest, Math.hypot(circle.x, circle.y) + circle.radius);
+    }
+    return { circles, extentRadius: farthest };
+  };
+  const place = (node, x, y, radius) => {
+    graph.setNodeAttribute(node, "x", x);
+    graph.setNodeAttribute(node, "y", y);
+    const nodeChildren = children.get(node) ?? [];
+    if (nodeChildren.length === 0)
+      return;
+    const { circles, extentRadius } = packSiblings(nodeChildren);
+    const usableRadius = Math.max(radius * 0.86, 28);
+    const scale2 = usableRadius / extentRadius;
+    for (const child of circles) {
+      const childRadius = child.radius * scale2;
+      place(child.id, x + child.x * scale2, y + child.y * scale2, childRadius);
+    }
+  };
+  place(root, 0, 0, rootRadius);
+  const detached = graph.nodes().filter((n2) => !visited.has(n2));
+  if (detached.length === 0)
+    return;
+  const detachedRadius = Math.max(220, detached.length * 24);
+  detached.forEach((node, index) => {
+    const angle = index / detached.length * 2 * Math.PI;
+    graph.setNodeAttribute(node, "x", -rootRadius * 1.7);
+    graph.setNodeAttribute(node, "y", detachedRadius * Math.sin(angle));
+  });
+}
 function runLayout(graph, _iterations, onDone) {
   requestAnimationFrame(() => {
-    if (currentLayout === "circular") {
-      import_circular.default.assign(graph);
-    } else if (currentLayout === "forceatlas2") {
+    if (currentLayout === "forceatlas2") {
       const settings = import_graphology_layout_forceatlas2.default.inferSettings(graph);
       import_graphology_layout_forceatlas2.default.assign(graph, { iterations: 150, settings });
+    } else if (currentLayout === "pack") {
+      packLayout(graph);
+    } else if (currentLayout === "collapsible-tree") {
+      collapsibleTreeLayout(graph);
     } else {
       radialLayout(graph);
     }
@@ -10090,7 +10086,8 @@ async function expandRelatedDatasets(nodeId, graph) {
       expandedRelatedKeys.add(expandKey);
       try {
         const url = `/api/lookup/related?datasetId=${encodeURIComponent(rel.datasetId)}&foreignKey=${encodeURIComponent(rel.foreignKey)}&value=${encodeURIComponent(String(value))}`;
-        const res = await fetch(url);
+        const urlWithLimit = `${url}&limit=${lookupLimitParam()}`;
+        const res = await fetch(urlWithLimit);
         if (!res.ok)
           continue;
         const { result } = await res.json();
@@ -10316,6 +10313,11 @@ function injectPanelStyles() {
     .lookup-table tbody tr:nth-child(odd) td { background: #0a0f22; }
     .lookup-table tbody tr:nth-child(even) td { background: #0b132b; }
     .lookup-table tbody tr:hover td { background: #121a34; color: #dbeafe; }
+    .lookup-table tbody tr.linked td {
+      background: #1d2b52 !important;
+      color: #e6f0ff;
+      box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.45);
+    }
     .lookup-skeleton {
       padding: 1rem;
       color: #44446a;
@@ -10690,7 +10692,7 @@ function renderResultSections(results, cnpj, graph) {
         <span style="color:${datasetColor};margin-right:0.3em;font-size:0.85em">⦿</span>${result.label}
       </span>
       <div class="lookup-section-actions">
-        ${hasHits ? `<span class="lookup-badge">${result.count}${result.count === 10 ? "+" : ""}</span>` : ""}
+        ${hasHits ? `<span class="lookup-badge">${result.count}</span>` : ""}
         ${actionsHtml}
         <span class="chevron">▶</span>
       </div>
@@ -10709,6 +10711,9 @@ function renderResultSections(results, cnpj, graph) {
       const tbody = table.querySelector("tbody");
       for (const row of result.rows) {
         const tr = document.createElement("tr");
+        const signature = rowSignature(result.id, row);
+        tr.dataset.rowSignature = signature;
+        tr.dataset.datasetId = result.id;
         for (const col of cols) {
           const val = row[col];
           const text = val == null ? "—" : String(val);
@@ -10718,13 +10723,10 @@ function renderResultSections(results, cnpj, graph) {
             const span = document.createElement("span");
             span.className = "cnpj-link";
             span.textContent = text;
-            span.addEventListener("click", () => {
+            span.addEventListener("click", (e3) => {
+              e3.stopPropagation();
               const basico = extractBasico(text);
-              lookupHistory.push({
-                cnpj: currentLookupCnpj,
-                label: currentLookupLabel
-              });
-              openLookupPanel(basico, graph);
+              window.open(`/?cnpj=${encodeURIComponent(basico)}`, "_blank", "noopener,noreferrer");
             });
             td.appendChild(span);
           } else {
@@ -10732,11 +10734,22 @@ function renderResultSections(results, cnpj, graph) {
           }
           tr.appendChild(td);
         }
+        tr.addEventListener("click", () => {
+          const nodeIds = rowSignatureToNodeIds.get(signature);
+          if (!nodeIds || nodeIds.size === 0 || !currentGraph)
+            return;
+          const nodeId = [...nodeIds][0];
+          selectedNode = nodeId;
+          hoveredNode = null;
+          renderer?.refresh({ skipIndexation: true });
+          showNodeDetails(nodeId, currentGraph);
+          syncLookupRowHighlight();
+        });
         tbody.appendChild(tr);
       }
       bodyDiv.appendChild(table);
     }
-    const datasetKey = `${cnpj}:${result.id}`;
+    const datasetKey = `${cnpj}:${result.id}:${lookupLimitParam()}`;
     const queryAndAddDataset = async () => {
       if (!canAddToGraph || datasetAdded || queriedDatasetKeys.has(datasetKey))
         return;
@@ -10811,6 +10824,7 @@ function renderResultSections(results, cnpj, graph) {
     section.appendChild(bodyDiv);
     body.appendChild(section);
   }
+  syncLookupRowHighlight();
 }
 function addResultsToGraph(result, companyCnpj, graph) {
   const newNodes = [];
@@ -10829,6 +10843,11 @@ function addResultsToGraph(result, companyCnpj, graph) {
     }
     seenInBatch.add(nodeId);
     trackNodeDetail(nodeId, result.id, result.label, companyCnpj, row);
+    const signature = rowSignature(result.id, row);
+    if (!rowSignatureToNodeIds.has(signature)) {
+      rowSignatureToNodeIds.set(signature, new Set);
+    }
+    rowSignatureToNodeIds.get(signature).add(nodeId);
     if (!knownNodeIds.has(nodeId)) {
       knownNodeIds.add(nodeId);
       nodeTypeMap.set(nodeId, nodeType);
@@ -10846,9 +10865,11 @@ function addResultsToGraph(result, companyCnpj, graph) {
   if (newNodes.length > 0) {
     runLayout(graph, 100, () => {
       setStatus(`+${newNodes.length} nó(s) de "${result.label}" adicionado(s)`);
+      syncLookupRowHighlight();
     });
   } else {
     setStatus(`Nenhum nó novo para "${result.label}".`);
+    syncLookupRowHighlight();
   }
 }
 function inferNodeId(result, row, companyCnpj, rowIndex) {
@@ -10917,8 +10938,8 @@ async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
     return;
   }
   try {
-    debugLog("GET /api/lookup/:cnpj", { cnpj });
-    const res = await fetch(`/api/lookup/${cnpj}`);
+    debugLog("GET /api/lookup/:cnpj", { cnpj, limit: currentLookupLimit });
+    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
     if (!res.ok)
       throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -10935,6 +10956,7 @@ async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
 async function init() {
   const params = new URLSearchParams(location.search);
   const cnpj = params.get("cnpj");
+  currentLookupLimit = sanitizeLookupLimit(params.get("qlimit"));
   const container = document.getElementById("graph-container");
   if (!cnpj) {
     setStatus("CNPJ não informado na URL.");
@@ -10952,6 +10974,7 @@ async function init() {
     return;
   }
   const graph = new Graph;
+  currentGraph = graph;
   const rootNode = data.nodes.find((n2) => n2.type === "empresa");
   const rootId = rootNode?.id ?? cnpj;
   layoutRootId = rootId;
@@ -10989,10 +11012,6 @@ async function init() {
     renderEdgeLabels: false,
     defaultEdgeType: "curved",
     edgeProgramClasses: { curved: createEdgeCurveProgram() },
-    nodeProgramClasses: {
-      square: NodeSquareProgram,
-      diamond: NodeDiamondProgram
-    },
     defaultDrawNodeLabel: drawLabelInsideNode,
     defaultDrawNodeHover: drawHoverInsideNode,
     labelRenderedSizeThreshold: 8,
@@ -11002,6 +11021,10 @@ async function init() {
     labelColor: { color: "#c8d0e0" },
     nodeReducer: (node, data2) => {
       const res = { ...data2 };
+      const alwaysShowLabels = currentLayout === "collapsible-tree";
+      if (alwaysShowLabels && res.fullLabel) {
+        res.label = res.fullLabel;
+      }
       if (!res.label && res.fullLabel) {
         if (hoveredNode === node || selectedNode === node) {
           res.label = res.fullLabel;
@@ -11019,7 +11042,8 @@ async function init() {
           res.zIndex = 5;
         } else {
           res.color = COLOR_FADE_NODE;
-          res.label = "";
+          if (!alwaysShowLabels)
+            res.label = "";
           res.zIndex = 0;
         }
       } else if (hoveredNode !== null) {
@@ -11033,17 +11057,22 @@ async function init() {
     edgeReducer: (edge, data2) => {
       const res = { ...data2 };
       const g2 = renderer?.getGraph();
+      if (currentLayout === "collapsible-tree") {
+        res.type = "line";
+        res.size = 1;
+        res.color = "rgba(96,122,176,0.45)";
+      }
       if (selectedNode !== null) {
         const src = g2?.source(edge);
         const tgt = g2?.target(edge);
         const touchesSelected = src === selectedNode || tgt === selectedNode;
         if (touchesSelected) {
           res.color = COLOR_EDGE_HOVER;
-          res.size = 2;
+          res.size = currentLayout === "collapsible-tree" ? 1.5 : 2;
           res.zIndex = 5;
         } else {
           res.color = COLOR_FADE_EDGE;
-          res.size = 0.5;
+          res.size = currentLayout === "collapsible-tree" ? 0.25 : 0.5;
           res.zIndex = 0;
         }
       } else if (hoveredNode !== null) {
@@ -11051,10 +11080,10 @@ async function init() {
         const tgt = g2?.target(edge);
         if (src === hoveredNode || tgt === hoveredNode) {
           res.color = COLOR_EDGE_HOVER;
-          res.size = 2;
+          res.size = currentLayout === "collapsible-tree" ? 1.5 : 2;
         } else {
           res.color = interpolateColor(COLOR_EDGE_BASE, COLOR_FADE_EDGE, 0.6);
-          res.size = 0.8;
+          res.size = currentLayout === "collapsible-tree" ? 0.5 : 0.8;
         }
       }
       return res;
@@ -11069,6 +11098,17 @@ async function init() {
       runLayout(graph, 200);
     });
   }
+  const queryLimitSelect = document.getElementById("query-limit-select");
+  if (queryLimitSelect) {
+    queryLimitSelect.value = lookupLimitParam();
+    queryLimitSelect.addEventListener("change", () => {
+      currentLookupLimit = sanitizeLookupLimit(queryLimitSelect.value);
+      queryLimitSelect.value = lookupLimitParam();
+      const next = new URL(location.href);
+      next.searchParams.set("qlimit", lookupLimitParam());
+      location.href = next.toString();
+    });
+  }
   const overlay = document.getElementById("loading-overlay");
   const loadingText = overlay?.querySelector(".loading-text");
   if (loadingText)
@@ -11076,7 +11116,7 @@ async function init() {
   setStatus("Cruzando com bases de dados…");
   let lookupResults = [];
   try {
-    const res = await fetch(`/api/lookup/${cnpj}`);
+    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
     if (res.ok) {
       const payload = await res.json();
       lookupResults = payload.results;
@@ -11084,7 +11124,7 @@ async function init() {
         if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
           addResultsToGraph(result, cnpj, graph);
           autoAddedDatasets.add(result.id);
-          queriedDatasetKeys.add(`${cnpj}:${result.id}`);
+          queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
         }
       }
       const hits = lookupResults.filter((r2) => r2.count > 0).length;
@@ -11139,11 +11179,13 @@ async function init() {
   renderer.on("clickStage", () => {
     selectedNode = null;
     renderer.refresh({ skipIndexation: true });
+    syncLookupRowHighlight();
   });
   renderer.on("clickNode", ({ node }) => {
     selectedNode = selectedNode === node ? null : node;
     hoveredNode = null;
     renderer.refresh({ skipIndexation: true });
+    syncLookupRowHighlight();
     const nodeType = nodeTypeMap.get(node);
     if (nodeType === "group") {
       showNodeDetails(node, graph);
