@@ -40,18 +40,29 @@ const PREFIX_TO_PATTERN: Record<string, string> = {
   SURGE:  "sudden_surge",
 };
 
-// ── thresholds ─────────────────────────────────────────────────────────────────
-const SPLIT_THRESHOLD_BRL          = 17_600;
-const SPLIT_MIN_COUNT              = 3;
-const CONCENTRATION_THRESHOLD      = 0.40;
-const CONCENTRATION_MIN_SPEND      = 50_000;
-const INEXIGIBILITY_MIN_COUNT      = 3;
+// ── thresholds (legal citations in docs/patterns-audit.md) ───────────────────
+// US1: Decreto 9.412/2018 (Lei 8.666/93 update); Lei 14.133/2021 art.75,I raised to R$50.000
+const SPLIT_THRESHOLD_BRL           = 17_600;
+const SPLIT_MIN_COUNT               = 3;
+// US2: CGU audit methodology — 40% share; R$50k min excludes micro-units; R$10k min supplier spend
+const CONCENTRATION_THRESHOLD       = 0.40;
+const CONCENTRATION_MIN_SPEND       = 50_000;
+const CONCENTRATION_MIN_SUPPLIER    = 10_000;
+// US3: TCU Acórdão 1.793/2011 — recorrência de inexigibilidade; R$1k min excludes micro-value
+const INEXIGIBILITY_MIN_COUNT       = 3;
+const INEXIGIBILITY_MIN_VALUE       = 1_000;
+// US4: Open Contracting Partnership "73 Red Flags" (2024), Flag #1
 const SINGLE_BIDDER_MIN_OCCURRENCES = 2;
+// US5: OCDE 2021 — competitive auctions only (≥2 bidders); Q3 of win-rate distribution
 const WIN_RATE_MIN_COMPETITIVE_BIDS = 10; // min participations in auctions with ≥2 bidders
+// US6: Lei 14.133/2021 art.125 §1º — legal ceiling = 25% above original for goods/services
 const AMENDMENT_INFLATION_THRESHOLD = 1.25;
+const AMENDMENT_MAX_INFLATION_RATIO = 10.0;  // cap — ratios above 10× are almost certainly data entry errors
 const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000;
+// US7: 180 days = practical minimum for legitimate operational readiness
 const NEWBORN_MAX_DAYS_TO_CONTRACT  = 180;
 const NEWBORN_MIN_CONTRACT_VALUE    = 50_000;
+// US8: UNODC procurement red flag methodology (2013) — 5× YoY + R$1M absolute
 const SURGE_RATIO_THRESHOLD         = 5.0;
 const SURGE_MIN_ABSOLUTE_VALUE      = 1_000_000;
 const SURGE_LOOKBACK_YEARS          = 4;
@@ -139,6 +150,7 @@ async function batchConcentration() {
     FROM spend s
     JOIN ministry_total m USING(nome_orgao_superior)
     WHERE m.tot >= ${CONCENTRATION_MIN_SPEND}
+      AND s.sup >= ${CONCENTRATION_MIN_SUPPLIER}
       AND s.sup / NULLIF(m.tot, 0) >= ${CONCENTRATION_THRESHOLD}
     ORDER BY share DESC
   `);
@@ -151,10 +163,13 @@ async function batchConcentration() {
 }
 
 // ── 3. INEXIGIBILITY — repeated no-bid awards ─────────────────────────────────
+// Groups by (cnpj_basico, id_unidade_gestora) to avoid merging units with identical names.
+// Excludes micro-value contracts (< R$1k) that are unlikely to represent real abuse.
 async function batchInexig() {
   const rows = await runQuery("INEXIG", `
     SELECT
       SUBSTR(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), 1, 8) AS cnpj_basico,
+      id_unidade_gestora,
       nome_unidade_gestora,
       COUNT(1)                  AS n,
       SUM(valor_inicial_compra) AS total
@@ -162,13 +177,14 @@ async function batchInexig() {
     WHERE ano = ${ANO}
       AND LENGTH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', '')) = 14
       AND UPPER(fundamento_legal) LIKE '%INEXIGIBILIDADE%'
-    GROUP BY 1, 2
+      AND valor_inicial_compra >= ${INEXIGIBILITY_MIN_VALUE}
+    GROUP BY 1, 2, 3
     HAVING COUNT(1) >= ${INEXIGIBILITY_MIN_COUNT}
   `);
   for (const r of rows) {
     addFlag(
       String(r.cnpj_basico),
-      `INEXIG ${r.nome_unidade_gestora} · ${r.n} contratos · ${fmt(Number(r.total))}`
+      `INEXIG ${r.nome_unidade_gestora} (${r.id_unidade_gestora}) · ${r.n} contratos · ${fmt(Number(r.total))}`
     );
   }
 }
@@ -282,6 +298,7 @@ async function batchAmendment() {
       AND LENGTH(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\\D', '')) = 14
       AND c.valor_inicial_compra >= ${AMENDMENT_MIN_ORIGINAL_VALUE}
       AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >= ${AMENDMENT_INFLATION_THRESHOLD}
+      AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) <= ${AMENDMENT_MAX_INFLATION_RATIO}
     GROUP BY 1
     ORDER BY total_excess DESC
   `);

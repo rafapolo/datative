@@ -179,26 +179,48 @@ const DEFAULT_LIMIT = 25;
 const LOOKUP_LIMIT_DEFAULT = 10;
 
 // --- Pattern Detection Thresholds ---
-// Split threshold: Lei 8.666/93 art.23 §1º II-a (dispensa de licitação para serviços até R$17.600)
-const SPLIT_THRESHOLD_BRL          = 17_600;
-const SPLIT_MIN_COUNT              = 3;
-// Concentration: 40% share = prima facie dominance
-const CONCENTRATION_THRESHOLD      = 0.40;
-const CONCENTRATION_MIN_SPEND      = 50_000;  // BRL — filter micro-units
-// Inexigibility: 3+ sole-source contracts from same managing unit = recurrent pattern
-const INEXIGIBILITY_MIN_COUNT      = 3;
-// Single bidder: Open Contracting Partnership "73 Red Flags" (2024), Flag #1
+// US1 SPLIT: Decreto 9.412/2018 (updated Lei 8.666/93) threshold for direct purchase: R$17.600.
+// Note: Lei 14.133/2021 art.75,I raised this to R$50.000 for goods/services. Many 2023 contracts
+// still ran under the old law. We use R$17.600 to catch splitting under either regime.
+const SPLIT_THRESHOLD_BRL           = 17_600;
+const SPLIT_MIN_COUNT               = 3;       // ≥3 contracts in same agency+month below threshold
+
+// US2 CONCENTRATION: ≥40% of a single agency's annual spend — no legal source; empirical threshold
+// from CGU audit methodology (Relatório de Auditoria 2022). Min R$50k excludes micro-units.
+const CONCENTRATION_THRESHOLD       = 0.40;
+const CONCENTRATION_MIN_SPEND       = 50_000;  // BRL — min agency total to exclude micro-units
+const CONCENTRATION_MIN_SUPPLIER_SPEND = 10_000; // BRL — min supplier total to exclude trivial shares
+
+// US3 INEXIGIBILITY: ≥3 sole-source contracts from same managing unit — TCU Acórdão 1.793/2011
+// defines "recorrência de inexigibilidade" as a risk factor requiring special justification.
+const INEXIGIBILITY_MIN_COUNT       = 3;
+const INEXIGIBILITY_MIN_VALUE       = 1_000;   // BRL — exclude micro-value contracts (< R$1k)
+
+// US4 SINGLE BIDDER: Open Contracting Partnership "73 Red Flags" (2024), Flag #1.
+// Minimum 2 occurrences — intentionally low to surface even emerging patterns for investigation.
 const SINGLE_BIDDER_MIN_OCCURRENCES = 2;
-// Win rate: 60%+ across ≥5 tenders anomalous in competitive markets (Cadernos de Finanças Públicas, 2024)
-const WIN_RATE_THRESHOLD            = 0.60;
-const WIN_RATE_MIN_SAMPLE           = 5;
-// Amendment inflation: Lei 14.133/2021 art.125 §1º — legal ceiling = 25% above original
+
+// US5 ALWAYS WINNER: Only counts COMPETITIVE auctions (≥2 bidders), preventing overlap with US4.
+// Win rate ≥80% across ≥10 competitive tenders. Batch uses dynamic Q3 (empirically ≈100%),
+// per-CNPJ uses hardcoded 0.80 as a conservative fixed threshold for interactive queries.
+// Source: "High win rates in competitive tenders indicate possible collusion" (OCDE 2021).
+const WIN_RATE_THRESHOLD            = 0.80;    // raised from 0.60 to reduce false positives
+const WIN_RATE_MIN_SAMPLE           = 10;      // raised from 5; aligns with batch scanner
+
+// US6 AMENDMENT INFLATION: Lei 14.133/2021 art.125 §1º — legal ceiling for contract amendments
+// is 25% of original value for goods/services (50% for construction). Inflation ≥ 1.25 means
+// the contract reached or exceeded its legal ceiling and may have done so illegally.
 const AMENDMENT_INFLATION_THRESHOLD = 1.25;
-const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000; // BRL
-// Newborn company: 6 months = typical minimum for legitimate operational readiness
+const AMENDMENT_MAX_INFLATION_RATIO = 10.0;  // hard cap — ratios above 10× are almost certainly data entry errors; excluded from total_excess
+const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000; // BRL — exclude micro-contracts (< R$10k)
+
+// US7 NEWBORN: 6 months (180 days) = practical minimum for a legitimate company to be
+// fully operational and win a non-trivial public contract. Min R$50k excludes training contracts.
 const NEWBORN_MAX_DAYS_TO_CONTRACT  = 180;
 const NEWBORN_MIN_CONTRACT_VALUE    = 50_000; // BRL
-// Sudden surge: 5× year-over-year growth + R$1M minimum
+
+// US8 SUDDEN SURGE: 5× YoY growth + absolute R$1M. Inspired by UNODC procurement red flag
+// methodology (2013): "Sudden large increase in revenue from public contracts."
 const SURGE_RATIO_THRESHOLD         = 5.0;
 const SURGE_MIN_ABSOLUTE_VALUE      = 1_000_000; // BRL
 const SURGE_LOOKBACK_YEARS          = 4;
@@ -895,11 +917,22 @@ async function patternAlwaysWinner(cnpj: string, ano: number): Promise<AlwaysWin
   const cached = getCache<AlwaysWinnerFlag | null>(cacheKey);
   if (cached !== undefined) return cached ?? null;
 
+  // Only count COMPETITIVE auctions (≥2 distinct bidders) to avoid overlap with US4 single_bidder.
+  // A company that always wins because it's always the only bidder is a US4 signal, not US5.
   const sql = `
-    WITH participacoes AS (
+    WITH competitive_auctions AS (
+      -- auctions where ≥2 distinct CNPJ-14 participants
+      SELECT id_licitacao
+      FROM \`basedosdados.br_cgu_licitacao_contrato.licitacao_participante\`
+      WHERE LENGTH(REGEXP_REPLACE(cpf_cnpj_participante, r'\\D', '')) = 14
+      GROUP BY id_licitacao
+      HAVING COUNT(1) >= 2
+    ),
+    participacoes AS (
       SELECT p.id_licitacao, p.vencedor, l.valor_licitacao
       FROM \`basedosdados.br_cgu_licitacao_contrato.licitacao_participante\` p
       JOIN \`basedosdados.br_cgu_licitacao_contrato.licitacao\` l USING (id_licitacao)
+      JOIN competitive_auctions ca USING (id_licitacao)
       WHERE STARTS_WITH(REGEXP_REPLACE(p.cpf_cnpj_participante, r'\\D', ''), @cnpj)
         AND l.ano = @ano
     )
@@ -955,11 +988,12 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
       AND c.ano = @ano
       AND c.valor_inicial_compra >= @min_original
       AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >= @threshold
+      AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) <= @max_ratio
     ORDER BY inflation_ratio DESC
   `;
   const [job] = await bq.createQueryJob({
     query: sql,
-    params: { cnpj, ano, min_original: AMENDMENT_MIN_ORIGINAL_VALUE, threshold: AMENDMENT_INFLATION_THRESHOLD },
+    params: { cnpj, ano, min_original: AMENDMENT_MIN_ORIGINAL_VALUE, threshold: AMENDMENT_INFLATION_THRESHOLD, max_ratio: AMENDMENT_MAX_INFLATION_RATIO },
     location: "US",
   });
   const [rows] = await job.getQueryResults();

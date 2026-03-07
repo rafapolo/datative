@@ -107,6 +107,7 @@ DATATIVE surfaces companies that are statistically anomalous in public procureme
 - Given a CNPJ with contracts where `valor_final_compra / valor_inicial_compra >= 1.25` (legal ceiling under Lei 14.133/2021) AND `valor_inicial_compra > R$ 10.000` → flag shown with count of inflated contracts, total excess value, and worst inflation ratio seen
 - Given all contracts within 25% of original value → no flag
 - Given `valor_inicial_compra = 0` → contract excluded (division guard)
+- Given `valor_final_compra / valor_inicial_compra > 10.0` → contract excluded (data quality guard — ratios above 10× indicate data entry errors, not real procurement fraud)
 
 ---
 

@@ -30,6 +30,7 @@ const SINGLE_BIDDER_MIN_OCCURRENCES = 2;
 const WIN_RATE_THRESHOLD            = 0.80;   // raised from 0.60; Q3 in practice = 1.0 (bimodal dataset)
 const WIN_RATE_MIN_SAMPLE           = 10;     // raised from 5 to match scan-all (statistical significance)
 const AMENDMENT_INFLATION_THRESHOLD = 1.25;
+const AMENDMENT_MAX_INFLATION_RATIO = 10.0;  // cap — ratios above 10× are almost certainly data entry errors
 const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000;
 const NEWBORN_MAX_DAYS_TO_CONTRACT  = 180;
 const NEWBORN_MIN_CONTRACT_VALUE    = 50_000;
@@ -143,8 +144,9 @@ async function checkAmendment(cnpj: string, ano: number) {
       SUM(c.valor_final_compra-c.valor_inicial_compra) AS excess
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\` c LEFT JOIN a USING(id_contrato)
     WHERE STARTS_WITH(REGEXP_REPLACE(c.cpf_cnpj_contratado,r'\\D',''),@cnpj) AND c.ano=@ano
-      AND c.valor_inicial_compra>=@min AND c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)>=@thr`,
-    { cnpj, ano, min: AMENDMENT_MIN_ORIGINAL_VALUE, thr: AMENDMENT_INFLATION_THRESHOLD });
+      AND c.valor_inicial_compra>=@min AND c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)>=@thr
+      AND c.valor_final_compra/NULLIF(c.valor_inicial_compra,0)<=@max_ratio`,
+    { cnpj, ano, min: AMENDMENT_MIN_ORIGINAL_VALUE, thr: AMENDMENT_INFLATION_THRESHOLD, max_ratio: AMENDMENT_MAX_INFLATION_RATIO });
   const n = Number(rows[0]?.n ?? 0);
   if (!n) return [];
   const maxr = Number(rows[0]?.maxr ?? 0);

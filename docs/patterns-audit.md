@@ -143,9 +143,11 @@ The `licitacao_participante` dataset is **strongly bimodal**: approximately 33% 
 3. **Value adjustment clauses**: Contracts with inflation adjustment clauses (INPC/IPCA) can legitimately reach or exceed 1.25× over multi-year terms without any amendment.
 4. **Data entry errors**: Some `valor_final_compra` values are clearly data quality issues (e.g., 100× original).
 
-### Improvements suggested (not yet applied)
-- Add a filter for `modalidade_licitacao` to apply different thresholds for construction vs goods/services.
-- Cap `inflation_ratio` at a reasonable maximum (e.g., 10×) to exclude obvious data errors from the `total_excess` calculation.
+### Improvements applied (iteration 3)
+- **Cap `inflation_ratio` at 10×** (`AMENDMENT_MAX_INFLATION_RATIO = 10.0`): ratios above this threshold are almost certainly data entry errors (e.g., `valor_final_compra` entered in a different unit) and would distort `total_excess` reporting. Applied to all three implementations via `AND ... <= @max_ratio` filter in SQL. Applied in `index.ts`, `scan-all.ts`, `scan-suspicious.ts`.
+
+### Improvements not yet applied
+- Add a filter for `modalidade_licitacao` to apply different thresholds for construction vs goods/services (50% ceiling under Lei 14.133/2021 art.125 §1º vs 25% for goods/services). This requires verifying that `contrato_compra` exposes a reliable construction indicator column.
 
 ### Per-CNPJ vs batch consistency
 ✅ Identical logic.
@@ -227,6 +229,6 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 | US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value |
 | US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | No change |
 | US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds |
-| US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | No change |
+| US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× cap on inflation_ratio to exclude data errors |
 | US7 Newborn | High — spinoffs, restructurings | CGU 2021 guide | No change |
 | US8 Surge | Medium — framework agreements, budget cycles | UNODC 2013 | No change |
