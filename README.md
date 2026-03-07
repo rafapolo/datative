@@ -1,8 +1,10 @@
 # Datative
 
-![Datative Logo](assets/logo.png)
+<div align="center">
+  <img src="assets/logo.png" alt="Datative Logo" width="200" />
+</div>
 
-Datative e uma plataforma de analise investigativa para explorar conexoes entre empresas, socios e dados publicos relacionados. O projeto combina consultas no BigQuery com visualizacao de grafo interativa para acelerar investigacoes.
+Datative é uma plataforma de analise investigativa para explorar conexoes entre empresas, socios e dados publicos combinando consultas no BigQuery do basedosdados.org com visualizações iterativas.
 
 ![Datative Screenshot](assets/datative.png)
 
@@ -46,7 +48,6 @@ cp .env.example .env
 - `GOOGLE_APPLICATION_CREDENTIALS`: caminho para o arquivo JSON (opcional se usar `GCP_SERVICE_ACCOUNT_JSON`)
 - `GCP_SERVICE_ACCOUNT_JSON`: JSON completo da credencial (opcional)
 - `PORT`: porta HTTP (padrao no codigo: `3003`)
-- `DOMAIN`, `CERT_RESOLVER`, `TRAEFIK_NETWORK`: usados no deploy com Traefik
 
 ## Executar localmente
 
@@ -65,17 +66,6 @@ App local:
 
 - `bun run start`: sobe o servidor (`index.ts`)
 - `bun run dev`: modo watch
-
-## Rotas principais
-
-HTML:
-
-- `GET /` ou `GET /graph?cnpj=<cnpj>`
-- `GET /table`
-
-Assets:
-
-- `GET /graph.js`
 
 APIs:
 
@@ -107,19 +97,9 @@ docker compose up -d
 - `cache.ts`: cache em memoria
 - `usage.json`: controle de bytes processados no mes
 
-## Desenvolvimento
+## ATENÇÃO
 
-Sempre que alterar `graph-client.ts`, gere novamente o bundle:
-
-```bash
-bun build graph-client.ts --outfile public/graph.js --target browser
-```
-
-Antes de commit:
-
-```bash
-git status
-```
+Queries longas e complexas podem incorrer em uso exponencial de recursos do Google Cloud. Em 3 dias de exploração foi consumido cerca de $400 em análises. Garanta ter tokens gratuitos e crie políticas de quota.
 
 ## Licenca
 
