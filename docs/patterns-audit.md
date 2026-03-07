@@ -156,8 +156,12 @@ The `licitacao_participante` dataset is **strongly bimodal**: approximately 33% 
 ### Improvements applied (iteration 3)
 - **Cap `inflation_ratio` at 10×** (`AMENDMENT_MAX_INFLATION_RATIO = 10.0`): ratios above this threshold are almost certainly data entry errors (e.g., `valor_final_compra` entered in a different unit) and would distort `total_excess` reporting. Applied to all three implementations via `AND ... <= @max_ratio` filter in SQL. Applied in `index.ts`, `scan-all.ts`, `scan-suspicious.ts`.
 
-### Improvements not yet applied
-- Add a filter for `modalidade_licitacao` to apply different thresholds for construction vs goods/services (50% ceiling under Lei 14.133/2021 art.125 §1º vs 25% for goods/services). This requires verifying that `contrato_compra` exposes a reliable construction indicator column.
+### Schema verification: construction vs goods/services threshold
+Lei 14.133/2021 art.125 §1º allows 50% amendments for engineering works vs 25% for goods/services. Applying the stricter 25% to everything is **conservative and safe** — it may over-flag construction contracts but will never under-flag goods contracts.
+
+**Column verified (schema dump):** `contrato_compra` has `id_modalidade_licitacao` (code) and `modalidade_licitacao` (name). However, this column encodes **bidding modality** (Concorrência, Pregão Eletrônico, Tomada de Preços, etc.) — not contract category (obras vs bens/serviços). Modalidade "Concorrência" is used for both large construction and large goods contracts; "Pregão Eletrônico" is almost exclusively goods/services. There is no `tipo_contrato` or `categoria` column in the accessible schema.
+
+**Conclusion:** Differentiating construction from goods/services would require text parsing of the `objeto` field for keywords like "obra", "construção", "reforma", "engenharia" — an inherently fragile approach. **This improvement is deferred.** Current 25% threshold is conservative and correct for the majority of contracts (goods/services); it may produce some false positives for large engineering works, which analysts should evaluate in context.
 
 ### Per-CNPJ vs batch consistency
 ✅ Identical logic.
@@ -254,6 +258,6 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 | US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations |
 | US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | Documented CPF-counting inconsistency (batch more aggressive) |
 | US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds |
-| US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× cap on inflation_ratio to exclude data errors |
+| US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× cap on inflation_ratio to exclude data errors; construction 50% ceiling deferred (no reliable contract-category column in schema) |
 | US7 Newborn | High — spinoffs, restructurings | CGU 2021 guide | No change |
 | US8 Surge | Medium — framework agreements, budget cycles | UNODC 2013 | Added consecutive-year guard (gap years no longer compare as YoY surge) |
