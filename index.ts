@@ -472,7 +472,7 @@ async function queryEmpresa(cnpjBasico: string): Promise<{ row: Company | null; 
 
   const cacheKey = `empresa_${cnpjBasico}`;
   const cached = getCache<Company | null>(cacheKey);
-  if (cached !== null) return { row: cached, bytesProcessed: 0 };
+  if (cached !== undefined) return { row: cached ?? null, bytesProcessed: 0 };
 
   const sql = `
     SELECT cnpj_basico, razao_social, natureza_juridica, qualificacao_responsavel, capital_social, porte, ente_federativo, ano

@@ -14,13 +14,16 @@ function filePath(key: string): string {
   return resolve(CACHE_DIR, safe + ".json");
 }
 
-export function getCache<T>(key: string): T | null {
+// Returns undefined on cache miss or expiry; returns T (including null) on hit.
+// Callers that cache null as a "found nothing" sentinel must use `!== undefined`
+// to distinguish a miss from a stored null result.
+export function getCache<T>(key: string): T | undefined {
   try {
     const entry = JSON.parse(readFileSync(filePath(key), "utf-8")) as CacheEntry<T>;
-    if (Date.now() > entry.expiresAt) return null;
+    if (Date.now() > entry.expiresAt) return undefined;
     return entry.data;
   } catch {
-    return null;
+    return undefined;  // cache miss — file not found or unreadable
   }
 }
 

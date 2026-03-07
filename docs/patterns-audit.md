@@ -235,6 +235,14 @@ The per-CNPJ implementation reports only the **first** qualifying surge year (br
 
 ---
 
+## Infrastructure Issue: Cache Miss vs Stored Null
+
+**Bug fixed:** `cache.ts` `getCache` was returning `null` for both cache misses (file not found) and legitimately stored null values (pattern found nothing). Patterns US4–US8 and the company lookup all use `null` as their "nothing found" sentinel and check `cached !== undefined` to skip re-querying. With the old `getCache` returning `null` on miss, `null !== undefined` evaluated to `true`, causing the BigQuery query to be skipped permanently — US4–US8 would never execute on a CNPJ not yet in cache.
+
+**Fix:** `getCache` now returns `undefined` on miss or expiry; returns `T` (including `null`) on a valid cache hit. Callers using truthiness checks (`if (cached)`) work unchanged. The company-lookup caller that used `!== null` was updated to `!== undefined`.
+
+---
+
 ## Cross-Pattern Issues
 
 ### Overlap between US4 and US5
@@ -256,8 +264,8 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 | US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 | Added NULL date guard to prevent spurious null-month bucket |
 | US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations |
 | US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations |
-| US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | Documented CPF-counting inconsistency (batch more aggressive) |
-| US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds |
-| US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× cap on inflation_ratio to exclude data errors; construction 50% ceiling deferred (no reliable contract-category column in schema) |
-| US7 Newborn | High — spinoffs, restructurings | CGU 2021 guide | No change |
-| US8 Surge | Medium — framework agreements, budget cycles | UNODC 2013 | Added consecutive-year guard (gap years no longer compare as YoY surge) |
+| US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | **cache.ts bug fixed** (getCache null-vs-undefined); CPF-counting inconsistency documented |
+| US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds; **cache.ts bug fixed** |
+| US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× inflation cap; **cache.ts bug fixed**; construction 50% ceiling deferred |
+| US7 Newborn | High — spinoffs, restructurings | CGU 2021 guide | **cache.ts bug fixed** (was never querying BigQuery on cache miss) |
+| US8 Surge | Medium — framework agreements, budget cycles | UNODC 2013 | Added consecutive-year guard; **cache.ts bug fixed** |
