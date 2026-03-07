@@ -41,8 +41,10 @@ const PREFIX_TO_PATTERN: Record<string, string> = {
 };
 
 // ── thresholds (legal citations in docs/patterns-audit.md) ───────────────────
-// US1: Decreto 9.412/2018 (Lei 8.666/93 update); Lei 14.133/2021 art.75,I raised to R$50.000
-const SPLIT_THRESHOLD_BRL           = 17_600;
+// US1: threshold is year-dependent.
+// - ≤ 2023: R$17.600 (Decreto 9.412/2018 / Lei 8.666/93 art.24,II)
+// - 2024+:  R$57.912 (Decreto 11.871/2024 / Lei 14.133/2021 art.75,I)
+const SPLIT_THRESHOLD_BRL           = ANO >= 2024 ? 57_912 : 17_600;
 const SPLIT_MIN_COUNT               = 3;
 // US2: CGU audit methodology — 40% share; R$50k min excludes micro-units; R$10k min supplier spend
 const CONCENTRATION_THRESHOLD       = 0.40;

@@ -19,7 +19,8 @@ const bq = new BigQuery({
 });
 
 // ── thresholds ────────────────────────────────────────────────────────────────
-const SPLIT_THRESHOLD_BRL          = 17_600;
+// US1: year-dependent — R$17.600 (≤2023, Decreto 9.412/2018) or R$57.912 (2024+, Decreto 11.871/2024)
+const SPLIT_THRESHOLD_BRL          = DEFAULT_YEAR >= 2024 ? 57_912 : 17_600;
 const SPLIT_MIN_COUNT              = 3;
 const CONCENTRATION_THRESHOLD      = 0.40;
 const CONCENTRATION_MIN_SPEND      = 50_000;

@@ -179,10 +179,12 @@ const DEFAULT_LIMIT = 25;
 const LOOKUP_LIMIT_DEFAULT = 10;
 
 // --- Pattern Detection Thresholds ---
-// US1 SPLIT: Decreto 9.412/2018 (updated Lei 8.666/93) threshold for direct purchase: R$17.600.
-// Note: Lei 14.133/2021 art.75,I raised this to R$50.000 for goods/services. Many 2023 contracts
-// still ran under the old law. We use R$17.600 to catch splitting under either regime.
-const SPLIT_THRESHOLD_BRL           = 17_600;
+// US1 SPLIT: threshold is year-dependent.
+// - ≤ 2023: R$17.600 (Decreto 9.412/2018 / Lei 8.666/93 art.24,II)
+// - 2024+:  R$57.912 (Decreto 11.871/2024 / Lei 14.133/2021 art.75,I)
+function splitThresholdForYear(ano: number): number {
+  return ano >= 2024 ? 57_912 : 17_600;
+}
 const SPLIT_MIN_COUNT               = 3;       // ≥3 contracts in same agency+month below threshold
 
 // US2 CONCENTRATION: ≥40% of a single agency's annual spend — no legal source; empirical threshold
@@ -740,7 +742,7 @@ async function queryByField(
 async function patternSplitContracts(cnpj: string, ano: number): Promise<SplitContractFlag[]> {
   const cacheKey = `patterns_split_${cnpj}_${ano}`;
   const cached = getCache<SplitContractFlag[]>(cacheKey);
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   const sql = `
     SELECT
@@ -762,7 +764,7 @@ async function patternSplitContracts(cnpj: string, ano: number): Promise<SplitCo
   `;
   const [job] = await bq.createQueryJob({
     query: sql,
-    params: { cnpj, ano, threshold: SPLIT_THRESHOLD_BRL, min_count: SPLIT_MIN_COUNT },
+    params: { cnpj, ano, threshold: splitThresholdForYear(ano), min_count: SPLIT_MIN_COUNT },
     location: "US",
   });
   const [rows] = await job.getQueryResults();
@@ -782,7 +784,7 @@ async function patternSplitContracts(cnpj: string, ano: number): Promise<SplitCo
 async function patternConcentration(cnpj: string, ano: number): Promise<ConcentrationFlag[]> {
   const cacheKey = `patterns_concentration_${cnpj}_${ano}`;
   const cached = getCache<ConcentrationFlag[]>(cacheKey);
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   const sql = `
     SELECT
@@ -833,7 +835,7 @@ async function patternConcentration(cnpj: string, ano: number): Promise<Concentr
 async function patternInexigibility(cnpj: string, ano: number): Promise<InexigibilityFlag[]> {
   const cacheKey = `patterns_inexigibility_${cnpj}_${ano}`;
   const cached = getCache<InexigibilityFlag[]>(cacheKey);
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   const sql = `
     SELECT
@@ -1126,7 +1128,7 @@ async function patternSuddenSurge(cnpj: string, ano: number): Promise<SuddenSurg
 async function runPatterns(cnpj: string, ano: number): Promise<PatternResult> {
   const cacheKey = `patterns_${cnpj}_${ano}`;
   const cached = getCache<PatternResult>(cacheKey);
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   const settled = await Promise.allSettled([
     patternSplitContracts(cnpj, ano),

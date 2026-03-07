@@ -28,7 +28,14 @@ HAVING COUNT(*) >= @min_count
    AND SUM(valor_inicial_compra) > @threshold
 ```
 
-Parameters: `cnpj`, `ano`, `threshold = SPLIT_THRESHOLD_BRL`, `min_count = SPLIT_MIN_COUNT`
+Parameters: `cnpj`, `ano`, `threshold = splitThresholdForYear(ano)`, `min_count = SPLIT_MIN_COUNT`
+
+### Threshold law reference (year-dependent)
+
+| Period | Threshold | Legal basis |
+|---|---|---|
+| ≤ 2023 | R$ 17.600 | Decreto 9.412/2018 / Lei 8.666/93 art.24,II |
+| 2024+ | R$ 57.912 | Decreto 11.871/2024 / Lei 14.133/2021 art.75,I |
 
 ---
 
@@ -53,3 +60,4 @@ One flag per (agency, month) cluster that meets the condition.
 - [x] NULL `data_assinatura_contrato` excluded — would otherwise produce a spurious `mes=NULL` bucket
 - [x] Partition filters `ano` present; no full-table scan
 - [x] Integrated into `runPatterns()` via `Promise.allSettled`
+- [x] Year-dependent threshold: R$17.600 for ≤ 2023, R$57.912 for 2024+ (Decreto 11.871/2024)
