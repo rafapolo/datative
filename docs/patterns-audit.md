@@ -32,7 +32,7 @@ Deep audit of all 8 risk patterns. For each pattern: legal basis, threshold rati
 - Added `AND data_assinatura_contrato IS NOT NULL` to WHERE clause in all three implementations to prevent NULL-date contracts from being grouped into a spurious `mes = NULL` bucket.
 
 ### Per-CNPJ vs batch consistency
-✅ Identical logic. Both group by `(id_orgao_superior, month)`, same thresholds, same NULL guard.
+⚠️ Minor: `index.ts` and `scan-suspicious.ts` group by `(id_orgao_superior, nome_orgao_superior, mes)`. `scan-all.ts` groups by `(cnpj_basico, nome_orgao_superior, mes)` — no `id_orgao_superior`. Two ministries with the same name would be merged in the batch (theoretical; no such collision exists at `orgao_superior` level). All three implementations have the same NULL guard and thresholds.
 
 ---
 
