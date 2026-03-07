@@ -109,7 +109,9 @@ Not inherently illegal, but flagged by:
 - Batch: uses `MAX(IF(vencedor, SUBSTR(...), NULL))` to extract the winner's CNPJ from the `auction_stats` CTE. If two rows have `vencedor=true` for the same auction (data quality issue), `MAX` picks lexicographically last — acceptable for batch purposes.
 
 ### Per-CNPJ vs batch consistency
-✅ Equivalent logic, different SQL styles. Both count solo-bid wins for the target CNPJ.
+⚠️ Minor inconsistency: **batch filters CPF participants** (`LENGTH(REGEXP_REPLACE(cpf_cnpj_participante, r'\D', '')) = 14`) before counting bidders, so an auction with 1 CNPJ + 1 CPF bidder has `total_bidders = 1` in the batch (flagged). **Per-CNPJ implementations** (`index.ts`, `scan-suspicious.ts`) count ALL participants with `COUNT(*)` and require `total_participantes = 1`, so the same auction has `total_participantes = 2` (not flagged).
+
+The per-CNPJ behavior is arguably more correct — a CPF bidder IS a real participant even if individuals rarely win procurement contracts. The batch produces slightly more flags (less conservative). This is a known acceptable divergence documented for transparency.
 
 ---
 
@@ -235,7 +237,7 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 | US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 | Added NULL date guard to prevent spurious null-month bucket |
 | US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations |
 | US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations |
-| US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | No change |
+| US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | Documented CPF-counting inconsistency (batch more aggressive) |
 | US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds |
 | US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× cap on inflation_ratio to exclude data errors |
 | US7 Newborn | High — spinoffs, restructurings | CGU 2021 guide | No change |
