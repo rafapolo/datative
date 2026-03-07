@@ -54,7 +54,7 @@ LIMIT @limit OFFSET @offset
 
 ## BigQuery / basedosdados Notes
 
-**Billing project:** `GCP_PROJECT_ID_REDACTED` (configured via `gcloud`). Queries are billed here even though data lives in `basedosdados`.
+**Billing project:** configured via `gcloud` (set `GCP_PROJECT_ID` env var). Queries are billed to your project even though data lives in `basedosdados`.
 
 **`bq` CLI quirk:** `bq ls basedosdados:` works (colon suffix, flags before argument); `bq ls --project_id=basedosdados` returns empty — no project-level list permission.
 

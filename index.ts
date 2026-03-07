@@ -1038,8 +1038,8 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
   return flag;
 }
 
-async function patternNewbornCompany(cnpj: string): Promise<NewbornCompanyFlag | null> {
-  const cacheKey = `patterns_newborn_company_${cnpj}`;
+async function patternNewbornCompany(cnpj: string, ano: number): Promise<NewbornCompanyFlag | null> {
+  const cacheKey = `patterns_newborn_company_${cnpj}_${ano}`;
   const cached = getCache<NewbornCompanyFlag | null>(cacheKey);
   if (cached !== undefined) return cached ?? null;
 
@@ -1080,7 +1080,7 @@ async function patternNewbornCompany(cnpj: string): Promise<NewbornCompanyFlag |
   `;
   const [job] = await bq.createQueryJob({
     query: sql,
-    params: { cnpj, empresa_ano: DEFAULT_YEAR, empresa_mes: 12, min_value: NEWBORN_MIN_CONTRACT_VALUE, max_days: NEWBORN_MAX_DAYS_TO_CONTRACT },
+    params: { cnpj, empresa_ano: ano, empresa_mes: 12, min_value: NEWBORN_MIN_CONTRACT_VALUE, max_days: NEWBORN_MAX_DAYS_TO_CONTRACT },
     location: "US",
   });
   const [rows] = await job.getQueryResults();
@@ -1161,7 +1161,7 @@ async function runPatterns(cnpj: string, ano: number): Promise<PatternResult> {
     patternSingleBidder(cnpj, ano),
     patternAlwaysWinner(cnpj, ano),
     patternAmendmentInflation(cnpj, ano),
-    patternNewbornCompany(cnpj),
+    patternNewbornCompany(cnpj, ano),
     patternSuddenSurge(cnpj, ano),
   ]);
 
