@@ -11,10 +11,14 @@ Deep audit of all 8 risk patterns. For each pattern: legal basis, threshold rati
 - Lei 8.666/1993, art. 23, §5º: "É vedada a utilização da modalidade 'convite' ou 'tomada de preços' [...] para parcelas de uma mesma obra ou serviço."
 - Lei 14.133/2021, art. 145: directly prohibits splitting to evade the mandatory bidding requirement.
 
-### Threshold: R$ 17.600
-- Source: **Decreto 9.412/2018**, which updated Lei 8.666/93 thresholds for *compras e outros serviços* (art. 23, I, "a").
-- **Important:** Lei 14.133/2021 art. 75, I raised this to **R$ 50.000** for goods/services. Decreto 11.871/2024 further updated to R$ 57.912.
-- For 2023 data: many contracts still ran under Lei 8.666/93 (both laws co-existed). The conservative R$17.600 threshold catches splitting under the old regime; raising to R$50.000 for 2024+ data is appropriate.
+### Threshold: year-dependent
+
+| Period | Threshold | Legal basis |
+|---|---|---|
+| ≤ 2023 | R$ 17.600 | Decreto 9.412/2018 / Lei 8.666/93 art. 23, I, "a" |
+| 2024+ | R$ 57.912 | Decreto 11.871/2024 / Lei 14.133/2021 art. 75, I |
+
+For 2023 data many contracts still ran under Lei 8.666/93 (both laws co-existed). From 2024 the threshold is R$57.912. Using a static R$17.600 for 2024+ data would miss the main fraud window (R$17k–R$57k per contract). **Fixed (iteration 7):** all three implementations compute the threshold from the query year.
 
 ### False positive scenarios
 1. **Legitimate multi-item purchasing**: A supplier providing diverse small items (office supplies, food for canteen) legitimately generates many small contracts below threshold from the same agency. The `combined_value > threshold` guard reduces but doesn't eliminate this.
@@ -237,9 +241,19 @@ The per-CNPJ implementation reports only the **first** qualifying surge year (br
 
 ## Infrastructure Issue: Cache Miss vs Stored Null
 
-**Bug fixed:** `cache.ts` `getCache` was returning `null` for both cache misses (file not found) and legitimately stored null values (pattern found nothing). Patterns US4–US8 and the company lookup all use `null` as their "nothing found" sentinel and check `cached !== undefined` to skip re-querying. With the old `getCache` returning `null` on miss, `null !== undefined` evaluated to `true`, causing the BigQuery query to be skipped permanently — US4–US8 would never execute on a CNPJ not yet in cache.
+### Bug 1: Cache Miss vs Stored Null (fixed iteration 6)
 
-**Fix:** `getCache` now returns `undefined` on miss or expiry; returns `T` (including `null`) on a valid cache hit. Callers using truthiness checks (`if (cached)`) work unchanged. The company-lookup caller that used `!== null` was updated to `!== undefined`.
+`cache.ts` `getCache` was returning `null` for both cache misses (file not found) and legitimately stored null values (pattern found nothing). Patterns US4–US8 and the company lookup all use `null` as their "nothing found" sentinel and check `cached !== undefined` to skip re-querying. With the old `getCache` returning `null` on miss, `null !== undefined` evaluated to `true`, causing the BigQuery query to be skipped permanently — US4–US8 would never execute on a CNPJ not yet in cache.
+
+**Fix:** `getCache` now returns `undefined` on miss or expiry; returns `T` (including `null`) on a valid cache hit. The company-lookup caller that used `!== null` was updated to `!== undefined`.
+
+### Bug 2: Falsy cache check for array-returning patterns (fixed iteration 7)
+
+US1, US2, US3, and `runPatterns()` in `index.ts` used `if (cached) return cached` to check for cache hits. An empty array `[]` is **falsy** in JavaScript — so a cached "no flags found" result (a real cache hit) was silently discarded, causing BigQuery to be re-queried on every subsequent call for clean CNPJs.
+
+Affected: `patternSplitContracts`, `patternConcentration`, `patternInexigibility`, `runPatterns`.
+
+**Fix:** changed all four to `if (cached !== undefined) return cached`. (US4–US8 already used this pattern since they cache `null` as "nothing found" — they were correct.)
 
 ---
 
@@ -261,9 +275,9 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 
 | Pattern | FP Risk | Legal Basis | Fixes Applied |
 |---------|---------|------------|---------------|
-| US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 | Added NULL date guard to prevent spurious null-month bucket |
-| US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations |
-| US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations |
+| US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 / Decreto 11.871/2024 | NULL date guard; year-dependent threshold (R$17.600 ≤2023, R$57.912 2024+); falsy cache check fixed |
+| US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations; **falsy cache check fixed** |
+| US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations; **falsy cache check fixed** |
 | US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | **cache.ts bug fixed** (getCache null-vs-undefined); CPF-counting inconsistency documented |
 | US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds; **cache.ts bug fixed** |
 | US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× inflation cap; **cache.ts bug fixed**; construction 50% ceiling deferred |
