@@ -1229,11 +1229,14 @@ function renderAlertasHtml(result: PatternResult): string {
       }
       case "single_bidder": {
         const sev = flag.occurrences >= 10 ? "red" : flag.occurrences >= 5 ? "orange" : "yellow";
+        const objs = flag.sampleObjects.length > 0
+          ? `<span>Exemplos: ${flag.sampleObjects.map(escHtml).join(" · ")}</span>` : "";
         return `<div class="alerta-card ${sev}">
           <div class="alerta-title">Vencedor Único em Licitações</div>
           <div class="alerta-meta">
             <span>${flag.occurrences} licitações sem concorrência · ${brl.format(flag.totalValue)}</span>
             <span>${flag.agencies.slice(0, 3).map(escHtml).join(", ")}${flag.agencies.length > 3 ? ` +${flag.agencies.length - 3}` : ""}</span>
+            ${objs}
           </div>
           <div class="alerta-source">CGU · licitacao_participante · OCP Red Flags #1</div>
         </div>`;
