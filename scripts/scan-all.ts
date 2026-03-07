@@ -137,25 +137,28 @@ async function batchSplit() {
 async function batchConcentration() {
   const rows = await runQuery("CONCENTRATION", `
     WITH spend AS (
+      -- Join on (id_orgao_superior, nome_orgao_superior) to prevent merging
+      -- two distinct agencies that share the same name (rare but possible).
       SELECT
         SUBSTR(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), 1, 8) AS cnpj_basico,
+        id_orgao_superior,
         nome_orgao_superior,
         SUM(valor_final_compra) AS sup
       FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
       WHERE ano = ${ANO}
         AND LENGTH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', '')) = 14
-      GROUP BY 1, 2
+      GROUP BY 1, 2, 3
     ),
     ministry_total AS (
-      SELECT nome_orgao_superior, SUM(valor_final_compra) AS tot
+      SELECT id_orgao_superior, nome_orgao_superior, SUM(valor_final_compra) AS tot
       FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
       WHERE ano = ${ANO}
-      GROUP BY 1
+      GROUP BY 1, 2
     )
     SELECT s.cnpj_basico, s.nome_orgao_superior,
       s.sup / NULLIF(m.tot, 0) AS share, s.sup, m.tot
     FROM spend s
-    JOIN ministry_total m USING(nome_orgao_superior)
+    JOIN ministry_total m USING(id_orgao_superior, nome_orgao_superior)
     WHERE m.tot >= ${CONCENTRATION_MIN_SPEND}
       AND s.sup >= ${CONCENTRATION_MIN_SUPPLIER}
       AND s.sup / NULLIF(m.tot, 0) >= ${CONCENTRATION_THRESHOLD}

@@ -70,15 +70,17 @@ async function checkSplit(cnpj: string, ano: number) {
 }
 
 async function checkConcentration(cnpj: string, ano: number) {
+  // Group by (id_orgao_superior, nome_orgao_superior) to prevent merging two distinct
+  // agencies that share the same name (mirrors index.ts patternConcentration behavior).
   const rows = await query(`
-    SELECT nome_orgao_superior,
+    SELECT id_orgao_superior, nome_orgao_superior,
       SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D',''),@cnpj) THEN valor_final_compra ELSE 0 END) AS sup,
       SUM(valor_final_compra) AS tot
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
     WHERE ano=@ano AND id_orgao_superior IN (
       SELECT DISTINCT id_orgao_superior FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
       WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D',''),@cnpj) AND ano=@ano)
-    GROUP BY nome_orgao_superior
+    GROUP BY id_orgao_superior, nome_orgao_superior
     HAVING SUM(valor_final_compra)>=@min
       AND SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado,r'\\D',''),@cnpj) THEN valor_final_compra ELSE 0 END) >= @min_supplier
       AND SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado,r'\\D',''),@cnpj) THEN valor_final_compra ELSE 0 END)/NULLIF(SUM(valor_final_compra),0)>=@thr`,

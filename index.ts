@@ -288,7 +288,8 @@ interface AmendmentInflationFlag {
   totalFinalValue: number;
   excessValue: number;
   worstAgency: string;
-  zeroAmendmentCount: number; // inflated contracts with 0 contrato_termo_aditivo records — most suspicious
+  zeroAmendmentCount: number;   // inflated contracts with 0 contrato_termo_aditivo records — most suspicious
+  constructionCount: number;    // contracts flagged at 1.50× construction threshold (vs 1.25× goods/services)
 }
 
 interface NewbornCompanyFlag {
@@ -996,7 +997,8 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
       c.valor_inicial_compra,
       c.valor_final_compra,
       c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) AS inflation_ratio,
-      COALESCE(a.aditivo_count, 0)                             AS aditivo_count
+      COALESCE(a.aditivo_count, 0)                             AS aditivo_count,
+      REGEXP_CONTAINS(LOWER(IFNULL(c.objeto, '')), ${CONSTRUCTION_KEYWORDS_RE}) AS is_construction
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\` c
     LEFT JOIN aditivos a USING (id_contrato)
     WHERE STARTS_WITH(REGEXP_REPLACE(c.cpf_cnpj_contratado, r'\\D', ''), @cnpj)
@@ -1020,6 +1022,7 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
   const totalFinal = typed.reduce((s, r) => s + Number(r.valor_final_compra ?? 0), 0);
   const maxRatio = Math.max(...typed.map((r) => Number(r.inflation_ratio ?? 0)));
   const zeroAmendmentCount = typed.filter((r) => Number(r.aditivo_count ?? 0) === 0).length;
+  const constructionCount = typed.filter((r) => r.is_construction === true).length;
   const flag: AmendmentInflationFlag = {
     pattern: "amendment_inflation",
     contractCount: rows.length,
@@ -1029,6 +1032,7 @@ async function patternAmendmentInflation(cnpj: string, ano: number): Promise<Ame
     excessValue: totalFinal - totalOriginal,
     worstAgency: String(typed[0].nome_unidade_gestora ?? ""),
     zeroAmendmentCount,
+    constructionCount,
   };
   setCache(cacheKey, flag);
   return flag;
@@ -1278,11 +1282,16 @@ function renderAlertasHtml(result: PatternResult): string {
         const sev = flag.maxInflationRatio >= 2.0 ? "red" : "orange";
         const zeroAmendNote = flag.zeroAmendmentCount > 0
           ? `<span>⚠ ${flag.zeroAmendmentCount} sem termos aditivos registrados</span>` : "";
+        // constructionCount: contracts that were flagged at the 1.50× construction threshold.
+        // Show a note so analysts know the 50% legal ceiling applied (not 25%).
+        const constructionNote = flag.constructionCount > 0
+          ? `<span title="Teto legal 50% (Lei 14.133 art.125 §1º, II)">${flag.constructionCount} de obra/engenharia (limite 50%)</span>` : "";
         return `<div class="alerta-card ${sev}">
           <div class="alerta-title">Superfaturamento via Aditivos Contratuais</div>
           <div class="alerta-meta">
             <span>${flag.contractCount} contratos acima do limite legal · excesso ${brl.format(flag.excessValue)}</span>
             <span>Maior índice: +${maxPct}% · ${escHtml(flag.worstAgency)}</span>
+            ${constructionNote}
             ${zeroAmendNote}
           </div>
           <div class="alerta-source">CGU · contrato_compra · Lei 14.133/2021 art.125</div>

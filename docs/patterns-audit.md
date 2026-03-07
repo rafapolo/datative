@@ -61,8 +61,8 @@ No specific legal prohibition, but **TCU** and **CGU** audit methodology treat >
 - Added `CONCENTRATION_MIN_SUPPLIER_SPEND` filter to `index.ts` `patternConcentration` HAVING clause (iteration 4 — was present in batch/scan-suspicious but missing from web UI).
 
 ### Per-CNPJ vs batch consistency
-✅ Fixed (iteration 4): `index.ts` HAVING clause now includes `supplier_spend >= CONCENTRATION_MIN_SUPPLIER_SPEND`. Previously ⚠️ — the per-CNPJ web UI was missing this guard, producing more false positives than the batch scanner.
-⚠️ Minor (acceptable): `index.ts` groups by `(id_orgao_superior, nome_orgao_superior)` while `scan-suspicious.ts` and `scan-all.ts` group by `nome_orgao_superior` only. If two ministries share the same name (very rare at `orgao_superior` level), `scan-suspicious` and `scan-all` would merge them. The behavior difference is negligible in practice for ministry-level data.
+✅ Fixed (iteration 4): `index.ts` HAVING clause now includes `supplier_spend >= CONCENTRATION_MIN_SUPPLIER_SPEND`.
+✅ Fixed (iteration 9): `scan-all.ts` and `scan-suspicious.ts` now group by `(id_orgao_superior, nome_orgao_superior)` in both the spend and ministry_total CTEs, joining on the composite key. All three implementations are consistent.
 
 ---
 
@@ -178,8 +178,11 @@ All three implementations now apply `IF(REGEXP_CONTAINS(LOWER(IFNULL(objeto, '')
 
 **Known limitations:** The `objeto` field is free-text entered by procurement officers. Some construction contracts may use generic descriptions ("serviços de manutenção") and be missed by this detection — applying the 1.25× threshold is safe for those (conservative false positive vs missed construction exemption).
 
+### Improvements applied (iteration 9): constructionCount field
+`AmendmentInflationFlag` now includes `constructionCount`: the number of flagged contracts that matched the construction keywords and were therefore evaluated at the 1.50× threshold. The UI card shows this count with a tooltip explaining the applicable legal ceiling. This helps analysts distinguish "inflated by >25% on goods (potentially illegal)" from "inflated by >50% on obras (definitely exceeds even the construction ceiling)."
+
 ### Per-CNPJ vs batch consistency
-⚠️ Minor divergence (accepted): `index.ts` now includes the aditivos CTE to surface `zeroAmendmentCount`. The batch scanners (`scan-all.ts`, `scan-suspicious.ts`) do NOT include this join — a full scan of `contrato_termo_aditivo` for every batch run would be prohibitively expensive. The `zeroAmendmentCount` field is only available in the web UI's per-CNPJ output.
+⚠️ Minor divergence (accepted): `index.ts` includes the aditivos CTE (`zeroAmendmentCount`) and `constructionCount` from `is_construction`. The batch scanners do NOT include these — `contrato_termo_aditivo` full scan is too expensive in batch, and `constructionCount` is per-row info not aggregable without the row-level data. Both fields are only available in the web UI's per-CNPJ output.
 
 ---
 
@@ -287,10 +290,10 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 | Pattern | FP Risk | Legal Basis | Fixes Applied |
 |---------|---------|------------|---------------|
 | US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 / Decreto 11.871/2024 | NULL date guard; year-dependent threshold (R$17.600 ≤2023, R$57.912 2024+); falsy cache check fixed; **batch GROUP BY now includes id_orgao_superior** |
-| US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations; **falsy cache check fixed** |
+| US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations; **falsy cache check fixed**; **all 3 now GROUP BY (id+name) — no ministry-name collision** |
 | US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations; **falsy cache check fixed** |
 | US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | **cache.ts bug fixed** (getCache null-vs-undefined); **batch now counts all participants (CPF+CNPJ)** — consistent with per-CNPJ |
 | US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds; **cache.ts bug fixed** |
-| US6 Amendment | Medium — inflation clauses | Lei 14.133/2021 art.125 | Added 10× inflation cap; **cache.ts bug fixed**; **construction keyword detection: 1.50× threshold for obras/construção/reforma/etc.** |
+| US6 Amendment | Medium — inflation clauses | Lei 14.133/2021 art.125 | Added 10× inflation cap; **cache.ts bug fixed**; **construction keyword detection: 1.50× threshold for obras/etc.**; **constructionCount in UI flag** |
 | US7 Newborn | High — spinoffs, restructurings | CGU 2021 guide | **cache.ts bug fixed** (was never querying BigQuery on cache miss) |
 | US8 Surge | Medium — framework agreements, budget cycles | UNODC 2013 | Added consecutive-year guard; **cache.ts bug fixed** |
