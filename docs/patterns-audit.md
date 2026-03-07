@@ -50,10 +50,11 @@ No specific legal prohibition, but **TCU** and **CGU** audit methodology treat >
 3. **Framework agreements**: A single framework contract can make one supplier appear to dominate even if bidding was competitive at framework establishment.
 
 ### Improvements applied
-- Added `CONCENTRATION_MIN_SUPPLIER_SPEND = 10_000` to batch query to reduce trivially small cases.
+- Added `CONCENTRATION_MIN_SUPPLIER_SPEND = 10_000` to batch query and `scan-suspicious.ts` (iteration 2).
+- Added `CONCENTRATION_MIN_SUPPLIER_SPEND` filter to `index.ts` `patternConcentration` HAVING clause (iteration 4 — was present in batch/scan-suspicious but missing from web UI).
 
 ### Per-CNPJ vs batch consistency
-⚠️ Minor: per-CNPJ query uses a correlated subquery to find agencies; batch uses GROUP BY across all agencies. Results equivalent but per-CNPJ may be slightly more accurate for edge cases near the threshold due to different aggregation paths.
+✅ Fixed (iteration 4): `index.ts` HAVING clause now includes `supplier_spend >= CONCENTRATION_MIN_SUPPLIER_SPEND`. Previously ⚠️ — the per-CNPJ web UI was missing this guard, producing more false positives than the batch scanner.
 
 ---
 
@@ -73,11 +74,14 @@ No specific legal prohibition, but **TCU** and **CGU** audit methodology treat >
 3. **Artistic/cultural organizations**: Museums, theaters, and orchestras commonly contract artists via inexigibilidade.
 
 ### Improvements applied (iteration 2)
-- **Batch**: Now groups by `id_unidade_gestora` (ID) + `nome_unidade_gestora` (name). Previously grouped by name only, risking merger of distinct units sharing a common name.
-- **Batch**: Added `valor_inicial_compra >= R$ 1.000` filter. Micro-value contracts (< R$1k) rarely represent real abuse.
+- **Batch + scan-suspicious**: Now groups by `id_unidade_gestora` (ID) + `nome_unidade_gestora` (name). Previously grouped by name only, risking merger of distinct units sharing a common name.
+- **Batch + scan-suspicious**: Added `valor_inicial_compra >= R$ 1.000` filter. Micro-value contracts (< R$1k) rarely represent real abuse.
+
+### Improvements applied (iteration 4)
+- **`index.ts`**: Added `AND valor_inicial_compra >= @min_value` to WHERE clause of `patternInexigibility`. The web UI was missing this filter, causing micro-value contracts to inflate the count and trigger false flags.
 
 ### Per-CNPJ vs batch consistency
-✅ Fixed: both now use `id_unidade_gestora` for grouping.
+✅ Fixed (iteration 4): all three implementations now filter `valor_inicial_compra >= R$ 1.000` and group by `id_unidade_gestora`.
 
 ---
 
@@ -225,8 +229,8 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 | Pattern | FP Risk | Legal Basis | Iteration 2 Fix |
 |---------|---------|------------|-----------------|
 | US1 Split | Medium — multi-item purchasing | Decreto 9.412/2018 | Threshold documented |
-| US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend |
-| US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value |
+| US2 Concentration | Medium — specialized markets | CGU 2022 methodology | Added min supplier spend to all 3 implementations |
+| US3 Inexigibility | High — legitimate exclusive suppliers | TCU Acórdão 1.793/2011 | Fixed grouping by ID; added min value to all 3 implementations |
 | US4 Single Bidder | Medium — specialized/remote markets | OCP 2024 Flag #1 | No change |
 | US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds |
 | US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× cap on inflation_ratio to exclude data errors |

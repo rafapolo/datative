@@ -801,12 +801,14 @@ async function patternConcentration(cnpj: string, ano: number): Promise<Concentr
     GROUP BY id_orgao_superior, nome_orgao_superior
     HAVING SUM(valor_final_compra) >= @min_agency_spend
        AND SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
+                    THEN valor_final_compra ELSE 0 END) >= @min_supplier_spend
+       AND SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
                     THEN valor_final_compra ELSE 0 END)
            / NULLIF(SUM(valor_final_compra), 0) >= @threshold
   `;
   const [job] = await bq.createQueryJob({
     query: sql,
-    params: { cnpj, ano, threshold: CONCENTRATION_THRESHOLD, min_agency_spend: CONCENTRATION_MIN_SPEND },
+    params: { cnpj, ano, threshold: CONCENTRATION_THRESHOLD, min_agency_spend: CONCENTRATION_MIN_SPEND, min_supplier_spend: CONCENTRATION_MIN_SUPPLIER_SPEND },
     location: "US",
   });
   const [rows] = await job.getQueryResults();
@@ -844,12 +846,13 @@ async function patternInexigibility(cnpj: string, ano: number): Promise<Inexigib
     WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D', ''), @cnpj)
       AND ano = @ano
       AND UPPER(fundamento_legal) LIKE '%INEXIGIBILIDADE%'
+      AND valor_inicial_compra >= @min_value
     GROUP BY id_unidade_gestora, nome_unidade_gestora
     HAVING COUNT(*) >= @min_count
   `;
   const [job] = await bq.createQueryJob({
     query: sql,
-    params: { cnpj, ano, min_count: INEXIGIBILITY_MIN_COUNT },
+    params: { cnpj, ano, min_count: INEXIGIBILITY_MIN_COUNT, min_value: INEXIGIBILITY_MIN_VALUE },
     location: "US",
   });
   const [rows] = await job.getQueryResults();
