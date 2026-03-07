@@ -187,7 +187,7 @@ async function checkSurge(cnpj: string, ano: number) {
   const hist = rows.map(r => ({ ano: Number(r.ano), v: Number(r.v) }));
   for (let i = 1; i < hist.length; i++) {
     const prev = hist[i-1], curr = hist[i];
-    if (prev.v > 0 && curr.v >= SURGE_MIN_ABSOLUTE_VALUE && curr.v/prev.v >= SURGE_RATIO_THRESHOLD) {
+    if (curr.ano - prev.ano === 1 && prev.v > 0 && curr.v >= SURGE_MIN_ABSOLUTE_VALUE && curr.v/prev.v >= SURGE_RATIO_THRESHOLD) {
       return [`  SURGE  ${curr.ano}: ${(curr.v/prev.v).toFixed(1)}× · ${fmt(prev.v)} → ${fmt(curr.v)}`];
     }
   }

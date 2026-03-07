@@ -375,13 +375,15 @@ async function batchSurge() {
     lagged AS (
       SELECT
         cnpj_basico, ano, v,
-        LAG(v) OVER (PARTITION BY cnpj_basico ORDER BY ano) AS prev_v
+        LAG(v)   OVER (PARTITION BY cnpj_basico ORDER BY ano) AS prev_v,
+        LAG(ano) OVER (PARTITION BY cnpj_basico ORDER BY ano) AS prev_ano
       FROM yearly
     )
     SELECT cnpj_basico, ano, v, prev_v,
       v / NULLIF(prev_v, 0) AS ratio
     FROM lagged
-    WHERE prev_v > 0
+    WHERE ano - prev_ano = 1        -- consecutive years only; gaps mean dormant period, not a surge
+      AND prev_v > 0
       AND v >= ${SURGE_MIN_ABSOLUTE_VALUE}
       AND v / NULLIF(prev_v, 0) >= ${SURGE_RATIO_THRESHOLD}
     ORDER BY ratio DESC

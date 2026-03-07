@@ -1110,7 +1110,7 @@ async function patternSuddenSurge(cnpj: string, ano: number): Promise<SuddenSurg
   for (let i = 1; i < history.length; i++) {
     const prev = history[i - 1];
     const curr = history[i];
-    if (prev.value > 0 && curr.value >= SURGE_MIN_ABSOLUTE_VALUE && curr.value / prev.value >= SURGE_RATIO_THRESHOLD) {
+    if (curr.ano - prev.ano === 1 && prev.value > 0 && curr.value >= SURGE_MIN_ABSOLUTE_VALUE && curr.value / prev.value >= SURGE_RATIO_THRESHOLD) {
       surgeFlag = {
         pattern: "sudden_surge",
         surgeYear: curr.ano,

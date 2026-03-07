@@ -207,9 +207,15 @@ Not illegal, but flagged by:
 3. **Government budget cycles**: Some sectors receive large multi-year contracts every 4 years (e.g., IT system replacements) creating apparent surges.
 
 ### SQL robustness note
-Both per-CNPJ and batch use `prev_v > 0` guard to exclude zero→nonzero transitions (handled by US7 newborn_company instead). The batch uses `LAG` window function; per-CNPJ iterates over the history array client-side. Results are equivalent.
+Both per-CNPJ and batch use `prev_v > 0` guard to exclude zero→nonzero transitions (handled by US7 newborn_company instead). The batch uses `LAG` window function; per-CNPJ iterates over the history array client-side.
 
-The per-CNPJ implementation reports only the **first** qualifying surge year (breaks on first hit). If a company surged twice, only the earlier event is shown. This is conservative — the most distant surge is more likely to still be relevant context.
+**Consecutive-year guard (iteration 6):** The spec says `value[year_N] / value[year_N-1]`. Without a guard, `LAG` compares any adjacent rows in sorted order — if a company had data in 2019 and 2023 (dormant 2020–2022), the comparison spans 4 years and produces a false surge. Fixed by:
+- `scan-all.ts`: added `LAG(ano)` alongside `LAG(v)` and `WHERE ano - prev_ano = 1`
+- `index.ts`, `scan-suspicious.ts`: added `curr.ano - prev.ano === 1` to the JS loop condition
+
+**false positive (false negative from audit):** The first false positive scenario (post-restructuring recovery) is now LESS likely to trigger since the consecutive-year guard would catch companies dormant for ≥1 year.
+
+The per-CNPJ implementation reports only the **first** qualifying surge year (breaks on first hit). If a company surged twice, only the earlier event is shown. This is conservative.
 
 ### Per-CNPJ vs batch consistency
 ✅ Equivalent. Batch uses SQL `LAG`; per-CNPJ uses JS loop. Both find the first qualifying year.
@@ -241,4 +247,4 @@ All patterns use `cnpj_basico` (8-digit root) as the joining key. This means **a
 | US5 Always Winner | **Was HIGH** (no competitive filter) → Now Medium | OCDE 2021 | Fixed: competitive auctions only; raised thresholds |
 | US6 Amendment | Medium — inflation clauses, construction ceiling | Lei 14.133/2021 art.125 | Added 10× cap on inflation_ratio to exclude data errors |
 | US7 Newborn | High — spinoffs, restructurings | CGU 2021 guide | No change |
-| US8 Surge | Medium — framework agreements, budget cycles | UNODC 2013 | No change |
+| US8 Surge | Medium — framework agreements, budget cycles | UNODC 2013 | Added consecutive-year guard (gap years no longer compare as YoY surge) |

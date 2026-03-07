@@ -133,6 +133,7 @@ DATATIVE surfaces companies that are statistically anomalous in public procureme
 - Given a CNPJ where `value[year_N] / value[year_N-1] >= 5.0` AND `value[year_N] >= R$ 1.000.000` AND `value[year_N-1] > 0` → flag shown with surge year, growth multiplier, prior-year value, surge-year value, and agency count
 - Given no prior-year activity → no flag (use `newborn_company` instead)
 - Given surge below 5× or absolute value below R$ 1M → no flag
+- Given `year_N-1` has no data (gap year — company was dormant) → no flag; `year_N-1` must be the calendar year immediately preceding `year_N`, otherwise the growth spans multiple dormant years and is not a YoY surge
 
 ---
 
