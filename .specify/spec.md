@@ -68,9 +68,11 @@ Given a company CNPJ, detect suspicious procurement patterns using data already 
 **So that** I can identify possible bid-rigging, insider advantage, or specifications tailored to this vendor.
 
 **Acceptance scenarios:**
-- Given a CNPJ with ≥ 5 participations in `licitacao_participante` AND win rate ≥ 60% → flag shown with win rate %, wins vs total participations, and total value competed
-- Given fewer than 5 participations → no flag (insufficient sample)
-- Given win rate below 60% → no flag
+- Given a CNPJ with ≥ 10 participations in **competitive** auctions (where total bidders ≥ 2) AND win rate ≥ Q3 of the distribution across all qualifying bidders → flag shown with win rate %, wins vs total, and total value competed
+- Given fewer than 10 competitive participations → no flag (insufficient sample)
+- Given win rate below Q3 → no flag
+
+**Implementation note:** The win rate distribution in `br_cgu_licitacao_contrato` is strongly bimodal — ~33% of qualifying companies have a perfect 100% win rate, making Q3 = 100% regardless of sample size. The Q3 threshold is therefore intentionally strict, flagging only companies with a perfect competitive win record. The dynamic threshold is printed at runtime. The 60% hardcoded floor was removed in favour of the data-driven Q3.
 
 ---
 
@@ -118,7 +120,8 @@ Given a company CNPJ, detect suspicious procurement patterns using data already 
 | `br_cgu_licitacao_contrato.licitacao_participante` | US4–5 | `id_licitacao`, `cpf_cnpj_participante`, `vencedor` |
 | `br_cgu_licitacao_contrato.licitacao` | US4–5 | `id_licitacao`, `id_orgao_superior`, `valor_licitacao`, `ano` |
 | `br_cgu_licitacao_contrato.contrato_termo_aditivo` | US6 | `id_contrato`, `id_termo_aditivo` |
-| `br_me_cnpj.empresas` | US7 | `cnpj_basico`, `data_inicio_atividade`, `porte`, `ano`, `mes` |
+| `br_me_cnpj.empresas` | US7 | `cnpj_basico`, `porte`, `ano`, `mes` |
+| `br_me_cnpj.estabelecimentos` | US7 | `cnpj_basico`, `data_inicio_atividade`, `ano`, `mes` — **`data_inicio_atividade` lives here, not in `empresas`; requires JOIN on `cnpj_basico` with partition filter `ano=N AND mes=12`** |
 
 ---
 
@@ -130,3 +133,31 @@ Given a company CNPJ, detect suspicious procurement patterns using data already 
 - Zero full-table scans — every query filters by `ano`
 - All thresholds are named constants with comments citing legal basis or source
 - No external API dependency for any of the 8 patterns
+
+---
+
+## Implementation Notes (post-build learnings)
+
+### Batch scanner (`scripts/scan-all.ts`)
+Rewrites all 8 patterns as `GROUP BY cnpj_basico` queries that process every company in a single pass. Results for 2023: **15,182 distinct CNPJs**, 34,819 contracts. Runtime: ~12s total (~8 BigQuery jobs) vs ~10 hours for a per-CNPJ loop. Run via:
+```
+GCP_PROJECT_ID=xxx bun run scripts/scan-all.ts --ano 2023 [--out results.json]
+```
+
+### `data_inicio_atividade` schema bug
+Column does **not** exist in `br_me_cnpj.empresas`. It lives in `br_me_cnpj.estabelecimentos`. The newborn check (US7) requires joining both tables:
+```sql
+JOIN `br_me_cnpj.estabelecimentos` est
+  ON est.cnpj_basico = e.cnpj_basico AND est.ano = @ano AND est.mes = 12
+```
+
+### Win rate distribution (US5)
+The `licitacao_participante` table has a strongly bimodal win rate distribution: median ≈ 24%, but ~33% of companies with ≥10 competitive participations have a perfect 100% win rate. Q3 = 1.0 across all sample-size cuts. The dynamic Q3 threshold therefore flags only perfect-win companies (100%), which is stricter than the original hardcoded 60%.
+
+### CNPJ matching pattern
+All cross-dataset CNPJ joins use:
+```sql
+STARTS_WITH(REGEXP_REPLACE(col, r'\D', ''), @cnpj)   -- per-CNPJ queries
+SUBSTR(REGEXP_REPLACE(col, r'\D', ''), 1, 8)          -- batch GROUP BY queries
+```
+Filter `LENGTH(REGEXP_REPLACE(col, r'\D', '')) = 14` to exclude CPFs (11 digits).
