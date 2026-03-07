@@ -23,10 +23,12 @@ const SPLIT_THRESHOLD_BRL          = 17_600;
 const SPLIT_MIN_COUNT              = 3;
 const CONCENTRATION_THRESHOLD      = 0.40;
 const CONCENTRATION_MIN_SPEND      = 50_000;
+const CONCENTRATION_MIN_SUPPLIER   = 10_000;  // R$10k — excludes trivially small supplier spend (scan-all parity)
 const INEXIGIBILITY_MIN_COUNT      = 3;
+const INEXIGIBILITY_MIN_VALUE      = 1_000;   // R$1k — excludes micro-value contracts (scan-all parity)
 const SINGLE_BIDDER_MIN_OCCURRENCES = 2;
-const WIN_RATE_THRESHOLD            = 0.60;
-const WIN_RATE_MIN_SAMPLE           = 5;
+const WIN_RATE_THRESHOLD            = 0.80;   // raised from 0.60; Q3 in practice = 1.0 (bimodal dataset)
+const WIN_RATE_MIN_SAMPLE           = 10;     // raised from 5 to match scan-all (statistical significance)
 const AMENDMENT_INFLATION_THRESHOLD = 1.25;
 const AMENDMENT_MIN_ORIGINAL_VALUE  = 10_000;
 const NEWBORN_MAX_DAYS_TO_CONTRACT  = 180;
@@ -71,20 +73,25 @@ async function checkConcentration(cnpj: string, ano: number) {
       SELECT DISTINCT id_orgao_superior FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
       WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado, r'\\D',''),@cnpj) AND ano=@ano)
     GROUP BY nome_orgao_superior
-    HAVING SUM(valor_final_compra)>=@min AND SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado,r'\\D',''),@cnpj) THEN valor_final_compra ELSE 0 END)/NULLIF(SUM(valor_final_compra),0)>=@thr`,
-    { cnpj, ano, min: CONCENTRATION_MIN_SPEND, thr: CONCENTRATION_THRESHOLD });
+    HAVING SUM(valor_final_compra)>=@min
+      AND SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado,r'\\D',''),@cnpj) THEN valor_final_compra ELSE 0 END) >= @min_supplier
+      AND SUM(CASE WHEN STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado,r'\\D',''),@cnpj) THEN valor_final_compra ELSE 0 END)/NULLIF(SUM(valor_final_compra),0)>=@thr`,
+    { cnpj, ano, min: CONCENTRATION_MIN_SPEND, min_supplier: CONCENTRATION_MIN_SUPPLIER, thr: CONCENTRATION_THRESHOLD });
   return rows.map(r => `  CONC   ${r.nome_orgao_superior} · ${((Number(r.sup)/Number(r.tot))*100).toFixed(0)}% · sup ${fmt(Number(r.sup))} / tot ${fmt(Number(r.tot))}`);
 }
 
 async function checkInexig(cnpj: string, ano: number) {
+  // Group by (id_unidade_gestora, nome_unidade_gestora) to avoid merging distinct units with identical names.
+  // Min value R$1k excludes micro-value contracts unlikely to represent real abuse.
   const rows = await query(`
-    SELECT nome_unidade_gestora, COUNT(*) AS n, SUM(valor_inicial_compra) AS total
+    SELECT id_unidade_gestora, nome_unidade_gestora, COUNT(*) AS n, SUM(valor_inicial_compra) AS total
     FROM \`basedosdados.br_cgu_licitacao_contrato.contrato_compra\`
     WHERE STARTS_WITH(REGEXP_REPLACE(cpf_cnpj_contratado,r'\\D',''),@cnpj)
       AND ano=@ano AND UPPER(fundamento_legal) LIKE '%INEXIGIBILIDADE%'
-    GROUP BY nome_unidade_gestora HAVING COUNT(*)>=@min`,
-    { cnpj, ano, min: INEXIGIBILITY_MIN_COUNT });
-  return rows.map(r => `  INEXIG ${r.nome_unidade_gestora} · ${r.n} contratos · ${fmt(Number(r.total))}`);
+      AND valor_inicial_compra >= @min_val
+    GROUP BY id_unidade_gestora, nome_unidade_gestora HAVING COUNT(*)>=@min`,
+    { cnpj, ano, min: INEXIGIBILITY_MIN_COUNT, min_val: INEXIGIBILITY_MIN_VALUE });
+  return rows.map(r => `  INEXIG ${r.nome_unidade_gestora} (${r.id_unidade_gestora}) · ${r.n} contratos · ${fmt(Number(r.total))}`);
 }
 
 async function checkSingleBidder(cnpj: string, ano: number) {
@@ -104,11 +111,21 @@ async function checkSingleBidder(cnpj: string, ano: number) {
 }
 
 async function checkAlwaysWinner(cnpj: string, ano: number) {
+  // Only counts competitive auctions (≥2 bidders) to avoid overlap with US4 single_bidder.
+  // Threshold 0.80 and min sample 10 match scan-all.ts (spec §US5).
   const rows = await query(`
-    WITH p AS (
+    WITH competitive AS (
+      -- auctions with ≥2 distinct bidders; evaluated across all data (id_licitacao is global)
+      SELECT id_licitacao
+      FROM \`basedosdados.br_cgu_licitacao_contrato.licitacao_participante\`
+      WHERE LENGTH(REGEXP_REPLACE(cpf_cnpj_participante, r'\\D', '')) = 14
+      GROUP BY id_licitacao HAVING COUNT(1) >= 2
+    ),
+    p AS (
       SELECT pa.id_licitacao, pa.vencedor, l.valor_licitacao
       FROM \`basedosdados.br_cgu_licitacao_contrato.licitacao_participante\` pa
       JOIN \`basedosdados.br_cgu_licitacao_contrato.licitacao\` l USING(id_licitacao)
+      JOIN competitive USING(id_licitacao)
       WHERE STARTS_WITH(REGEXP_REPLACE(pa.cpf_cnpj_participante,r'\\D',''),@cnpj) AND l.ano=@ano)
     SELECT COUNT(*) AS tot, COUNTIF(vencedor) AS wins, SUM(valor_licitacao) AS value FROM p
     HAVING COUNT(*)>=@min AND COUNTIF(vencedor)/NULLIF(COUNT(*),0)>=@thr`,

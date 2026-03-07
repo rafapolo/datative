@@ -114,7 +114,7 @@ DATATIVE surfaces companies that are statistically anomalous in public procureme
 **So that** I can identify possible shell companies created specifically for a procurement scheme.
 
 **Acceptance scenarios:**
-- Given a CNPJ where `data_inicio_atividade` in `br_me_cnpj.empresas` is within 180 days of the first `data_assinatura_contrato`, AND total contract value ≥ R$ 50.000 → flag shown with company age at first contract, size category, and total value won
+- Given a CNPJ where `data_inicio_atividade` (from `br_me_cnpj.estabelecimentos`, joined via `cnpj_basico`) is within 180 days of the first `data_assinatura_contrato`, AND total contract value ≥ R$ 50.000 → flag shown with company age at first contract, size category, and total value won
 - Given founding date NULL → no flag (insufficient data)
 - Given only small contracts (< R$ 50.000) → no flag
 
