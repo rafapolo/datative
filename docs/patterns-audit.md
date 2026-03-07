@@ -58,6 +58,7 @@ No specific legal prohibition, but **TCU** and **CGU** audit methodology treat >
 
 ### Per-CNPJ vs batch consistency
 ✅ Fixed (iteration 4): `index.ts` HAVING clause now includes `supplier_spend >= CONCENTRATION_MIN_SUPPLIER_SPEND`. Previously ⚠️ — the per-CNPJ web UI was missing this guard, producing more false positives than the batch scanner.
+⚠️ Minor (acceptable): `index.ts` groups by `(id_orgao_superior, nome_orgao_superior)` while `scan-suspicious.ts` and `scan-all.ts` group by `nome_orgao_superior` only. If two ministries share the same name (very rare at `orgao_superior` level), `scan-suspicious` and `scan-all` would merge them. The behavior difference is negligible in practice for ministry-level data.
 
 ---
 
