@@ -882,11 +882,13 @@ async function patternNewbornCompany(cnpj: string): Promise<NewbornCompanyFlag |
 
   const sql = `
     WITH empresa AS (
-      SELECT cnpj_basico, data_inicio_atividade, porte
-      FROM \`basedosdados.br_me_cnpj.empresas\`
-      WHERE cnpj_basico = @cnpj
-        AND ano = @empresa_ano AND mes = @empresa_mes
-      LIMIT 1
+      SELECT e.cnpj_basico, MIN(est.data_inicio_atividade) AS data_inicio_atividade, e.porte
+      FROM \`basedosdados.br_me_cnpj.empresas\` e
+      JOIN \`basedosdados.br_me_cnpj.estabelecimentos\` est
+        ON est.cnpj_basico = e.cnpj_basico AND est.ano = @empresa_ano AND est.mes = @empresa_mes
+      WHERE e.cnpj_basico = @cnpj
+        AND e.ano = @empresa_ano AND e.mes = @empresa_mes
+      GROUP BY e.cnpj_basico, e.porte
     ),
     contratos AS (
       SELECT
