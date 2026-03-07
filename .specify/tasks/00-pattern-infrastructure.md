@@ -91,8 +91,8 @@ const INEXIGIBILITY_MIN_COUNT = 3;
 
 ## Acceptance Criteria
 
-- [ ] All interfaces defined before any pattern function
-- [ ] `runPatterns()` uses `Promise.allSettled` — one failure never blocks others
-- [ ] "Alertas de Risco" section renders with 0, 1, and 8 simultaneous flags
-- [ ] Section does not appear on the company list page
-- [ ] All thresholds are named constants with a comment citing their legal basis
+- [x] All interfaces defined before any pattern function (lines 231–314; pattern functions start at 742)
+- [x] `runPatterns()` uses `Promise.allSettled` — one failure never blocks others
+- [x] "Alertas de Risco" section renders with 0, 1, and 8 simultaneous flags (`renderAlertasHtml` handles empty array, single flag, and all-8-flags)
+- [x] Section does not appear on the company list page (`renderGraphPage` is separate from `renderPage`; alertas panel only rendered when a CNPJ is provided)
+- [x] All thresholds are named constants with a comment citing their legal basis (lines 181–228)
