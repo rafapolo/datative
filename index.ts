@@ -400,7 +400,18 @@ async function queryLookup(
 
   const topKey = `lookup_${docDigits}_limit_${limit}`;
   const cachedAll = getCache<LookupResult[]>(topKey);
-  if (cachedAll) return { results: cachedAll, totalBytes: 0 };
+  if (cachedAll && cachedAll.every((r) => !r.queryError)) return { results: cachedAll, totalBytes: 0 };
+
+  // Try to build from per-dataset caches first
+  const perDatasetCached = CNPJ_DATASETS.map((ds) => {
+    const dsKey = `lookup_${docDigits}_${ds.id}_limit_${limit}`;
+    return getCache<LookupResult>(dsKey);
+  });
+  if (perDatasetCached.every((r) => r !== null)) {
+    const results = perDatasetCached as LookupResult[];
+    setCache(topKey, results);
+    return { results, totalBytes: 0 };
+  }
 
   if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
