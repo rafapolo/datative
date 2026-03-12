@@ -41,6 +41,12 @@ const PORT = parseInt(process.env.PORT ?? "3003", 10);
 const TABLE = "basedosdados.br_me_cnpj.empresas";
 const SOCIOS_TABLE = "basedosdados.br_me_cnpj.socios";
 const GRAPH_JS_PATH = resolve(import.meta.dir, "public/graph.js");
+const DONORS_HTML_PATH = resolve(import.meta.dir, "donors.html");
+const DONORS2_HTML_PATH = resolve(import.meta.dir, "donors2.html");
+const TSE_TRANSFERS_HTML_PATH = resolve(import.meta.dir, "tse_transfers.html");
+const DONORS_RECEIVERS_MD_PATH = resolve(import.meta.dir, "donors-receivers.md");
+const RECEIRVERS_DONORS_MD_PATH = resolve(import.meta.dir, "receirvers-donors.md");
+const DONORS_TRANSFERS_CSV_PATH = resolve(import.meta.dir, "donors-transfers.csv");
 const BASEDOSDADOS_SCHEMA_PATH = resolve(import.meta.dir, "basedosdados-schema.json");
 const FREE_TIER_BYTES = 1_000_000_000_000; // 1 TB/mês
 const USAGE_FILE = new URL("./usage.json", import.meta.url).pathname;
@@ -201,11 +207,11 @@ interface Socio {
 }
 
 async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[]; bytesProcessed: number }> {
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
-
   const cacheKey = `socios_${cnpjBasico}`;
   const cached = getCache<Socio[]>(cacheKey);
   if (cached) return { rows: cached, bytesProcessed: 0 };
+
+  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
   const sql = `
     SELECT nome, documento, qualificacao
@@ -222,11 +228,11 @@ async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[]; bytesPr
 }
 
 async function queryEmpresa(cnpjBasico: string): Promise<{ row: Company | null; bytesProcessed: number }> {
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
-
   const cacheKey = `empresa_${cnpjBasico}`;
   const cached = getCache<Company | null>(cacheKey);
   if (cached !== null) return { row: cached, bytesProcessed: 0 };
+
+  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
   const sql = `
     SELECT cnpj_basico, razao_social, natureza_juridica, qualificacao_responsavel, capital_social, porte, ente_federativo, ano
@@ -302,7 +308,6 @@ async function queryLookupDataset(
   forceFresh = false,
   limit = LOOKUP_LIMIT_DEFAULT,
 ): Promise<{ result: LookupResult; bytes: number }> {
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
   const docDigits = cnpjBasico.replace(/\D/g, "");
   const docLen = docDigits.length;
   const cnpjRoot = docDigits.slice(0, 8);
@@ -318,6 +323,8 @@ async function queryLookupDataset(
     const cachedDs = getCache<LookupResult>(dsKey);
     if (cachedDs) return { result: cachedDs, bytes: 0 };
   }
+
+  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
   const whereParts = ds.cnpjColumns.map((col) => buildCnpjWhere(col));
   const whereClause =
@@ -391,7 +398,6 @@ async function queryLookup(
   cnpjBasico: string,
   limit = LOOKUP_LIMIT_DEFAULT,
 ): Promise<{ results: LookupResult[]; totalBytes: number }> {
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
   const docDigits = cnpjBasico.replace(/\D/g, "");
   if (docDigits.length < 8) {
     throw new Error("Lookup value must have at least 8 digits.");
@@ -400,6 +406,8 @@ async function queryLookup(
   const topKey = `lookup_${docDigits}_limit_${limit}`;
   const cachedAll = getCache<LookupResult[]>(topKey);
   if (cachedAll) return { results: cachedAll, totalBytes: 0 };
+
+  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
 
   const jobs = CNPJ_DATASETS.map((ds) =>
     queryLookupDataset(cnpjBasico, ds.id, false, limit),
@@ -1061,7 +1069,9 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       font-size: 1.2rem;
       letter-spacing: 0.1em;
       color: var(--gold);
+      text-decoration: none;
     }
+    .h-brand:hover { opacity: 0.9; }
     .h-divider {
       width: 1px;
       height: 18px;
@@ -1194,7 +1204,7 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
 <body>
   <div class="gold-bar"></div>
   <header>
-    <span class="h-brand">DATA_</span>
+    <a class="h-brand" href="/">DATA_</a>
     <span class="h-divider"></span>
     <nav class="breadcrumb">
       <a href="/">INÍCIO</a>
@@ -1272,6 +1282,68 @@ Bun.serve({
         });
       } catch {
         return new Response("graph.js not found — run: bun build graph-client.ts --outfile public/graph.js --target browser", { status: 404 });
+      }
+    }
+
+    // Donors view + markdown data files
+    if (url.pathname === "/donors.html") {
+      try {
+        const html = readFileSync(DONORS_HTML_PATH);
+        return new Response(html, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      } catch {
+        return new Response("donors.html not found", { status: 404 });
+      }
+    }
+    if (url.pathname === "/donors2.html") {
+      try {
+        const html = readFileSync(DONORS2_HTML_PATH);
+        return new Response(html, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      } catch {
+        return new Response("donors2.html not found", { status: 404 });
+      }
+    }
+    if (url.pathname === "/tse_transfers.html") {
+      try {
+        const html = readFileSync(TSE_TRANSFERS_HTML_PATH);
+        return new Response(html, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      } catch {
+        return new Response("tse_transfers.html not found", { status: 404 });
+      }
+    }
+    if (url.pathname === "/donors-receivers.md") {
+      try {
+        const md = readFileSync(DONORS_RECEIVERS_MD_PATH);
+        return new Response(md, {
+          headers: { "Content-Type": "text/markdown; charset=utf-8" },
+        });
+      } catch {
+        return new Response("donors-receivers.md not found", { status: 404 });
+      }
+    }
+    if (url.pathname === "/receirvers-donors.md") {
+      try {
+        const md = readFileSync(RECEIRVERS_DONORS_MD_PATH);
+        return new Response(md, {
+          headers: { "Content-Type": "text/markdown; charset=utf-8" },
+        });
+      } catch {
+        return new Response("receirvers-donors.md not found", { status: 404 });
+      }
+    }
+    if (url.pathname === "/donors-transfers.csv") {
+      try {
+        const csv = readFileSync(DONORS_TRANSFERS_CSV_PATH);
+        return new Response(csv, {
+          headers: { "Content-Type": "text/csv; charset=utf-8" },
+        });
+      } catch {
+        return new Response("donors-transfers.csv not found", { status: 404 });
       }
     }
 
