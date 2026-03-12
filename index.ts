@@ -405,15 +405,22 @@ async function queryLookup(
   // Try to build from per-dataset caches first
   const perDatasetCached = CNPJ_DATASETS.map((ds) => {
     const dsKey = `lookup_${docDigits}_${ds.id}_limit_${limit}`;
-    return getCache<LookupResult>(dsKey);
+    return { ds, cached: getCache<LookupResult>(dsKey) };
   });
-  if (perDatasetCached.every((r) => r !== null)) {
-    const results = perDatasetCached as LookupResult[];
+
+  if (!PROJECT_ID) {
+    const results = perDatasetCached.map(({ ds, cached }) =>
+      cached ?? { id: ds.id, label: ds.label, count: 0, rows: [], cnpjColumnNames: [], nodeType: ds.nodeType, queryError: "Not available offline" }
+    );
     setCache(topKey, results);
     return { results, totalBytes: 0 };
   }
 
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
+  if (perDatasetCached.every(({ cached }) => cached !== null)) {
+    const results = perDatasetCached.map(({ cached }) => cached as LookupResult);
+    setCache(topKey, results);
+    return { results, totalBytes: 0 };
+  }
 
   const jobs = CNPJ_DATASETS.map((ds) =>
     queryLookupDataset(cnpjBasico, ds.id, false, limit),
