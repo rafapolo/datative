@@ -41,12 +41,7 @@ const PORT = parseInt(process.env.PORT ?? "3003", 10);
 const TABLE = "basedosdados.br_me_cnpj.empresas";
 const SOCIOS_TABLE = "basedosdados.br_me_cnpj.socios";
 const GRAPH_JS_PATH = resolve(import.meta.dir, "public/graph.js");
-const DONORS_HTML_PATH = resolve(import.meta.dir, "donors.html");
-const DONORS2_HTML_PATH = resolve(import.meta.dir, "donors2.html");
-const TSE_TRANSFERS_HTML_PATH = resolve(import.meta.dir, "tse_transfers.html");
-const DONORS_RECEIVERS_MD_PATH = resolve(import.meta.dir, "donors-receivers.md");
-const RECEIRVERS_DONORS_MD_PATH = resolve(import.meta.dir, "receirvers-donors.md");
-const DONORS_TRANSFERS_CSV_PATH = resolve(import.meta.dir, "donors-transfers.csv");
+
 const BASEDOSDADOS_SCHEMA_PATH = resolve(import.meta.dir, "basedosdados-schema.json");
 const FREE_TIER_BYTES = 1_000_000_000_000; // 1 TB/mês
 const USAGE_FILE = new URL("./usage.json", import.meta.url).pathname;
@@ -1285,67 +1280,7 @@ Bun.serve({
       }
     }
 
-    // Donors view + markdown data files
-    if (url.pathname === "/donors.html") {
-      try {
-        const html = readFileSync(DONORS_HTML_PATH);
-        return new Response(html, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
-      } catch {
-        return new Response("donors.html not found", { status: 404 });
-      }
-    }
-    if (url.pathname === "/donors2.html") {
-      try {
-        const html = readFileSync(DONORS2_HTML_PATH);
-        return new Response(html, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
-      } catch {
-        return new Response("donors2.html not found", { status: 404 });
-      }
-    }
-    if (url.pathname === "/tse_transfers.html") {
-      try {
-        const html = readFileSync(TSE_TRANSFERS_HTML_PATH);
-        return new Response(html, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
-      } catch {
-        return new Response("tse_transfers.html not found", { status: 404 });
-      }
-    }
-    if (url.pathname === "/donors-receivers.md") {
-      try {
-        const md = readFileSync(DONORS_RECEIVERS_MD_PATH);
-        return new Response(md, {
-          headers: { "Content-Type": "text/markdown; charset=utf-8" },
-        });
-      } catch {
-        return new Response("donors-receivers.md not found", { status: 404 });
-      }
-    }
-    if (url.pathname === "/receirvers-donors.md") {
-      try {
-        const md = readFileSync(RECEIRVERS_DONORS_MD_PATH);
-        return new Response(md, {
-          headers: { "Content-Type": "text/markdown; charset=utf-8" },
-        });
-      } catch {
-        return new Response("receirvers-donors.md not found", { status: 404 });
-      }
-    }
-    if (url.pathname === "/donors-transfers.csv") {
-      try {
-        const csv = readFileSync(DONORS_TRANSFERS_CSV_PATH);
-        return new Response(csv, {
-          headers: { "Content-Type": "text/csv; charset=utf-8" },
-        });
-      } catch {
-        return new Response("donors-transfers.csv not found", { status: 404 });
-      }
-    }
+
 
     // Graph page (also root)
     if (url.pathname === "/" || url.pathname === "/graph") {
