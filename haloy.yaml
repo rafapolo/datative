@@ -1,7 +1,7 @@
 name: datative
-server: haloy.xn--2dk.digital
+server: haloy.xn--2dk.xyz
 domains:
-  - domain: datative.xn--2dk.digital
+  - domain: datative.xn--2dk.xyz
 port: 3003
 health_check_path: /
 env:
