@@ -24,18 +24,18 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          echo "${{ secrets.LIVRE_SSH_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.FINLAND_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.LIVRE_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.FINLAND_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Deploy on server with Haloy
         shell: bash
         run: |
           set -euo pipefail
-          ssh "${{ secrets.LIVRE_USER }}@${{ secrets.LIVRE_HOST }}" "
+          ssh "${{ secrets.FINLAND_USER }}@${{ secrets.FINLAND_HOST }}" "
             set -euo pipefail
             export PATH=\"\$HOME/.local/bin:\$PATH\"
-            cd '${{ secrets.LIVRE_APP_DIR }}'
+            cd '${{ secrets.FINLAND_APP_DIR }}'
             git fetch origin main
             git reset --hard origin/main
             \$HOME/.local/bin/haloy deploy
