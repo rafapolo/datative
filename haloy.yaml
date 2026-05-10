@@ -21,3 +21,5 @@ env:
   - name: S3_SECRET_ACCESS_KEY
     from:
       env: S3_SECRET_ACCESS_KEY
+volumes:
+  - datative-cache:/app/.cache
