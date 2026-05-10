@@ -9723,8 +9723,11 @@ function syncLookupRowHighlight() {
 async function fetchGraph(cnpj) {
   debugLog("GET /api/graph", { cnpj });
   const res = await fetch(`/api/graph/${cnpj}`);
-  if (!res.ok)
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(unreadable)");
+    console.error(`[fetch] ${res.status} /api/graph/${cnpj}`, body);
     throw new Error(`API error ${res.status}`);
+  }
   debugLog("GET /api/graph done", { cnpj, status: res.status });
   return res.json();
 }
@@ -9735,8 +9738,11 @@ async function fetchLookupDataset(cnpj, datasetId) {
     limit: currentLookupLimit
   });
   const res = await fetch(`/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1&limit=${lookupLimitParam()}`);
-  if (!res.ok)
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(unreadable)");
+    console.error(`[fetch] ${res.status} /api/lookup/${cnpj}/dataset/${datasetId}`, body);
     throw new Error(`Lookup dataset API error ${res.status}`);
+  }
   const payload = await res.json();
   debugLog("GET dataset done", {
     cnpj,
@@ -10126,8 +10132,11 @@ async function expandRelatedDatasets(nodeId, graph) {
         const url = `/api/lookup/related?datasetId=${encodeURIComponent(rel.datasetId)}&foreignKey=${encodeURIComponent(rel.foreignKey)}&value=${encodeURIComponent(String(value))}`;
         const urlWithLimit = `${url}&limit=${lookupLimitParam()}`;
         const res = await fetch(urlWithLimit);
-        if (!res.ok)
+        if (!res.ok) {
+          const body = await res.text().catch(() => "(unreadable)");
+          console.error(`[fetch] ${res.status} ${urlWithLimit}`, body);
           continue;
+        }
         const { result } = await res.json();
         if (result.rows.length > 0)
           addResultsToGraph(result, nodeId, graph);
@@ -10980,8 +10989,11 @@ async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
   try {
     debugLog("GET /api/lookup/:cnpj", { cnpj, limit: currentLookupLimit });
     const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (!res.ok)
+    if (!res.ok) {
+      const body2 = await res.text().catch(() => "(unreadable)");
+      console.error(`[fetch] ${res.status} /api/lookup/${cnpj}`, body2);
       throw new Error(`HTTP ${res.status}`);
+    }
     const data = await res.json();
     debugLog("GET /api/lookup done", {
       cnpj,
@@ -11161,8 +11173,11 @@ async function init() {
   let lookupResults = [];
   try {
     const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (!res.ok)
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error(`[fetch] ${res.status} /api/lookup/${cnpj}`, body);
       throw new Error(`HTTP ${res.status}`);
+    }
     const payload = await res.json();
     lookupResults = payload.results;
     for (const result of lookupResults) {
