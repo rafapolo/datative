@@ -3,7 +3,7 @@ import { resolve } from "path";
 import { CNPJ_DATASETS, RELATED_DATASETS } from "./cnpj-datasets";
 import { getCache, setCache } from "./cache";
 import { queryParquetDataset, tableExists, getTableColumns, getBytesReceived, resetBytesReceived, warmUp } from "./parquet-store";
-import { queryByCnpj, extractCnpjRoot, DatasetInfo, CnpjColumn } from "./cnpj-index";
+import { queryByCnpj, extractCnpjRoot, socioNodeId, DatasetInfo, CnpjColumn } from "./cnpj-index";
 
 function log(...args: unknown[]) {
   const ts = new Date().toISOString().slice(11, 23);
@@ -115,16 +115,6 @@ interface Socio {
   nome: string;
   documento: string | null;
   qualificacao: string;
-}
-
-// Masked CPF format: ***XXXXXX** (6 visible digits, never a full 11-digit CPF).
-// Full CNPJs (14 digits) are never masked.
-// Masked/null docs are scoped to companyId to prevent false graph merges
-// when different people share the same placeholder (e.g. ***000000**).
-function socioNodeId(documento: string | null, companyId: string, nome: string): string {
-  if (!documento) return `${companyId}:name:${nome}`;
-  if (documento.includes("*")) return `${companyId}:masked:${documento}:${nome}`;
-  return documento; // full CNPJ → global deduplication across companies
 }
 
 async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[] }> {
