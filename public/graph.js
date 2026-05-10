@@ -9634,6 +9634,44 @@ function setStatus(msg) {
   if (el)
     el.textContent = msg;
 }
+function setStatusLoading(active) {
+  const el = document.getElementById("status");
+  if (!el)
+    return;
+  el.dataset.loading = active ? "true" : "false";
+}
+function formatElapsed(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+function setExecutionTime(ms) {
+  const el = document.getElementById("execution-time");
+  if (!el)
+    return;
+  el.textContent = ms == null ? "Execução · --:--" : `Execução · ${formatElapsed(ms)}`;
+}
+function startStatusTimer(baseMsg) {
+  const startedAt = performance.now();
+  setStatusLoading(true);
+  const update = () => {
+    setStatus(`${baseMsg} ${formatElapsed(performance.now() - startedAt)}`);
+  };
+  update();
+  const intervalId = window.setInterval(update, 1000);
+  return {
+    stop(finalStatus) {
+      window.clearInterval(intervalId);
+      const elapsedMs = Math.max(0, performance.now() - startedAt);
+      setStatusLoading(false);
+      setExecutionTime(elapsedMs);
+      if (finalStatus)
+        setStatus(finalStatus);
+      return elapsedMs;
+    }
+  };
+}
 function debugLog(...args) {
   if (!DEBUG_LOOKUP)
     return;
@@ -10926,6 +10964,7 @@ async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
   backBtn.style.display = lookupHistory.length > 0 ? "inline-block" : "none";
   body.innerHTML = `<div class="lookup-skeleton">Consultando ${30}+ bases de dados…</div>`;
   panel.classList.add("open");
+  const lookupPanelStatusTimer = prefetched ? null : startStatusTimer("Consultando bases de dados…");
   const newBack = backBtn.cloneNode(true);
   backBtn.replaceWith(newBack);
   newBack.addEventListener("click", () => {
@@ -10934,6 +10973,7 @@ async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
       openLookupPanel(prev.cnpj, graph, true);
   });
   if (prefetched) {
+    setStatus("Bases consultadas");
     renderResultSections(prefetched, cnpj, graph);
     return;
   }
@@ -10948,8 +10988,11 @@ async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
       status: res.status,
       datasets: data.results.length
     });
+    const hits = data.results.filter((result) => result.count > 0).length;
+    lookupPanelStatusTimer?.stop(`${hits} base(s) com referência`);
     renderResultSections(data.results, cnpj, graph);
   } catch (e3) {
+    lookupPanelStatusTimer?.stop(`Erro ao consultar bases: ${e3.message}`);
     body.innerHTML = `<div class="lookup-error">Erro ao consultar: ${e3.message}</div>`;
   }
 }
@@ -10965,7 +11008,8 @@ async function init() {
   injectPanelStyles();
   createPanel();
   createNodeDetailsPanel();
-  setStatus("Consultando BigQuery…");
+  setExecutionTime(null);
+  setStatus("Carregando dados…");
   let data;
   try {
     data = await fetchGraph(cnpj);
@@ -11113,26 +11157,26 @@ async function init() {
   const loadingText = overlay?.querySelector(".loading-text");
   if (loadingText)
     loadingText.textContent = "cruzando bases de dados…";
-  setStatus("Cruzando com bases de dados…");
+  const lookupStatusTimer = startStatusTimer("Cruzando com bases de dados…");
   let lookupResults = [];
   try {
     const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (res.ok) {
-      const payload = await res.json();
-      lookupResults = payload.results;
-      for (const result of lookupResults) {
-        if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
-          addResultsToGraph(result, cnpj, graph);
-          autoAddedDatasets.add(result.id);
-          queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
-        }
+    if (!res.ok)
+      throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    lookupResults = payload.results;
+    for (const result of lookupResults) {
+      if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
+        addResultsToGraph(result, cnpj, graph);
+        autoAddedDatasets.add(result.id);
+        queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
       }
-      const hits = lookupResults.filter((r2) => r2.count > 0).length;
-      setStatus(`${hits} base(s) com referência`);
-      runLayout(graph, 300);
     }
+    const hits = lookupResults.filter((r2) => r2.count > 0).length;
+    lookupStatusTimer.stop(`${hits} base(s) com referência`);
+    runLayout(graph, 300);
   } catch (e3) {
-    setStatus(`Erro ao cruzar bases: ${e3.message}`);
+    lookupStatusTimer.stop(`Erro ao cruzar bases: ${e3.message}`);
   } finally {
     if (overlay)
       overlay.style.display = "none";
@@ -11147,8 +11191,8 @@ async function init() {
     isDragging = false;
     renderer.getCamera().disable();
     const mousePos = renderer.viewportToGraph({
-      x: event.clientX,
-      y: event.clientY
+      x: event.x,
+      y: event.y
     });
     const nodeX = graph.getNodeAttribute(node, "x");
     const nodeY = graph.getNodeAttribute(node, "y");
@@ -11158,7 +11202,7 @@ async function init() {
     if (!draggedNode)
       return;
     isDragging = true;
-    const pos = renderer.viewportToGraph({ x: e3.clientX, y: e3.clientY });
+    const pos = renderer.viewportToGraph({ x: e3.x, y: e3.y });
     graph.setNodeAttribute(draggedNode, "x", pos.x + dragOffset.dx);
     graph.setNodeAttribute(draggedNode, "y", pos.y + dragOffset.dy);
   });

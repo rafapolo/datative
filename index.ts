@@ -1,8 +1,14 @@
-import { BigQuery } from "@google-cloud/bigquery";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync } from "fs";
 import { resolve } from "path";
-import { CNPJ_DATASETS, RELATED_DATASETS, buildCnpjWhere } from "./cnpj-datasets";
+import { CNPJ_DATASETS, RELATED_DATASETS } from "./cnpj-datasets";
 import { getCache, setCache } from "./cache";
+import { queryParquetDataset, tableExists, getTableColumns, getBytesReceived, resetBytesReceived } from "./parquet-store";
+import { queryByCnpj, extractCnpjRoot, DatasetInfo, CnpjColumn } from "./cnpj-index";
+
+function log(...args: unknown[]) {
+  const ts = new Date().toISOString().slice(11, 23);
+  console.log(`[${ts}]`, ...args);
+}
 
 // --- CNPJs de Interesse ---
 interface CnpjInteresse { cnpj_basico: string; razao_social: string; porte: string }
@@ -33,98 +39,28 @@ function loadCnpjsInteresse(): CnpjInteresse[] {
 const cnpjsInteresse = loadCnpjsInteresse();
 
 // --- Config ---
-const PROJECT_ID = process.env.GCP_PROJECT_ID ?? "";
-const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-const KEY_JSON = process.env.GCP_SERVICE_ACCOUNT_JSON;
 const PORT = parseInt(process.env.PORT ?? "3003", 10);
 
-const TABLE = "basedosdados.br_me_cnpj.empresas";
-const SOCIOS_TABLE = "basedosdados.br_me_cnpj.socios";
 const GRAPH_JS_PATH = resolve(import.meta.dir, "public/graph.js");
 
-const BASEDOSDADOS_SCHEMA_PATH = resolve(import.meta.dir, "basedosdados-schema.json");
-const FREE_TIER_BYTES = 1_000_000_000_000; // 1 TB/mês
-const USAGE_FILE = new URL("./usage.json", import.meta.url).pathname;
-
-// --- Usage tracking ---
-interface UsageData { month: string; bytes: number }
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function loadUsage(): UsageData {
-  if (existsSync(USAGE_FILE)) {
-    try {
-      const data = JSON.parse(readFileSync(USAGE_FILE, "utf-8")) as UsageData;
-      if (data.month === currentMonth()) return data;
-    } catch {}
-  }
-  return { month: currentMonth(), bytes: 0 };
-}
-
-function saveUsage(data: UsageData): void {
-  writeFileSync(USAGE_FILE, JSON.stringify(data));
-}
-
-let usage = loadUsage();
 const DEFAULT_YEAR = 2023;
 const DEFAULT_LIMIT = 25;
 const LOOKUP_LIMIT_DEFAULT = 10;
+const LOOKUP_CACHE_VERSION = "v2";
 
-interface SchemaColumn {
-  name: string;
-  type?: string;
-  description?: string;
+interface SessionData {
+  bytesReceived: number;
 }
 
-type SchemaIndex = Record<string, Record<string, SchemaColumn[]>>;
+const sessionData: SessionData = {
+  bytesReceived: 0,
+};
 
-function loadSchemaIndex(): SchemaIndex {
-  try {
-    return JSON.parse(readFileSync(BASEDOSDADOS_SCHEMA_PATH, "utf-8")) as SchemaIndex;
-  } catch {
-    return {};
-  }
-}
-
-const schemaIndex = loadSchemaIndex();
-
-function getSchemaColumnsForTable(tableRef: string): SchemaColumn[] {
-  const parts = tableRef.split(".");
-  if (parts.length !== 3) return [];
-  const datasetId = parts[1];
-  const tableId = parts[2];
-  const dataset = schemaIndex[datasetId];
-  if (!dataset) return [];
-  return dataset[tableId] ?? [];
-}
-
-// --- BigQuery client (singleton) ---
-function createClient(): BigQuery {
-  const opts: ConstructorParameters<typeof BigQuery>[0] = { location: "US" };
-  if (PROJECT_ID) opts.projectId = PROJECT_ID;
-  if (KEY_FILE) {
-    opts.keyFilename = KEY_FILE;
-  } else if (KEY_JSON) {
-    try {
-      opts.credentials = JSON.parse(KEY_JSON);
-    } catch (error) {
-      console.error("Invalid GCP_SERVICE_ACCOUNT_JSON:", error);
-    }
-  }
-  return new BigQuery(opts);
-}
-
-const bq = createClient();
-
-// --- Custom errors ---
-class BillingError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BillingError";
-  }
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 // --- Query ---
@@ -146,53 +82,37 @@ interface Company {
   ano: number;
 }
 
-async function queryCompanies(params: QueryParams): Promise<{ rows: Company[]; bytesProcessed: number }> {
-  if (!PROJECT_ID) {
-    throw new BillingError(
-      "GCP_PROJECT_ID not set. Set it via environment variable."
-    );
-  }
-
-  const cacheKey = `companies_${params.ano}_${params.limit}_${params.offset}_${params.search.replace(/\s+/g, "_")}`;
+async function queryCompanies(params: QueryParams): Promise<{ rows: Company[] }> {
+  const cacheKey = `companies_${params.ano}_${params.limit}_${params.offset}_${params.search.toUpperCase().replace(/\s+/g, "_")}`;
   const cached = getCache<Company[]>(cacheKey);
-  if (cached) return { rows: cached, bytesProcessed: 0 };
+  if (cached) { log("queryCompanies cache hit", { cacheKey }); return { rows: cached }; }
 
-  let whereClause = "WHERE ano = @ano";
-  const queryParams: Record<string, unknown> = {
-    ano: params.ano,
-    lim: params.limit,
-    off: params.offset,
-  };
+  log("queryCompanies", { params });
+  const t0 = Date.now();
+  const rows: Company[] = [];
+  const searchUpper = params.search.toUpperCase();
 
-  if (params.search) {
-    whereClause += " AND UPPER(razao_social) LIKE UPPER(@search)";
-    queryParams.search = `%${params.search}%`;
+  for await (const row of queryParquetDataset("br_me_cnpj", "empresas", {
+    columns: ["cnpj_basico", "razao_social", "natureza_juridica", "qualificacao_responsavel", "capital_social", "porte", "ente_federativo", "ano"],
+    filters: { ano: params.ano },
+    limit: params.offset + params.limit,
+  })) {
+    if (params.search && !String(row.razao_social ?? "").toUpperCase().includes(searchUpper)) {
+      continue;
+    }
+    rows.push(row as unknown as Company);
   }
 
-  const sql = `
-    SELECT
-      cnpj_basico,
-      razao_social,
-      natureza_juridica,
-      qualificacao_responsavel,
-      capital_social,
-      porte,
-      ente_federativo,
-      ano
-    FROM \`${TABLE}\`
-    ${whereClause}
-    ORDER BY capital_social DESC NULLS LAST
-    LIMIT @lim
-    OFFSET @off
-  `;
+  const sorted = rows.sort((a, b) => {
+    const capA = a.capital_social ?? -1;
+    const capB = b.capital_social ?? -1;
+    return capB - capA;
+  });
 
-  const [job] = await bq.createQueryJob({ query: sql, params: queryParams, location: "US" });
-  const [rows] = await job.getQueryResults();
-  const [meta] = await job.getMetadata();
-  const bytesProcessed = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
-
-  setCache(cacheKey, rows as Company[]);
-  return { rows: rows as Company[], bytesProcessed };
+  const result = sorted.slice(params.offset, params.offset + params.limit);
+  setCache(cacheKey, result);
+  log("queryCompanies done", { rows: result.length, ms: Date.now() - t0 });
+  return { rows: result };
 }
 
 interface Socio {
@@ -201,47 +121,57 @@ interface Socio {
   qualificacao: string;
 }
 
-async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[]; bytesProcessed: number }> {
+async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[] }> {
   const cacheKey = `socios_${cnpjBasico}`;
   const cached = getCache<Socio[]>(cacheKey);
-  if (cached) return { rows: cached, bytesProcessed: 0 };
+  if (cached) { log("querySocios cache hit", { cnpjBasico }); return { rows: cached }; }
 
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
+  log("querySocios", { cnpjBasico });
+  const t0 = Date.now();
+  const rows: Socio[] = [];
+  const cnpjRoot = extractCnpjRoot(cnpjBasico);
 
-  const sql = `
-    SELECT nome, documento, qualificacao
-    FROM \`${SOCIOS_TABLE}\`
-    WHERE cnpj_basico = @cnpj AND ano = @ano
-    LIMIT 50
-  `;
-  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico, ano: DEFAULT_YEAR }, location: "US" });
-  const [rows] = await job.getQueryResults();
-  const [meta] = await job.getMetadata();
-  const bytesProcessed = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
-  setCache(cacheKey, rows as Socio[]);
-  return { rows: rows as Socio[], bytesProcessed };
+  const sociosInfo: DatasetInfo = {
+    dataset: "br_me_cnpj",
+    table: "socios",
+    cnpjColumns: [{ name: "cnpj_basico", type: "basico" }],
+    displayFields: ["cnpj_basico", "nome", "documento", "qualificacao"],
+  };
+  for await (const row of queryByCnpj(sociosInfo, cnpjRoot, 50)) {
+    rows.push({
+      nome: String(row.nome ?? ""),
+      documento: String(row.documento ?? ""),
+      qualificacao: String(row.qualificacao ?? ""),
+    });
+  }
+
+  setCache(cacheKey, rows);
+  log("querySocios done", { rows: rows.length, ms: Date.now() - t0 });
+  return { rows };
 }
 
-async function queryEmpresa(cnpjBasico: string): Promise<{ row: Company | null; bytesProcessed: number }> {
+async function queryEmpresa(cnpjBasico: string): Promise<{ row: Company | null }> {
   const cacheKey = `empresa_${cnpjBasico}`;
   const cached = getCache<Company | null>(cacheKey);
-  if (cached !== null) return { row: cached, bytesProcessed: 0 };
+  if (cached !== null) { log("queryEmpresa cache hit", { cnpjBasico }); return { row: cached }; }
 
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
+  log("queryEmpresa", { cnpjBasico });
+  const t0 = Date.now();
+  const cnpjRoot = extractCnpjRoot(cnpjBasico);
+  let row: Company | null = null;
 
-  const sql = `
-    SELECT cnpj_basico, razao_social, natureza_juridica, qualificacao_responsavel, capital_social, porte, ente_federativo, ano
-    FROM \`${TABLE}\`
-    WHERE cnpj_basico = @cnpj AND ano = @ano
-    LIMIT 1
-  `;
-  const [job] = await bq.createQueryJob({ query: sql, params: { cnpj: cnpjBasico, ano: DEFAULT_YEAR }, location: "US" });
-  const [rows] = await job.getQueryResults();
-  const [meta] = await job.getMetadata();
-  const bytesProcessed = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
-  const row = (rows[0] as Company) ?? null;
+  for await (const r of queryParquetDataset("br_me_cnpj", "empresas", {
+    columns: ["cnpj_basico", "razao_social", "natureza_juridica", "qualificacao_responsavel", "capital_social", "porte", "ente_federativo", "ano"],
+    filters: { cnpj_basico: cnpjRoot },
+    limit: 5,
+  })) {
+    row = r as unknown as Company;
+    break;
+  }
+
   setCache(cacheKey, row);
-  return { row, bytesProcessed };
+  log("queryEmpresa done", { found: row !== null, ms: Date.now() - t0 });
+  return { row };
 }
 
 interface LookupResult {
@@ -261,7 +191,10 @@ function inferLookupNodeFields(ds: (typeof CNPJ_DATASETS)[number]): {
   nodeLabelField?: string;
 } {
   const available = new Set(ds.displayFields);
-  const schemaCols = getSchemaColumnsForTable(ds.table).map((c) => c.name);
+  const tableParts = ds.table.split(".");
+  const schemaCols = tableParts.length === 3 
+    ? (getTableColumns(tableParts[1], tableParts[2]) ?? [])
+    : [];
 
   const findAvailable = (candidates: string[]): string | undefined =>
     candidates.find((c) => available.has(c));
@@ -302,9 +235,8 @@ async function queryLookupDataset(
   datasetId: string,
   forceFresh = false,
   limit = LOOKUP_LIMIT_DEFAULT,
-): Promise<{ result: LookupResult; bytes: number }> {
+): Promise<{ result: LookupResult }> {
   const docDigits = cnpjBasico.replace(/\D/g, "");
-  const docLen = docDigits.length;
   const cnpjRoot = docDigits.slice(0, 8);
   if (cnpjRoot.length < 8) {
     throw new Error("Lookup value must have at least 8 digits.");
@@ -313,55 +245,40 @@ async function queryLookupDataset(
   const ds = CNPJ_DATASETS.find((d) => d.id === datasetId);
   if (!ds) throw new Error(`Dataset not found: ${datasetId}`);
 
-  const dsKey = `lookup_${docDigits}_${ds.id}_limit_${limit}`;
+  const dsKey = `lookup_${LOOKUP_CACHE_VERSION}_${docDigits}_${ds.id}_limit_${limit}`;
   if (!forceFresh) {
     const cachedDs = getCache<LookupResult>(dsKey);
-    if (cachedDs) return { result: cachedDs, bytes: 0 };
+    if (cachedDs) return { result: cachedDs };
   }
 
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
+  const tableParts = ds.table.split(".");
+  if (tableParts.length !== 3) {
+    throw new Error(`Invalid table reference: ${ds.table}`);
+  }
+  const dataset = tableParts[1];
+  const table = tableParts[2];
 
-  const whereParts = ds.cnpjColumns.map((col) => buildCnpjWhere(col));
-  const whereClause =
-    whereParts.length === 1 ? whereParts[0] : `(${whereParts.join(" OR ")})`;
-
-  const fields = ds.displayFields.join(", ");
-  const sql = `
-    WITH matched AS (
-      SELECT ${fields}
-      FROM \`${ds.table}\`
-      WHERE ${whereClause}
-    )
-    SELECT
-      *,
-      COUNT(*) OVER() AS __total_count
-    FROM matched
-    LIMIT @limit
-  `;
   const inferredFields = inferLookupNodeFields(ds);
 
+  log("queryLookupDataset", { datasetId, cnpjRoot, limit });
+  const t0 = Date.now();
   try {
-    const [job] = await bq.createQueryJob({
-      query: sql,
-      params: { cnpj_root: cnpjRoot, doc_digits: docDigits, doc_len: docLen, limit },
-      location: "US",
-    });
-    const [rawRows] = await job.getQueryResults();
-    const [meta] = await job.getMetadata();
-    const bytes = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
-    const rowsWithCount = rawRows as Array<Record<string, unknown>>;
-    const totalCountRaw = rowsWithCount[0]?.__total_count;
-    const totalCount =
-      typeof totalCountRaw === "number"
-        ? totalCountRaw
-        : totalCountRaw != null
-          ? Number(totalCountRaw)
-          : 0;
-    const rows = rowsWithCount.map(({ __total_count: _ignored, ...row }) => row);
+    const datasetInfo: DatasetInfo = {
+      dataset,
+      table,
+      cnpjColumns: ds.cnpjColumns as CnpjColumn[],
+      displayFields: ds.displayFields,
+      yearField: ds.yearField,
+    };
+    const rows: Record<string, unknown>[] = [];
+    for await (const row of queryByCnpj(datasetInfo, cnpjRoot, limit)) {
+      rows.push(row);
+    }
+
     const result: LookupResult = {
       id: ds.id,
       label: ds.label,
-      count: Number.isFinite(totalCount) ? totalCount : rows.length,
+      count: rows.length,
       rows,
       cnpjColumnNames: ds.cnpjColumns.map((c) => c.name),
       nodeType: ds.nodeType,
@@ -370,8 +287,10 @@ async function queryLookupDataset(
       queryError: undefined,
     };
     setCache(dsKey, result);
-    return { result, bytes };
+    log("queryLookupDataset done", { datasetId, rows: rows.length, ms: Date.now() - t0 });
+    return { result };
   } catch (err) {
+    console.error(`[error] queryLookupDataset ${datasetId}`, err);
     const queryError = err instanceof Error ? err.message : String(err);
     const failedResult: LookupResult = {
       id: ds.id,
@@ -385,52 +304,44 @@ async function queryLookupDataset(
       queryError,
     };
     setCache(dsKey, failedResult);
-    return { result: failedResult, bytes: 0 };
+    return { result: failedResult };
   }
 }
 
 async function queryLookup(
   cnpjBasico: string,
   limit = LOOKUP_LIMIT_DEFAULT,
-): Promise<{ results: LookupResult[]; totalBytes: number }> {
+): Promise<{ results: LookupResult[] }> {
   const docDigits = cnpjBasico.replace(/\D/g, "");
   if (docDigits.length < 8) {
     throw new Error("Lookup value must have at least 8 digits.");
   }
 
-  const topKey = `lookup_${docDigits}_limit_${limit}`;
+  const topKey = `lookup_${LOOKUP_CACHE_VERSION}_${docDigits}_limit_${limit}`;
   const cachedAll = getCache<LookupResult[]>(topKey);
-  if (cachedAll && cachedAll.every((r) => !r.queryError)) return { results: cachedAll, totalBytes: 0 };
+  if (cachedAll && cachedAll.every((r) => !r.queryError)) return { results: cachedAll };
 
-  // Try to build from per-dataset caches first
   const perDatasetCached = CNPJ_DATASETS.map((ds) => {
-    const dsKey = `lookup_${docDigits}_${ds.id}_limit_${limit}`;
+    const dsKey = `lookup_${LOOKUP_CACHE_VERSION}_${docDigits}_${ds.id}_limit_${limit}`;
     return { ds, cached: getCache<LookupResult>(dsKey) };
   });
-
-  if (!PROJECT_ID) {
-    const results = perDatasetCached.map(({ ds, cached }) =>
-      cached ?? { id: ds.id, label: ds.label, count: 0, rows: [], cnpjColumnNames: [], nodeType: ds.nodeType, queryError: "Not available offline" }
-    );
-    setCache(topKey, results);
-    return { results, totalBytes: 0 };
-  }
 
   if (perDatasetCached.every(({ cached }) => cached !== null)) {
     const results = perDatasetCached.map(({ cached }) => cached as LookupResult);
     setCache(topKey, results);
-    return { results, totalBytes: 0 };
+    return { results };
   }
 
-  const jobs = CNPJ_DATASETS.map((ds) =>
-    queryLookupDataset(cnpjBasico, ds.id, false, limit),
+  const jobs = perDatasetCached.map(({ ds, cached }) =>
+    cached
+      ? Promise.resolve({ result: cached })
+      : queryLookupDataset(cnpjBasico, ds.id, false, limit),
   );
 
   const settled = await Promise.all(jobs);
   const results = settled.map((s) => s.result);
-  const totalBytes = settled.reduce((acc, s) => acc + s.bytes, 0);
   setCache(topKey, results);
-  return { results, totalBytes };
+  return { results };
 }
 
 async function queryByField(
@@ -439,9 +350,7 @@ async function queryByField(
   value: string,
   forceFresh = false,
   limit = LOOKUP_LIMIT_DEFAULT,
-): Promise<{ result: LookupResult; bytes: number }> {
-  if (!PROJECT_ID) throw new BillingError("GCP_PROJECT_ID not set.");
-
+): Promise<{ result: LookupResult }> {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(foreignKey)) {
     throw new Error(`Invalid foreignKey: ${foreignKey}`);
   }
@@ -452,44 +361,32 @@ async function queryByField(
   const cacheKey = `related_${datasetId}_${foreignKey}_${value}_limit_${limit}`;
   if (!forceFresh) {
     const cached = getCache<LookupResult>(cacheKey);
-    if (cached) return { result: cached, bytes: 0 };
+    if (cached) return { result: cached };
   }
 
-  const sql = `
-    WITH matched AS (
-      SELECT ${ds.displayFields.join(", ")}
-      FROM \`${ds.table}\`
-      WHERE ${foreignKey} = @value
-    )
-    SELECT
-      *,
-      COUNT(*) OVER() AS __total_count
-    FROM matched
-    LIMIT @limit
-  `;
+  const tableParts = ds.table.split(".");
+  if (tableParts.length !== 3) {
+    throw new Error(`Invalid table reference: ${ds.table}`);
+  }
+  const dataset = tableParts[1];
+  const table = tableParts[2];
 
+  log("queryByField", { datasetId, foreignKey, value, limit });
+  const t0 = Date.now();
   try {
-    const [job] = await bq.createQueryJob({
-      query: sql,
-      params: { value, limit },
-      location: "US",
-    });
-    const [rawRows] = await job.getQueryResults();
-    const [meta] = await job.getMetadata();
-    const bytes = parseInt(meta.statistics?.totalBytesProcessed ?? "0", 10);
-    const rowsWithCount = rawRows as Array<Record<string, unknown>>;
-    const totalCountRaw = rowsWithCount[0]?.__total_count;
-    const totalCount =
-      typeof totalCountRaw === "number"
-        ? totalCountRaw
-        : totalCountRaw != null
-          ? Number(totalCountRaw)
-          : 0;
-    const rows = rowsWithCount.map(({ __total_count: _ignored, ...row }) => row);
+    const rows: Record<string, unknown>[] = [];
+    for await (const row of queryParquetDataset(dataset, table, {
+      columns: ds.displayFields,
+      filters: { [foreignKey]: value },
+      limit,
+    })) {
+      rows.push(row);
+    }
+
     const result: LookupResult = {
       id: ds.id,
       label: ds.label,
-      count: Number.isFinite(totalCount) ? totalCount : rows.length,
+      count: rows.length,
       rows,
       cnpjColumnNames: [],
       nodeType: ds.nodeType,
@@ -497,33 +394,29 @@ async function queryByField(
       nodeLabelField: ds.nodeLabelField,
     };
     setCache(cacheKey, result);
-    return { result, bytes };
+    log("queryByField done", { datasetId, rows: rows.length, ms: Date.now() - t0 });
+    return { result };
   } catch (err) {
+    console.error(`[error] queryByField ${datasetId}`, err);
     const queryError = err instanceof Error ? err.message : String(err);
     const failedResult: LookupResult = {
       id: ds.id, label: ds.label, count: 0, rows: [],
       cnpjColumnNames: [], nodeType: ds.nodeType,
       nodeIdField: ds.nodeIdField, nodeLabelField: ds.nodeLabelField, queryError,
     };
-    return { result: failedResult, bytes: 0 };
+    return { result: failedResult };
   }
 }
 
-function classifyError(err: unknown): { kind: "auth" | "billing" | "other"; message: string } {
+function classifyError(err: unknown): { kind: "other"; message: string } {
   const msg = err instanceof Error ? err.message : String(err);
-  if (msg.includes("401") || msg.includes("UNAUTHENTICATED") || msg.includes("credentials")) {
-    return { kind: "auth", message: msg };
-  }
-  if (
-    msg.includes("GCP_PROJECT_ID") ||
-    msg.includes("billing") ||
-    msg.includes("projectId") ||
-    msg.includes("project") ||
-    err instanceof BillingError
-  ) {
-    return { kind: "billing", message: msg };
-  }
   return { kind: "other", message: msg };
+}
+
+function flushS3Bytes(): number {
+  const bytes = getBytesReceived();
+  resetBytesReceived();
+  return bytes;
 }
 
 function parseLookupLimit(value: string | null): number {
@@ -563,8 +456,7 @@ function buildUrl(base: URLSearchParams, overrides: Record<string, string>): str
 function renderPage(
   params: QueryParams,
   rows: Company[] | null,
-  error: { kind: "auth" | "billing" | "other"; message: string } | null,
-  usageData: UsageData
+  error: { kind: "other"; message: string } | null
 ): string {
   const sp = new URLSearchParams({
     ano: String(params.ano),
@@ -600,14 +492,8 @@ function renderPage(
           .join("");
 
   const errorBanner = error
-    ? `<div class="error ${error.kind}">
-        ${
-          error.kind === "auth"
-            ? `<strong>Erro de autenticação.</strong> Execute <code>gcloud auth application-default login</code> e reinicie o servidor.`
-            : error.kind === "billing"
-            ? `<strong>Projeto GCP não configurado.</strong> Defina <code>GCP_PROJECT_ID=seu-projeto</code> ao iniciar o servidor.<br><small>${escHtml(error.message)}</small>`
-            : `<strong>Erro:</strong> ${escHtml(error.message)}`
-        }
+    ? `<div class="error other">
+        <strong>Erro:</strong> ${escHtml(error.message)}
       </div>`
     : "";
 
@@ -654,14 +540,9 @@ function renderPage(
 <body>
   <header>
     <h1>DATATIVE</h1>
-    <span>CNPJ / Receita Federal · basedosdados.br_me_cnpj.empresas</span>
+    <span>CNPJ / Receita Federal · S3 Parquet</span>
     <span style="margin-left:auto;font-size:0.8rem;opacity:0.85">
-      BQ ${usageData.month} &nbsp;·&nbsp;
-      ${(usageData.bytes / 1e9).toFixed(2)} GB consumidos
-      &nbsp;·&nbsp;
-      ${((usageData.bytes / FREE_TIER_BYTES) * 100).toFixed(3)}% do 1 TB free
-      &nbsp;·&nbsp;
-      ${((FREE_TIER_BYTES - usageData.bytes) / 1e9).toFixed(2)} GB restantes
+      ${formatBytes(sessionData.bytesReceived)} recebidos nesta sessão
     </span>
   </header>
   <main>
@@ -725,13 +606,6 @@ function renderPage(
 }
 
 // --- Graph API helper ---
-function trackBytes(bytes: number) {
-  if (bytes > 0) {
-    if (usage.month !== currentMonth()) usage = { month: currentMonth(), bytes: 0 };
-    usage.bytes += bytes;
-    saveUsage(usage);
-  }
-}
 
 // --- / landing page ---
 function renderGraphLanding(): string {
@@ -1036,10 +910,7 @@ function renderGraphLanding(): string {
 }
 
 // --- /graph HTML page ---
-function renderGraphPage(cnpj: string, usageData: UsageData): string {
-  const gbUsed = (usageData.bytes / 1e9).toFixed(2);
-  const pct = ((usageData.bytes / FREE_TIER_BYTES) * 100).toFixed(3);
-  const gbLeft = ((FREE_TIER_BYTES - usageData.bytes) / 1e9).toFixed(2);
+function renderGraphPage(cnpj: string): string {
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1156,6 +1027,18 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    #status[data-loading="true"] {
+      color: var(--text);
+    }
+    #status[data-loading="true"]::before {
+      content: "● ";
+      color: var(--gold);
+      animation: statusPulse 1s ease-in-out infinite;
+    }
+    @keyframes statusPulse {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 1; }
+    }
     #graph-container {
       flex: 1;
       width: 100%;
@@ -1248,16 +1131,14 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
   <div id="graph-container">
     <div id="loading-overlay">
       <div class="spinner"></div>
-      <span class="loading-text">consultando bigquery</span>
+      <span class="loading-text">consultando dados</span>
     </div>
   </div>
   <footer>
     <span id="status">Carregando…</span>
     <div class="footer-meta">
-      <span>BQ ${escHtml(usageData.month)}</span>
-      <span>${gbUsed} GB</span>
-      <span>${pct}% do 1 TB free</span>
-      <span>${gbLeft} GB restantes</span>
+      <span id="execution-time">Execução · --:--</span>
+      <span>S3 · ${formatBytes(sessionData.bytesReceived)} recebidos</span>
     </div>
   </footer>
   <script>
@@ -1283,8 +1164,10 @@ function renderGraphPage(cnpj: string, usageData: UsageData): string {
 // --- HTTP server ---
 Bun.serve({
   port: PORT,
+  idleTimeout: 255,
   async fetch(req) {
     const url = new URL(req.url);
+    log(`→ ${req.method} ${url.pathname}${url.search}`);
 
     // Static JS bundle
     if (url.pathname === "/graph.js") {
@@ -1306,7 +1189,7 @@ Bun.serve({
       if (!cnpj) return new Response(renderGraphLanding(), {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
-      return new Response(renderGraphPage(cnpj, usage), {
+      return new Response(renderGraphPage(cnpj), {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
@@ -1324,12 +1207,13 @@ Bun.serve({
         });
       }
       try {
-        const { result, bytes } = await queryByField(datasetId, foreignKey, value, false, limit);
-        trackBytes(bytes);
+        const { result } = await queryByField(datasetId, foreignKey, value, false, limit);
+        sessionData.bytesReceived += flushS3Bytes();
         return new Response(JSON.stringify({ result }), {
           headers: { "Content-Type": "application/json; charset=utf-8" },
         });
       } catch (err) {
+        console.error(`[error] GET ${url.pathname}${url.search}`, err);
         const e = classifyError(err);
         return new Response(JSON.stringify({ error: e.message }), {
           status: 500, headers: { "Content-Type": "application/json" },
@@ -1346,17 +1230,18 @@ Bun.serve({
       const fresh = url.searchParams.get("fresh") === "1";
       const limit = parseLookupLimit(url.searchParams.get("limit"));
       try {
-        const { result, bytes } = await queryLookupDataset(
+        const { result } = await queryLookupDataset(
           cnpj,
           datasetId,
           fresh,
           limit,
         );
-        trackBytes(bytes);
+        sessionData.bytesReceived += flushS3Bytes();
         return new Response(JSON.stringify({ cnpj, result }), {
           headers: { "Content-Type": "application/json; charset=utf-8" },
         });
       } catch (err) {
+        console.error(`[error] GET ${url.pathname}`, err);
         const e = classifyError(err);
         const status = e.message.startsWith("Dataset not found:") ? 404 : 500;
         return new Response(JSON.stringify({ error: e.message }), {
@@ -1372,12 +1257,13 @@ Bun.serve({
       const cnpj = lookupMatch[1];
       const limit = parseLookupLimit(url.searchParams.get("limit"));
       try {
-        const { results, totalBytes } = await queryLookup(cnpj, limit);
-        trackBytes(totalBytes);
+        const { results } = await queryLookup(cnpj, limit);
+        sessionData.bytesReceived += flushS3Bytes();
         return new Response(JSON.stringify({ cnpj, results }), {
           headers: { "Content-Type": "application/json; charset=utf-8" },
         });
       } catch (err) {
+        console.error(`[error] GET ${url.pathname}`, err);
         const e = classifyError(err);
         return new Response(JSON.stringify({ error: e.message }), {
           status: 500,
@@ -1395,7 +1281,7 @@ Bun.serve({
           queryEmpresa(cnpj),
           querySocios(cnpj),
         ]);
-        trackBytes(empresaResult.bytesProcessed + sociosResult.bytesProcessed);
+        sessionData.bytesReceived += flushS3Bytes();
 
         const nodes: Array<{ id: string; label: string; type: string }> = [];
         const links: Array<{ source: string; target: string }> = [];
@@ -1415,6 +1301,7 @@ Bun.serve({
           headers: { "Content-Type": "application/json; charset=utf-8" },
         });
       } catch (err) {
+        console.error(`[error] GET ${url.pathname}`, err);
         const e = classifyError(err);
         return new Response(JSON.stringify({ error: e.message }), {
           status: 500,
@@ -1441,17 +1328,18 @@ Bun.serve({
     };
 
     let rows: Company[] | null = null;
-    let error: { kind: "auth" | "billing" | "other"; message: string } | null = null;
+    let error: { kind: "other"; message: string } | null = null;
 
     try {
       const result = await queryCompanies(params);
       rows = result.rows;
-      trackBytes(result.bytesProcessed);
+      sessionData.bytesReceived += flushS3Bytes();
     } catch (err) {
+      console.error(`[error] GET ${url.pathname}`, err);
       error = classifyError(err);
     }
 
-    const html = renderPage(params, rows, error, usage);
+    const html = renderPage(params, rows, error);
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });

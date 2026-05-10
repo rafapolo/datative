@@ -4,10 +4,12 @@
   "type": "module",
   "scripts": {
     "start": "bun run index.ts",
-    "dev": "bun --watch run index.ts"
+    "dev": "bun --watch run index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@google-cloud/bigquery": "^8.1.1",
+    "@duckdb/node-api": "^1.5.1-r.1",
     "@sigma/edge-curve": "^3.1.0",
     "graphology": "^0.26.0",
     "graphology-layout": "^0.6.1",
@@ -15,6 +17,7 @@
     "sigma": "^3.0.2"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
   }
 }

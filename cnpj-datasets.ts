@@ -176,18 +176,7 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     nodeLabelField: "nome_doador",
   },
 
-  // --- Exportadoras / Importadoras ---
-  {
-    id: "exportadoras",
-    label: "ME · Exportadoras/Importadoras",
-    color: "#10b981",
-    table: "basedosdados.br_me_exportadoras_importadoras.estabelecimentos",
-    cnpjColumns: [{ name: "cnpj", type: "full" }],
-    displayFields: ["cnpj", "razao_social", "sigla_uf", "id_municipio", "id_exportacao_importacao"],
-    nodeType: "estabelecimento",
-    nodeIdField: "cnpj",
-    nodeLabelField: "razao_social",
-  },
+  // --- Exportadoras / Importadoras (not available in S3) ---
 
   // --- CNES ---
   {
@@ -285,9 +274,9 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     id: "bcb_sicor",
     label: "BCB · SICOR Operações",
     color: "#059669",
-    table: "basedosdados.br_bcb_sicor.microdados_operacao",
+    table: "basedosdados.br_bcb_sicor.operacao",
     cnpjColumns: [{ name: "cnpj_basico_instituicao_financeira", type: "basico" }],
-    displayFields: ["cnpj_basico_instituicao_financeira", "valor_parcela_credito", "area_financiada", "taxa_juro", "ano"],
+    displayFields: ["cnpj_basico_instituicao_financeira", "valor_parcela_credito", "area_financiada", "taxa_juro", "ano_emissao"],
   },
 
   // --- Base dos Dados · Diretórios ---
@@ -300,15 +289,7 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     displayFields: ["cnpj_basico", "razao_social", "nome_fantasia", "natureza_juridica", "situacao_cadastral"],
   },
 
-  // --- CGU Pessoal ---
-  {
-    id: "cgu_terceirizados",
-    label: "CGU · Terceirizados",
-    color: "#c2410c",
-    table: "basedosdados.br_cgu_pessoal_executivo_federal.terceirizados",
-    cnpjColumns: [{ name: "cnpj_empresa", type: "full" }],
-    displayFields: ["cnpj_empresa", "razao_social_empresa", "unidade_gestora", "nome", "categoria_profissional"],
-  },
+  // --- CGU Pessoal (not available in S3) ---
 
   // --- CVM ---
   {
@@ -338,7 +319,6 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     displayFields: ["id_escola", "cnpj_escola_privada", "rede", "tipo_categoria_escola_privada", "sigla_uf", "id_municipio"],
     relatedLookups: [
       { datasetId: "inep_turma", localKey: "id_escola", foreignKey: "id_escola" },
-      { datasetId: "inep_docente", localKey: "id_escola", foreignKey: "id_escola" },
     ],
   },
 
@@ -360,18 +340,7 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     displayFields: ["cnpj_cpf", "company", "state", "municipality_id", "capacity"],
   },
 
-  // --- SP ALESP ---
-  {
-    id: "sp_alesp",
-    label: "SP · ALESP Despesas",
-    color: "#ca8a04",
-    table: "basedosdados.br_sp_alesp.despesas_gabinete",
-    cnpjColumns: [{ name: "cpf_cnpj", type: "mixed" }],
-    displayFields: ["nome_deputado", "fornecedor", "cpf_cnpj", "valor", "tipo"],
-    nodeType: "pagamento",
-    nodeIdField: "cpf_cnpj",
-    nodeLabelField: "fornecedor",
-  },
+  // --- SP ALESP (not available in S3) ---
 
   // --- MS SIH ---
   {
@@ -383,18 +352,7 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     displayFields: ["cnpj_estabelecimento", "id_estabelecimento_cnes", "id_municipio_estabelecimento", "sigla_uf", "carater_internacao", "data_internacao", "procedimento_realizado", "valor_aih"],
   },
 
-  // --- SGP Cartão Corporativo ---
-  {
-    id: "sgp_cartao",
-    label: "SGP · Cartão Corporativo",
-    color: "#047857",
-    table: "basedosdados.br_sgp_informacao.despesas_cartao_corporativo",
-    cnpjColumns: [{ name: "cpf_cnpj_fornecedor", type: "mixed" }],
-    displayFields: ["nome_fornecedor", "cpf_cnpj_fornecedor", "valor", "tipo", "data_pagamento"],
-    nodeType: "pagamento",
-    nodeIdField: "cpf_cnpj_fornecedor",
-    nodeLabelField: "nome_fornecedor",
-  },
+  // --- SGP Cartão Corporativo (not available in S3) ---
 
   // --- CNPJ Estabelecimentos ---
   {
@@ -471,30 +429,33 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     label: "BCB · SICOR Cooperados",
     color: "#064e3b",
     table: "basedosdados.br_bcb_sicor.recurso_publico_cooperado",
-    cnpjColumns: [{ name: "tipo_cpf_cnpj", type: "mixed" }],
-    displayFields: ["id_referencia_bacen", "numero_ordem", "tipo_cpf_cnpj", "tipo_pessoa", "valor_parcela"],
+    cnpjColumns: [{ name: "cnpj_basico", type: "basico" }],
+    displayFields: ["id_referencia_bacen", "numero_ordem", "cnpj_basico", "cpf", "tipo_pessoa", "valor_parcela"],
     nodeIdField: "id_referencia_bacen",
-    nodeLabelField: "tipo_cpf_cnpj",
+    nodeLabelField: "cnpj_basico",
   },
   {
     id: "sicor_mutuario",
     label: "BCB · SICOR Mutuários",
     color: "#14532d",
     table: "basedosdados.br_bcb_sicor.recurso_publico_mutuario",
-    cnpjColumns: [{ name: "tipo_cpf_cnpj", type: "mixed" }],
-    displayFields: ["id_referencia_bacen", "tipo_cpf_cnpj", "tipo_beneficiario", "id_dap", "indicador_sexo"],
+    cnpjColumns: [
+      { name: "cnpj_basico", type: "basico" },
+      { name: "cnpj", type: "full" },
+    ],
+    displayFields: ["id_referencia_bacen", "cnpj_basico", "cnpj", "cpf", "tipo_beneficiario", "id_dap", "sexo"],
     nodeIdField: "id_referencia_bacen",
-    nodeLabelField: "tipo_cpf_cnpj",
+    nodeLabelField: "cnpj_basico",
   },
   {
     id: "sicor_propriedade",
     label: "BCB · SICOR Propriedades Rurais",
     color: "#166534",
     table: "basedosdados.br_bcb_sicor.recurso_publico_propriedade",
-    cnpjColumns: [{ name: "tipo_cpf_cnpj", type: "mixed" }],
-    displayFields: ["id_referencia_bacen", "numero_ordem", "tipo_cpf_cnpj", "id_sncr", "id_nirf", "id_car"],
+    cnpjColumns: [{ name: "cnpj_basico", type: "basico" }],
+    displayFields: ["id_referencia_bacen", "numero_ordem", "cnpj_basico", "cpf", "id_sncr", "id_nirf", "id_car"],
     nodeIdField: "id_referencia_bacen",
-    nodeLabelField: "tipo_cpf_cnpj",
+    nodeLabelField: "cnpj_basico",
   },
 
   // --- MS SIH Serviços Profissionais ---
@@ -674,15 +635,7 @@ export const RELATED_DATASETS: RelatedDatasetEntry[] = [
     nodeIdField: "id_turma",
     nodeLabelField: "tipo_turma",
   },
-  {
-    id: "inep_docente",
-    label: "INEP · Docentes",
-    color: "#d97706",
-    table: "basedosdados.br_inep_censo_escolar.docente",
-    displayFields: ["id_escola", "id_docente", "id_turma", "sexo", "tipo_contratacao"],
-    nodeIdField: "id_docente",
-    nodeLabelField: "id_docente",
-  },
+  // INEP Docente (not available in S3)
 
   // --- MIDES Licitação (joined by id_licitacao_bd from mides items/participantes) ---
   {
@@ -697,7 +650,7 @@ export const RELATED_DATASETS: RelatedDatasetEntry[] = [
   },
 ];
 
-/** Build BigQuery WHERE clause fragment for CPF/CNPJ-aware document matching */
+/** Legacy helper kept for compatibility while parquet migration is completed. */
 export function buildCnpjWhere(col: CnpjColumn): string {
   const digits = `REGEXP_REPLACE(CAST(${col.name} AS STRING), r'\\D', '')`;
   if (col.type === "basico") {
