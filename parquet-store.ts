@@ -87,7 +87,6 @@ async function createConn(): Promise<DuckDBConnection> {
     SET s3_secret_access_key='${S3_SECRET_ACCESS_KEY}';
     SET s3_use_ssl=true;
     SET s3_url_style='path';
-    SET s3_max_connections=50;
   `);
   return conn;
 }
