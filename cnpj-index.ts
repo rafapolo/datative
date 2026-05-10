@@ -75,6 +75,16 @@ export function matchesCnpj(
   return false;
 }
 
+// Masked CPF format: ***XXXXXX** (6 visible digits, never a full 11-digit CPF).
+// Full CNPJs (14 digits) are never masked.
+// Masked/null docs are scoped to companyId to prevent false graph merges
+// when different people share the same placeholder (e.g. ***000000**).
+export function socioNodeId(documento: string | null, companyId: string, nome: string): string {
+  if (!documento) return `${companyId}:name:${nome}`;
+  if (isMaskedDocument(documento)) return `${companyId}:masked:${documento}:${nome}`;
+  return documento; // full CNPJ → global deduplication across companies
+}
+
 function buildCnpjRawWhere(cnpjColumns: CnpjColumn[], cnpjRoot: string): string {
   const parts: string[] = [];
   for (const col of cnpjColumns) {
