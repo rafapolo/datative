@@ -9,10 +9,15 @@ env:
     value: production
   - name: PORT
     value: "3003"
-  - name: GCP_PROJECT_ID
+  - name: HETZNER_S3_BUCKET
     from:
-      env: GCP_PROJECT_ID
-  - name: GOOGLE_APPLICATION_CREDENTIALS
-    value: /gcp-credentials.json
-volumes:
-  - "/opt/datative/gcp-credentials.json:/gcp-credentials.json:ro"
+      env: HETZNER_S3_BUCKET
+  - name: HETZNER_S3_ENDPOINT
+    from:
+      env: HETZNER_S3_ENDPOINT
+  - name: S3_ACCESS_KEY_ID
+    from:
+      env: S3_ACCESS_KEY_ID
+  - name: S3_SECRET_ACCESS_KEY
+    from:
+      env: S3_SECRET_ACCESS_KEY

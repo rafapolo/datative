@@ -5,3 +5,6 @@ node_modules/
 .env
 .DS_Store
 gcp-credentials.json
+tmp/
+package-lock.json
+cnpj-index-cache.json

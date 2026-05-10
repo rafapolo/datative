@@ -7,69 +7,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 bun run dev    # development with hot-reload
 bun run start  # production
+bun test       # run tests
+bun run typecheck  # TypeScript check
 ```
 
-**Prerequisites:**
-```bash
-export GCP_PROJECT_ID="your-gcp-project-id"
-gcloud auth application-default login
-```
-
-No build step — Bun JIT-compiles TypeScript directly. No test or lint setup exists.
-
-## Schema Dump
-
-```bash
-./scripts/dump-schema.sh   # crawls basedosdados BigQuery project, writes basedosdados-schema.json + .md
-```
-
-Requires `bq` CLI and Python 3. Skips datasets/tables with permission errors.
-
-Output files `basedosdados-schema.json` and `basedosdados-schema.md` are the authoritative local reference for all accessible tables and columns in the `basedosdados` GCP project.
+No build step — Bun JIT-compiles TypeScript directly.
 
 ## Architecture
 
-Single-file monolith: **`index.ts`** (~325 lines, no framework).
+**`index.ts`** (~1350 lines) — HTTP server, HTML rendering, all API handlers.
 
-**Request flow:** `GET /` → parse query params → `queryCompanies()` → BigQuery → render HTML string → response
+**Request flow:** `GET /` → parse CNPJ → `queryEmpresa()` + `querySocios()` → DuckDB S3 → render graph page
 
-**Data source:** `basedosdados.br_me_cnpj` — Brazilian Federal Revenue (Receita Federal) dataset via Base dos Dados.
+**Data source:** Parquet files in Hetzner S3 (`hel1`), read via DuckDB `httpfs`. Table catalog in `schemas.json`.
 
-**Key sections in `index.ts`:**
-- Lines 13–20: BigQuery client setup (uses `GCP_PROJECT_ID` + Application Default Credentials)
-- Lines 41–86: `queryCompanies(params)` — builds parameterized SQL with optional `LIKE` search, year filter, pagination
-- Lines 88–111: Error classification (`BillingError`, `AuthError`) from message content
-- Lines 113–286: HTML rendering — server-side string templating, BRL formatting, XSS escaping
-- Lines 289–325: `Bun.serve()` HTTP handler
+**Key files:**
+- `index.ts`: HTTP server (`Bun.serve`), HTML renderers, query functions
+- `parquet-store.ts`: DuckDB singleton + `queryParquetDataset()` async generator
+- `cnpj-index.ts`: CNPJ-aware lookup (`queryByCnpj`) across any dataset
+- `cnpj-datasets.ts`: dataset configs — 20+ datasets with CNPJ columns + graph node types
+- `cache.ts`: in-memory cache
+- `schemas.json`: table catalog — 533 datasets with S3 paths and column schemas
+- `graph-client.ts`: browser bundle (Sigma 3 + graphology); rebuild with:
+  `bun build graph-client.ts --outfile public/graph.js --target browser`
 
-**Current query (empresas only):**
-```sql
-SELECT ... FROM `basedosdados.br_me_cnpj.empresas`
-WHERE ano = @ano [AND UPPER(razao_social) LIKE UPPER(@search)]
-ORDER BY capital_social DESC NULLS LAST
-LIMIT @limit OFFSET @offset
+**Stack:** TypeScript (strict) · Bun runtime · DuckDB (`@duckdb/node-api`) · Sigma 3 · server-rendered HTML · Portuguese UI
+
+## DuckDB / S3 Notes
+
+DuckDB is initialized as a singleton with `httpfs` extension pointed at the Hetzner S3 endpoint. Config:
+
+```
+SET s3_endpoint='hel1.your-objectstorage.com';
+SET s3_url_style='path';
+SET s3_use_ssl=true;
 ```
 
-**Stack:** TypeScript (strict) · Bun runtime · `@google-cloud/bigquery` ^8.1.1 · server-rendered HTML · Portuguese-language UI
+**Known quirk:** `DuckDBInstance.create(":memory:", { threads: "4" })` — the `threads` override is required due to a DuckDB 1.5.x integer overflow bug on ARM when auto-detecting CPU count.
 
-## BigQuery / basedosdados Notes
-
-**Billing project:** `api-project-542496383517` (configured via `gcloud`). Queries are billed here even though data lives in `basedosdados`.
-
-**`bq` CLI quirk:** `bq ls basedosdados:` works (colon suffix, flags before argument); `bq ls --project_id=basedosdados` returns empty — no project-level list permission.
-
-**br_me_cnpj join key:** `cnpj_basico` (8-digit root) links all 5 tables:
+**br_me_cnpj join key:** `cnpj_basico` (8-digit root) links all tables:
 
 | Table | Key columns | Partitioned by |
 |-------|------------|----------------|
 | `empresas` | `cnpj_basico`, `razao_social`, `capital_social`, `porte` | `ano`, `mes` |
 | `estabelecimentos` | `cnpj_basico`, `cnpj` (full 14-digit), `municipio`, `cnae_fiscal_principal` | `ano`, `mes` |
-| `socios` | `cnpj_basico`, `nome_socio`, `cnpj_cpf_do_socio` | `ano`, `mes` |
+| `socios` | `cnpj_basico`, `nome`, `documento` | `ano`, `mes` |
 | `simples` | `cnpj_basico`, `opcao_pelo_simples`, `opcao_pelo_mei` | — |
-| `dicionario` | lookup/decode table | — |
 
-Always filter `WHERE ano = <year> AND mes = <month>` on partitioned tables to avoid full scans.
+`hive_partitioning=true` in `read_parquet()` enables automatic partition pruning via WHERE on `ano`/`mes`.
 
-**Full CNPJ** = `cnpj_basico` (8) + `cnpj_ordem` (4) + `cnpj_dv` (2). `estabelecimentos.cnpj` has the full 14-digit value. For cross-dataset joins using `cpf_cnpj_*` columns, filter `LENGTH(REGEXP_REPLACE(col, r'\D', '')) = 14` to exclude CPFs.
+**Full CNPJ** = `cnpj_basico` (8) + `cnpj_ordem` (4) + `cnpj_dv` (2). For cross-dataset joins on `cpf_cnpj_*` columns, filter by string length to exclude CPFs (11 digits).
 
-**41 tables** across `basedosdados` have CNPJ columns — see `basedosdados-schema.json` for the full list. Key joinable datasets: `br_cgu_licitacao_contrato`, `br_cgu_cartao_pagamento`, `br_tse_eleicoes`, `br_me_exportadoras_importadoras`, `br_ms_cnes`, `br_rf_arrecadacao`.
+Key joinable datasets: `br_cgu_licitacao_contrato`, `br_cgu_cartao_pagamento`, `br_tse_eleicoes`, `br_me_exportadoras_importadoras`, `br_ms_cnes`, `br_rf_arrecadacao`.

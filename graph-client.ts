@@ -179,6 +179,48 @@ function setStatus(msg: string) {
   if (el) el.textContent = msg;
 }
 
+function setStatusLoading(active: boolean) {
+  const el = document.getElementById("status");
+  if (!el) return;
+  el.dataset.loading = active ? "true" : "false";
+}
+
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function setExecutionTime(ms: number | null) {
+  const el = document.getElementById("execution-time");
+  if (!el) return;
+  el.textContent = ms == null
+    ? "Execução · --:--"
+    : `Execução · ${formatElapsed(ms)}`;
+}
+
+function startStatusTimer(baseMsg: string) {
+  const startedAt = performance.now();
+  setStatusLoading(true);
+  const update = () => {
+    setStatus(`${baseMsg} ${formatElapsed(performance.now() - startedAt)}`);
+  };
+  update();
+  const intervalId = window.setInterval(update, 1000);
+
+  return {
+    stop(finalStatus?: string) {
+      window.clearInterval(intervalId);
+      const elapsedMs = Math.max(0, performance.now() - startedAt);
+      setStatusLoading(false);
+      setExecutionTime(elapsedMs);
+      if (finalStatus) setStatus(finalStatus);
+      return elapsedMs;
+    },
+  };
+}
+
 function debugLog(...args: unknown[]) {
   if (!DEBUG_LOOKUP) return;
   console.log("[lookup-debug]", ...args);
@@ -237,7 +279,11 @@ function syncLookupRowHighlight() {
 async function fetchGraph(cnpj: string): Promise<GraphData> {
   debugLog("GET /api/graph", { cnpj });
   const res = await fetch(`/api/graph/${cnpj}`);
-  if (!res.ok) throw new Error(`API error ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(unreadable)");
+    console.error(`[fetch] ${res.status} /api/graph/${cnpj}`, body);
+    throw new Error(`API error ${res.status}`);
+  }
   debugLog("GET /api/graph done", { cnpj, status: res.status });
   return res.json() as Promise<GraphData>;
 }
@@ -254,7 +300,11 @@ async function fetchLookupDataset(
   const res = await fetch(
     `/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1&limit=${lookupLimitParam()}`,
   );
-  if (!res.ok) throw new Error(`Lookup dataset API error ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(unreadable)");
+    console.error(`[fetch] ${res.status} /api/lookup/${cnpj}/dataset/${datasetId}`, body);
+    throw new Error(`Lookup dataset API error ${res.status}`);
+  }
   const payload = (await res.json()) as LookupDatasetResponse;
   debugLog("GET dataset done", {
     cnpj,
@@ -806,7 +856,11 @@ async function expandRelatedDatasets(nodeId: string, graph: Graph) {
         const url = `/api/lookup/related?datasetId=${encodeURIComponent(rel.datasetId)}&foreignKey=${encodeURIComponent(rel.foreignKey)}&value=${encodeURIComponent(String(value))}`;
         const urlWithLimit = `${url}&limit=${lookupLimitParam()}`;
         const res = await fetch(urlWithLimit);
-        if (!res.ok) continue;
+        if (!res.ok) {
+          const body = await res.text().catch(() => "(unreadable)");
+          console.error(`[fetch] ${res.status} ${urlWithLimit}`, body);
+          continue;
+        }
         const { result } = (await res.json()) as { result: LookupResult };
         if (result.rows.length > 0) addResultsToGraph(result, nodeId, graph);
       } catch {
@@ -1764,6 +1818,9 @@ async function openLookupPanel(
 
   body.innerHTML = `<div class="lookup-skeleton">Consultando ${30}+ bases de dados…</div>`;
   panel.classList.add("open");
+  const lookupPanelStatusTimer = prefetched
+    ? null
+    : startStatusTimer("Consultando bases de dados…");
 
   // Wire back button (idempotent — replaces any prior listener via clone)
   const newBack = backBtn.cloneNode(true) as HTMLButtonElement;
@@ -1774,6 +1831,7 @@ async function openLookupPanel(
   });
 
   if (prefetched) {
+    setStatus("Bases consultadas");
     renderResultSections(prefetched, cnpj, graph);
     return;
   }
@@ -1781,15 +1839,22 @@ async function openLookupPanel(
   try {
     debugLog("GET /api/lookup/:cnpj", { cnpj, limit: currentLookupLimit });
     const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error(`[fetch] ${res.status} /api/lookup/${cnpj}`, body);
+      throw new Error(`HTTP ${res.status}`);
+    }
     const data = (await res.json()) as LookupResponse;
     debugLog("GET /api/lookup done", {
       cnpj,
       status: res.status,
       datasets: data.results.length,
     });
+    const hits = data.results.filter((result) => result.count > 0).length;
+    lookupPanelStatusTimer?.stop(`${hits} base(s) com referência`);
     renderResultSections(data.results, cnpj, graph);
   } catch (e) {
+    lookupPanelStatusTimer?.stop(`Erro ao consultar bases: ${(e as Error).message}`);
     body.innerHTML = `<div class="lookup-error">Erro ao consultar: ${(e as Error).message}</div>`;
   }
 }
@@ -1811,8 +1876,9 @@ async function init() {
   injectPanelStyles();
   createPanel();
   createNodeDetailsPanel();
+  setExecutionTime(null);
 
-  setStatus("Consultando BigQuery…");
+  setStatus("Carregando dados…");
 
   let data: GraphData;
   try {
@@ -1985,26 +2051,30 @@ async function init() {
     ".loading-text",
   ) as HTMLElement | null;
   if (loadingText) loadingText.textContent = "cruzando bases de dados…";
-  setStatus("Cruzando com bases de dados…");
+  const lookupStatusTimer = startStatusTimer("Cruzando com bases de dados…");
   let lookupResults: LookupResult[] = [];
   try {
     const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (res.ok) {
-      const payload = (await res.json()) as LookupResponse;
-      lookupResults = payload.results;
-      for (const result of lookupResults) {
-        if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
-          addResultsToGraph(result, cnpj, graph);
-          autoAddedDatasets.add(result.id);
-          queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
-        }
-      }
-      const hits = lookupResults.filter((r) => r.count > 0).length;
-      setStatus(`${hits} base(s) com referência`);
-      runLayout(graph, 300);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error(`[fetch] ${res.status} /api/lookup/${cnpj}`, body);
+      throw new Error(`HTTP ${res.status}`);
     }
+
+    const payload = (await res.json()) as LookupResponse;
+    lookupResults = payload.results;
+    for (const result of lookupResults) {
+      if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
+        addResultsToGraph(result, cnpj, graph);
+        autoAddedDatasets.add(result.id);
+        queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
+      }
+    }
+    const hits = lookupResults.filter((r) => r.count > 0).length;
+    lookupStatusTimer.stop(`${hits} base(s) com referência`);
+    runLayout(graph, 300);
   } catch (e) {
-    setStatus(`Erro ao cruzar bases: ${(e as Error).message}`);
+    lookupStatusTimer.stop(`Erro ao cruzar bases: ${(e as Error).message}`);
   } finally {
     if (overlay) overlay.style.display = "none";
     // Open panels after everything is loaded
@@ -2022,18 +2092,18 @@ async function init() {
     isDragging = false;
     renderer!.getCamera().disable();
     const mousePos = renderer!.viewportToGraph({
-      x: (event as MouseEvent).clientX,
-      y: (event as MouseEvent).clientY,
+      x: event.x,
+      y: event.y,
     });
     const nodeX = graph.getNodeAttribute(node, "x") as number;
     const nodeY = graph.getNodeAttribute(node, "y") as number;
     dragOffset = { dx: nodeX - mousePos.x, dy: nodeY - mousePos.y };
   });
 
-  renderer.getMouseCaptor().on("mousemovebody", (e: MouseEvent) => {
+  renderer.getMouseCaptor().on("mousemovebody", (e) => {
     if (!draggedNode) return;
     isDragging = true;
-    const pos = renderer!.viewportToGraph({ x: e.clientX, y: e.clientY });
+    const pos = renderer!.viewportToGraph({ x: e.x, y: e.y });
     graph.setNodeAttribute(draggedNode, "x", pos.x + dragOffset.dx);
     graph.setNodeAttribute(draggedNode, "y", pos.y + dragOffset.dy);
   });
