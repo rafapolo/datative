@@ -498,6 +498,7 @@ function renderPage(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
   <title>DATATIVE — CNPJ Browser</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -620,6 +621,7 @@ function renderGraphLanding(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
   <title>DATATIVE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap">
@@ -912,6 +914,7 @@ function renderGraphPage(cnpj: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
   <title>DATA_ ${escHtml(cnpj)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap">
@@ -1165,6 +1168,12 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     log(`→ ${req.method} ${url.pathname}${url.search}`);
+
+    // Favicon
+    if (url.pathname === "/favicon.ico" || url.pathname === "/favicon.svg") {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#1a1a2e"/><line x1="10" y1="16" x2="22" y2="11" stroke="#4f46e5" stroke-width="1.5"/><line x1="10" y1="16" x2="22" y2="21" stroke="#4f46e5" stroke-width="1.5"/><circle cx="10" cy="16" r="4" fill="#4f46e5"/><circle cx="22" cy="11" r="3" fill="#7c3aed"/><circle cx="22" cy="21" r="3" fill="#7c3aed"/></svg>`;
+      return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" } });
+    }
 
     // Static JS bundle
     if (url.pathname === "/graph.js") {
