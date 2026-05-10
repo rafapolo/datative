@@ -1,4 +1,4 @@
-import { DuckDBInstance } from "@duckdb/node-api";
+import { DuckDBInstance, DuckDBConnection } from "@duckdb/node-api";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
@@ -23,6 +23,9 @@ export interface ReadOptions {
   columns?: string[];
   filters?: Record<string, string | number | null>;
   limit?: number;
+  offset?: number;
+  orderBy?: string;
+  rawWhere?: string;
 }
 
 const S3_BUCKET = process.env.HETZNER_S3_BUCKET ?? "baseldosdados";
@@ -53,13 +56,28 @@ function getGlobPath(key: string): string | undefined {
   return `${base}/**/*.parquet`;
 }
 
-// --- DuckDB singleton ---
+// --- DuckDB connection pool ---
 
-let _connPromise: Promise<Awaited<ReturnType<typeof initConn>>> | null = null;
+// threads: "4" workaround for DuckDB 1.5.x ARM integer overflow on CPU detection
+const POOL_SIZE = 4;
 
-async function initConn() {
-  // threads: "4" workaround for DuckDB 1.5.x ARM integer overflow on CPU detection
-  const instance = await DuckDBInstance.create(":memory:", { threads: "4" });
+let _instancePromise: Promise<DuckDBInstance> | null = null;
+const _connPool: Array<{ conn: DuckDBConnection; busy: boolean }> = [];
+const _waiters: Array<(conn: DuckDBConnection) => void> = [];
+let _totalCreated = 0;
+
+function getInstance(): Promise<DuckDBInstance> {
+  if (!_instancePromise) {
+    _instancePromise = DuckDBInstance.create(":memory:", { threads: "4" }).catch((err) => {
+      _instancePromise = null;
+      throw err;
+    });
+  }
+  return _instancePromise;
+}
+
+async function createConn(): Promise<DuckDBConnection> {
+  const instance = await getInstance();
   const conn = await instance.connect();
   const host = S3_ENDPOINT.replace(/^https?:\/\//, "");
   await conn.run("INSTALL httpfs; LOAD httpfs;");
@@ -69,19 +87,40 @@ async function initConn() {
     SET s3_secret_access_key='${S3_SECRET_ACCESS_KEY}';
     SET s3_use_ssl=true;
     SET s3_url_style='path';
+    SET s3_max_connections=50;
   `);
-  log("DuckDB ready", { endpoint: host, bucket: S3_BUCKET });
   return conn;
 }
 
-function getConn() {
-  if (!_connPromise) {
-    _connPromise = initConn().catch((err) => {
-      _connPromise = null;
-      throw err;
-    });
+async function acquireConn(): Promise<DuckDBConnection> {
+  const free = _connPool.find((p) => !p.busy);
+  if (free) {
+    free.busy = true;
+    return free.conn;
   }
-  return _connPromise;
+  if (_totalCreated < POOL_SIZE) {
+    _totalCreated++;
+    const conn = await createConn();
+    _connPool.push({ conn, busy: true });
+    return conn;
+  }
+  return new Promise<DuckDBConnection>((resolve) => _waiters.push(resolve));
+}
+
+function releaseConn(conn: DuckDBConnection): void {
+  const next = _waiters.shift();
+  if (next) {
+    next(conn);
+    return;
+  }
+  const entry = _connPool.find((p) => p.conn === conn);
+  if (entry) entry.busy = false;
+}
+
+export async function warmUp(): Promise<void> {
+  const conns = await Promise.all(Array.from({ length: POOL_SIZE }, () => acquireConn()));
+  conns.forEach(releaseConn);
+  log("DuckDB pool ready", { size: POOL_SIZE });
 }
 
 function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
@@ -94,18 +133,20 @@ function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-function buildWhere(filters?: Record<string, string | number | null>): string {
-  if (!filters) return "";
+function buildWhere(filters?: Record<string, string | number | null>, rawWhere?: string): string {
   const parts: string[] = [];
-  for (const [col, val] of Object.entries(filters)) {
-    if (val === null) {
-      parts.push(`"${col}" IS NULL`);
-    } else if (typeof val === "number") {
-      parts.push(`"${col}" = ${val}`);
-    } else {
-      parts.push(`"${col}" = '${String(val).replace(/'/g, "''")}'`);
+  if (filters) {
+    for (const [col, val] of Object.entries(filters)) {
+      if (val === null) {
+        parts.push(`"${col}" IS NULL`);
+      } else if (typeof val === "number") {
+        parts.push(`"${col}" = ${val}`);
+      } else {
+        parts.push(`"${col}" = '${String(val).replace(/'/g, "''")}'`);
+      }
     }
   }
+  if (rawWhere) parts.push(rawWhere);
   return parts.length ? `WHERE ${parts.join(" AND ")}` : "";
 }
 
@@ -149,22 +190,47 @@ export async function* queryParquetDataset(
   const globPath = getGlobPath(key);
   if (!globPath) throw new Error(`Table not found in schemas: ${key}`);
 
-  const conn = await getConn();
-
   const select = options.columns?.length
     ? options.columns.map((c) => `"${c}"`).join(", ")
     : "*";
-  const where = buildWhere(options.filters);
+  const where = buildWhere(options.filters, options.rawWhere);
+  const order = options.orderBy ? `ORDER BY ${options.orderBy}` : "";
   const limit = options.limit !== undefined ? `LIMIT ${options.limit}` : "";
-  const sql = `SELECT ${select} FROM read_parquet('${globPath}', hive_partitioning=true) ${where} ${limit}`;
+  const offset = options.offset !== undefined ? `OFFSET ${options.offset}` : "";
+  const sql = `SELECT ${select} FROM read_parquet('${globPath}', hive_partitioning=true) ${where} ${order} ${limit} ${offset}`;
 
-  log("DuckDB query", { dataset, table, where: where || "none", limit: limit || "none" });
+  log("DuckDB query", { dataset, table, where: where || "none" });
   const t0 = Date.now();
-  const reader = await conn.runAndReadAll(sql);
-  log("DuckDB done", { ms: Date.now() - t0 });
+  const conn = await acquireConn();
+  try {
+    const reader = await conn.runAndReadAll(sql);
+    log("DuckDB done", { ms: Date.now() - t0 });
+    for (const row of reader.getRowObjectsJS()) {
+      yield normalizeRow(row as Record<string, unknown>);
+    }
+  } finally {
+    releaseConn(conn);
+  }
+}
 
-  for (const row of reader.getRowObjectsJS()) {
-    yield normalizeRow(row as Record<string, unknown>);
+export async function countParquetRows(
+  dataset: string,
+  table: string,
+  options: Pick<ReadOptions, "filters" | "rawWhere"> = {}
+): Promise<number> {
+  const key = tableKey(dataset, table);
+  const globPath = getGlobPath(key);
+  if (!globPath) throw new Error(`Table not found in schemas: ${key}`);
+
+  const where = buildWhere(options.filters, options.rawWhere);
+  const sql = `SELECT COUNT(*) AS n FROM read_parquet('${globPath}', hive_partitioning=true) ${where}`;
+  const conn = await acquireConn();
+  try {
+    const reader = await conn.runAndReadAll(sql);
+    const rows = reader.getRowObjectsJS();
+    return Number((rows[0] as Record<string, unknown>)?.n ?? 0);
+  } finally {
+    releaseConn(conn);
   }
 }
 

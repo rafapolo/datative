@@ -1,4 +1,4 @@
-import { queryParquetDataset, getTableColumns, tableExists } from "./parquet-store";
+import { queryParquetDataset, getTableColumns, tableExists, countParquetRows } from "./parquet-store";
 
 export interface CnpjColumn {
   name: string;
@@ -43,13 +43,19 @@ export function extractCnpjRoots(documents: string[]): Set<string> {
   return roots;
 }
 
+export function isMaskedDocument(value: string): boolean {
+  return value.includes("*");
+}
+
 export function matchesCnpj(
   value: string | null | undefined,
   cnpjRoot: string,
   colType: "basico" | "full" | "mixed"
 ): boolean {
   if (!value) return false;
-  const digits = String(value).replace(/\D/g, "");
+  const str = String(value);
+  if (isMaskedDocument(str)) return false;
+  const digits = str.replace(/\D/g, "");
   if (!digits) return false;
 
   if (colType === "basico") {
@@ -69,20 +75,21 @@ export function matchesCnpj(
   return false;
 }
 
-export function buildCnpjFilter(
-  cnpj: string,
-  cnpjColumns: CnpjColumn[]
-): Record<string, string> {
-  const cnpjRoot = extractCnpjRoot(cnpj);
-  const filters: Record<string, string> = {};
-
+function buildCnpjRawWhere(cnpjColumns: CnpjColumn[], cnpjRoot: string): string {
+  const parts: string[] = [];
   for (const col of cnpjColumns) {
+    const q = `"${col.name}"`;
     if (col.type === "basico") {
-      filters[col.name] = cnpjRoot;
+      parts.push(`${q} = '${cnpjRoot}'`);
+    } else if (col.type === "full") {
+      // digits-only 14-char string; prefix LIKE lets DuckDB use parquet min/max stats
+      parts.push(`${q} LIKE '${cnpjRoot}%'`);
+    } else if (col.type === "mixed") {
+      // CPF (11 digits) or CNPJ (14 digits), stored as digits-only; match only CNPJs
+      parts.push(`(length(${q}) = 14 AND ${q} LIKE '${cnpjRoot}%')`);
     }
   }
-
-  return filters;
+  return parts.length ? `(${parts.join(" OR ")})` : "TRUE";
 }
 
 export async function* queryByCnpj(
@@ -102,43 +109,16 @@ export async function* queryByCnpj(
     allColumns.push(yearField);
   }
 
+  const rawWhere = buildCnpjRawWhere(cnpjColumns, cnpjRoot);
   let count = 0;
-
   for await (const row of queryParquetDataset(dataset, table, {
     columns: allColumns,
+    rawWhere,
+    limit,
   })) {
     if (count >= limit) break;
-
-    let matches = false;
-    for (const col of cnpjColumns) {
-      const val = row[col.name];
-      if (val !== undefined && val !== null) {
-        const valStr = String(val).replace(/\D/g, "");
-        if (valStr.length >= 8 && valStr.slice(0, 8) === cnpjRoot) {
-          if (col.type === "mixed") {
-            const docLen = valStr.length;
-            if (docLen === 11) {
-              const searchDigits = cnpj.replace(/\D/g, "");
-              if (searchDigits.length === 11 && valStr === searchDigits) {
-                matches = true;
-                break;
-              }
-            } else if (docLen === 14) {
-              matches = true;
-              break;
-            }
-          } else {
-            matches = true;
-            break;
-          }
-        }
-      }
-    }
-
-    if (matches || cnpjColumns.length === 0) {
-      count++;
-      yield row;
-    }
+    count++;
+    yield row;
   }
 }
 
@@ -146,9 +126,8 @@ export async function getTotalCount(
   datasetInfo: DatasetInfo,
   cnpj: string
 ): Promise<number> {
-  let count = 0;
-  for await (const _ of queryByCnpj(datasetInfo, cnpj, 1000)) {
-    count++;
-  }
-  return count;
+  const { dataset, table, cnpjColumns } = datasetInfo;
+  const cnpjRoot = extractCnpjRoot(cnpj);
+  const rawWhere = buildCnpjRawWhere(cnpjColumns, cnpjRoot);
+  return countParquetRows(dataset, table, { rawWhere });
 }

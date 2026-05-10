@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { CNPJ_DATASETS, RELATED_DATASETS } from "./cnpj-datasets";
 import { getCache, setCache } from "./cache";
-import { queryParquetDataset, tableExists, getTableColumns, getBytesReceived, resetBytesReceived } from "./parquet-store";
+import { queryParquetDataset, tableExists, getTableColumns, getBytesReceived, resetBytesReceived, warmUp } from "./parquet-store";
 import { queryByCnpj, extractCnpjRoot, DatasetInfo, CnpjColumn } from "./cnpj-index";
 
 function log(...args: unknown[]) {
@@ -90,35 +90,41 @@ async function queryCompanies(params: QueryParams): Promise<{ rows: Company[] }>
   log("queryCompanies", { params });
   const t0 = Date.now();
   const rows: Company[] = [];
-  const searchUpper = params.search.toUpperCase();
+
+  const rawWhere = params.search
+    ? `UPPER("razao_social") LIKE '%${params.search.toUpperCase().replace(/'/g, "''").replace(/%/g, "\\%").replace(/_/g, "\\_")}%'`
+    : undefined;
 
   for await (const row of queryParquetDataset("br_me_cnpj", "empresas", {
     columns: ["cnpj_basico", "razao_social", "natureza_juridica", "qualificacao_responsavel", "capital_social", "porte", "ente_federativo", "ano"],
     filters: { ano: params.ano },
-    limit: params.offset + params.limit,
+    rawWhere,
+    orderBy: '"capital_social" DESC NULLS LAST',
+    limit: params.limit,
+    offset: params.offset,
   })) {
-    if (params.search && !String(row.razao_social ?? "").toUpperCase().includes(searchUpper)) {
-      continue;
-    }
     rows.push(row as unknown as Company);
   }
 
-  const sorted = rows.sort((a, b) => {
-    const capA = a.capital_social ?? -1;
-    const capB = b.capital_social ?? -1;
-    return capB - capA;
-  });
-
-  const result = sorted.slice(params.offset, params.offset + params.limit);
-  setCache(cacheKey, result);
-  log("queryCompanies done", { rows: result.length, ms: Date.now() - t0 });
-  return { rows: result };
+  setCache(cacheKey, rows);
+  log("queryCompanies done", { rows: rows.length, ms: Date.now() - t0 });
+  return { rows };
 }
 
 interface Socio {
   nome: string;
-  documento: string;
+  documento: string | null;
   qualificacao: string;
+}
+
+// Masked CPF format: ***XXXXXX** (6 visible digits, never a full 11-digit CPF).
+// Full CNPJs (14 digits) are never masked.
+// Masked/null docs are scoped to companyId to prevent false graph merges
+// when different people share the same placeholder (e.g. ***000000**).
+function socioNodeId(documento: string | null, companyId: string, nome: string): string {
+  if (!documento) return `${companyId}:name:${nome}`;
+  if (documento.includes("*")) return `${companyId}:masked:${documento}:${nome}`;
+  return documento; // full CNPJ → global deduplication across companies
 }
 
 async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[] }> {
@@ -140,7 +146,7 @@ async function querySocios(cnpjBasico: string): Promise<{ rows: Socio[] }> {
   for await (const row of queryByCnpj(sociosInfo, cnpjRoot, 50)) {
     rows.push({
       nome: String(row.nome ?? ""),
-      documento: String(row.documento ?? ""),
+      documento: row.documento != null ? String(row.documento) : null,
       qualificacao: String(row.qualificacao ?? ""),
     });
   }
@@ -1162,6 +1168,7 @@ function renderGraphPage(cnpj: string): string {
 }
 
 // --- HTTP server ---
+await warmUp();
 Bun.serve({
   port: PORT,
   idleTimeout: 255,
@@ -1290,8 +1297,8 @@ Bun.serve({
         nodes.push({ id: cnpj, label: companyLabel, type: "empresa" });
 
         for (const s of sociosResult.rows) {
-          const socioId = s.documento || `${cnpj}:${s.nome}`;
-          if (socioId && !nodes.find((n) => n.id === socioId)) {
+          const socioId = socioNodeId(s.documento, cnpj, s.nome);
+          if (!nodes.find((n) => n.id === socioId)) {
             nodes.push({ id: socioId, label: s.nome || socioId, type: "socio" });
           }
           links.push({ source: cnpj, target: socioId });
