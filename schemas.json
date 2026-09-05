@@ -1,7 +1,7 @@
 {
   "_meta": {
     "bucket": "baseldosdados",
-    "total_tables": 533,
+    "total_tables": 544,
     "total_size_bytes": 725252550876,
     "total_size_human": "675.4 GB",
     "errors": []
@@ -147557,6 +147557,1129 @@
           }
         }
       }
+    },
+    "br_comprasgov_sicaf.fornecedores": {
+      "path": "rodado://br_comprasgov_sicaf/fornecedores/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "ativo",
+          "type": "bool",
+          "nullable": true
+        },
+        {
+          "name": "cnpj",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "cpf",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "habilitadoLicitar",
+          "type": "bool",
+          "nullable": true
+        },
+        {
+          "name": "codigoCnae",
+          "type": "int64",
+          "nullable": true
+        },
+        {
+          "name": "nomeCnae",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "nomeMunicipio",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "naturezaJuridicaId",
+          "type": "int64",
+          "nullable": true
+        },
+        {
+          "name": "naturezaJuridicaNome",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "porteEmpresaId",
+          "type": "int64",
+          "nullable": true
+        },
+        {
+          "name": "porteEmpresaNome",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "nomeRazaoSocialFornecedor",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ufSigla",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "pesquisado_ativo",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_bcb_penalidades.penalidades": {
+      "path": "rodado://br_bcb_penalidades/penalidades/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "PAS",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Nome",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CPF_CNPJ",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Data_da_citacao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Numero_decisao_1_instancia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Data_da_decisao_1_instancia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_penalidade_1_instancia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Duracao_da_pena_1_instancia",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "Valor_da_multa_1_instancia",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "Apresentou_recurso",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Numero_decisao_2_instancia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Data_da_decisao_2_instancia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_penalidade_2_instancia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Duracao_da_pena_2_instancia",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "Valor_da_multa_2_instancia",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "Situacao",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_pgfn_dividaativa.divida": {
+      "path": "rodado://br_pgfn_dividaativa/divida/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "CPF_CNPJ",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "TIPO_PESSOA",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "TIPO_DEVEDOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "NOME_DEVEDOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "UF_DEVEDOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "UNIDADE_RESPONSAVEL",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ENTIDADE_RESPONSAVEL",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "UNIDADE_INSCRICAO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "NUMERO_INSCRICAO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "TIPO_SITUACAO_INSCRICAO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "SITUACAO_INSCRICAO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "RECEITA_PRINCIPAL",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DATA_INSCRICAO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "INDICADOR_AJUIZADO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "VALOR_CONSOLIDADO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "categoria",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "trimestre",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tcu_inidoneos.empresas": {
+      "path": "rodado://br_tcu_inidoneos/empresas/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "NOME",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CPF_CNPJ",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "PROCESSO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DELIBERACAO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DATA TRANSITO JULGADO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DATA FINAL",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DATA ACORDAO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "UF",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "MUNICIPIO",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tcu_inidoneos.resp_contas_julgadas_irregulares": {
+      "path": "rodado://br_tcu_inidoneos/resp_contas_julgadas_irregulares/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "NOME",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CPF_CNPJ",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "PROCESSO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DELIBERACAO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DATA TRANSITO JULGADO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "UF",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "MUNICIPIO",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_brasilio_holdings.holdings": {
+      "path": "rodado://br_brasilio_holdings/holdings/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "cnpj",
+          "type": "int64",
+          "nullable": true
+        },
+        {
+          "name": "razao_social",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_socia",
+          "type": "int64",
+          "nullable": true
+        },
+        {
+          "name": "qualificacao_socia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "razao_social_socia",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_fundos.fundos": {
+      "path": "rodado://br_cvm_fundos/fundos/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "TP_FUNDO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_FUNDO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DENOM_SOCIAL",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DT_REG",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "DT_CONST",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "CD_CVM",
+          "type": "int64",
+          "nullable": true
+        },
+        {
+          "name": "DT_CANCEL",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "SIT",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DT_INI_SIT",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "DT_INI_ATIV",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "DT_INI_EXERC",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "DT_FIM_EXERC",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "CLASSE",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DT_INI_CLASSE",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "RENTAB_FUNDO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CONDOM",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "FUNDO_COTAS",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "FUNDO_EXCLUSIVO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "TRIB_LPRAZO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "PUBLICO_ALVO",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ENTID_INVEST",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "TAXA_PERFM",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "INF_TAXA_PERFM",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "TAXA_ADM",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "INF_TAXA_ADM",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "VL_PATRIM_LIQ",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "DT_PATRIM_LIQ",
+          "type": "date32[day]",
+          "nullable": true
+        },
+        {
+          "name": "DIRETOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_ADMIN",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ADMIN",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "PF_PJ_GESTOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CPF_CNPJ_GESTOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "GESTOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_AUDITOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "AUDITOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_CUSTODIANTE",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CUSTODIANTE",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_CONTROLADOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CONTROLADOR",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "INVEST_CEMPR_EXTER",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CLASSE_ANBIMA",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tce_rj.contratos_estado": {
+      "path": "rodado://br_tce_rj/contratos_estado/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "Processo",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "AnoProcesso",
+          "type": "int64",
+          "nullable": true
+        },
+        {
+          "name": "DataContratacao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ValorTotalContrato",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "StatusContratacao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Unidade",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Objeto",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Fornecedor",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CPFCNPJ",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DataInicioVigencia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DataFimVigencia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CriterioJulgamento",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Contratacao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ValorTotalEmpenhado",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ValorTotalLiquidado",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ValorTotalPago",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tce_rj.contratos_municipio": {
+      "path": "rodado://br_tce_rj/contratos_municipio/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "Ente",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "UnidadeGestora",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "NumeroContrato",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "AnoContrato",
+          "type": "int64",
+          "nullable": true
+        },
+        {
+          "name": "TipoPessoa",
+          "type": "int32",
+          "nullable": true
+        },
+        {
+          "name": "CNPJCPFContratado",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Contratado",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ProcessoLicitatorio",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Modalidade",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ProcessoDispensa",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "TipoContrato",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Objeto",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DataAssinaturaContrato",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DataVencimentoContrato",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "ValorContrato",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "ValorEmpenhado",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "ValorLiquidado",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "ValorPago",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "PercentualRecursosUniao",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "UtilizaLei14133",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_bndes_operacoes_contratadas.operacoes_nao_automaticas": {
+      "path": "rodado://br_bndes_operacoes_contratadas/operacoes_nao_automaticas/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "area_operacional_bndes",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "classe_cnae",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_cliente",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_instituicao_financeira_credenciada",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "custo_financeiro",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "data_apuracao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "data_contratacao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "descricao_projeto",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "descricao_subclasse",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "divisao_cnae",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "forma_apoio",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "grupo_cnae",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "id_contrato",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "id_municipio",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "indicador_inovacao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "modalidade_apoio",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "natureza_cliente",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "nome_instituicao_financeira_credenciada",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "nome_municipio",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "porte_cliente",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "prazo_amortizacao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "prazo_carencia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "produto",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "razao_social_cliente",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "secao_cnae",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "setor_bndes",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "setor_cnae_bndes",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "situacao_contrato",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "subclasse_cnae",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "subsetor_agrupado_cnae_bndes",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "subsetor_bndes",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "taxa_juros",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "tipo_excepcionalidade",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "tipo_fonte_recursos",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "tipo_garantia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "tipo_instrumento_financeiro",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "valor_contratado",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "valor_desembolsado",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "br_mjsp_ckan.procon": {
+      "path": "rodado://br_mjsp_ckan/procon/",
+      "file_count": 1,
+      "total_size_bytes": 0,
+      "total_size_human": "unknown",
+      "columns": [
+        {
+          "name": "AnoCalendario",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DataArquivamento",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DataAbertura",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CodigoRegiao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Regiao",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "UF",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "strRazaoSocial",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "strNomeFantasia",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Tipo",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "NumeroCNPJ",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "RadicalCNPJ",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "RazaoSocialRFB",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "NomeFantasiaRFB",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CNAEPrincipal",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DescCNAEPrincipal",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "Atendida",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CodigoAssunto",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DescricaoAssunto",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CodigoProblema",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "DescricaoProblema",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "SexoConsumidor",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "FaixaEtariaConsumidor",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "CEPConsumidor",
+          "type": "string",
+          "nullable": true
+        }
+      ]
     }
   }
 }

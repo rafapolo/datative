@@ -1,4 +1,5 @@
 .cache/
+benchmarks/
 .node_modules
 usage.json
 node_modules/

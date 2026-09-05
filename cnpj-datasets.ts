@@ -1,6 +1,9 @@
 export interface CnpjColumn {
   name: string;
   type: "basico" | "full" | "mixed";
+  /** Column holds punctuation (dots/slash/dash) and/or a numeric type that drops
+   * leading zeros — strip non-digits and zero-pad before matching. */
+  normalize?: boolean;
 }
 
 export interface RelatedLookup {
@@ -17,7 +20,7 @@ export interface CnpjDatasetEntry {
   cnpjColumns: CnpjColumn[];
   displayFields: string[];
   yearField?: string;
-  nodeType?: "contrato" | "doacao" | "estabelecimento" | "pagamento";
+  nodeType?: "contrato" | "doacao" | "estabelecimento" | "pagamento" | "empresa";
   nodeIdField?: string;
   nodeLabelField?: string;
   relatedLookups?: RelatedLookup[];
@@ -29,7 +32,7 @@ export interface RelatedDatasetEntry {
   color: string;
   table: string;
   displayFields: string[];
-  nodeType?: "contrato" | "doacao" | "estabelecimento" | "pagamento";
+  nodeType?: "contrato" | "doacao" | "estabelecimento" | "pagamento" | "empresa";
   nodeIdField?: string;
   nodeLabelField?: string;
 }
@@ -469,6 +472,151 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     yearField: "ano",
     nodeIdField: "id_aih",
     nodeLabelField: "id_prestador_servico",
+  },
+
+  // --- Holdings · Participações Societárias (empresa-para-empresa; ranked
+  // highest of the additions below because every row IS a company-to-company
+  // join, unlike the other tables which join once to the searched CNPJ) ---
+  {
+    id: "brasilio_participacoes",
+    label: "Holdings · Sócias (quem me possui)",
+    color: "#5b21b6",
+    table: "basedosdados.br_brasilio_holdings.holdings",
+    cnpjColumns: [{ name: "cnpj", type: "full", normalize: true }],
+    displayFields: ["cnpj", "razao_social", "cnpj_socia", "qualificacao_socia", "razao_social_socia"],
+    nodeType: "empresa",
+    nodeIdField: "cnpj_socia",
+    nodeLabelField: "razao_social_socia",
+  },
+  {
+    id: "brasilio_subsidiarias",
+    label: "Holdings · Participações (o que eu possuo)",
+    color: "#6d28d9",
+    table: "basedosdados.br_brasilio_holdings.holdings",
+    cnpjColumns: [{ name: "cnpj_socia", type: "full", normalize: true }],
+    displayFields: ["cnpj", "razao_social", "cnpj_socia", "qualificacao_socia", "razao_social_socia"],
+    nodeType: "empresa",
+    nodeIdField: "cnpj",
+    nodeLabelField: "razao_social",
+  },
+
+  // --- PGFN · Dívida Ativa da União ---
+  {
+    id: "pgfn_dividaativa",
+    label: "PGFN · Dívida Ativa",
+    color: "#991b1b",
+    table: "basedosdados.br_pgfn_dividaativa.divida",
+    cnpjColumns: [{ name: "CPF_CNPJ", type: "mixed", normalize: true }],
+    displayFields: ["NOME_DEVEDOR", "CPF_CNPJ", "TIPO_DEVEDOR", "RECEITA_PRINCIPAL", "VALOR_CONSOLIDADO", "SITUACAO_INSCRICAO", "DATA_INSCRICAO", "UF_DEVEDOR"],
+    nodeIdField: "NUMERO_INSCRICAO",
+    nodeLabelField: "NOME_DEVEDOR",
+  },
+
+  // --- TCU · Inidôneos ---
+  {
+    id: "tcu_empresas_inidoneas",
+    label: "TCU · Empresas Inidôneas",
+    color: "#7f1d1d",
+    table: "basedosdados.br_tcu_inidoneos.empresas",
+    cnpjColumns: [{ name: "CPF_CNPJ", type: "mixed", normalize: true }],
+    displayFields: ["NOME", "CPF_CNPJ", "PROCESSO", "DELIBERACAO", "DATA TRANSITO JULGADO", "DATA FINAL", "UF", "MUNICIPIO"],
+    nodeIdField: "PROCESSO",
+    nodeLabelField: "NOME",
+  },
+  {
+    id: "tcu_contas_irregulares",
+    label: "TCU · Contas Julgadas Irregulares",
+    color: "#9f1239",
+    table: "basedosdados.br_tcu_inidoneos.resp_contas_julgadas_irregulares",
+    cnpjColumns: [{ name: "CPF_CNPJ", type: "mixed", normalize: true }],
+    displayFields: ["NOME", "CPF_CNPJ", "PROCESSO", "DELIBERACAO", "DATA TRANSITO JULGADO", "UF", "MUNICIPIO"],
+    nodeIdField: "PROCESSO",
+    nodeLabelField: "NOME",
+  },
+
+  // --- CVM · Fundos de Investimento ---
+  {
+    id: "cvm_fundos",
+    label: "CVM · Fundos de Investimento",
+    color: "#166534",
+    table: "basedosdados.br_cvm_fundos.fundos",
+    cnpjColumns: [
+      { name: "CNPJ_FUNDO", type: "full", normalize: true },
+      { name: "CNPJ_ADMIN", type: "full", normalize: true },
+    ],
+    displayFields: ["CNPJ_FUNDO", "DENOM_SOCIAL", "CLASSE", "SIT", "ADMIN", "CNPJ_ADMIN", "GESTOR", "VL_PATRIM_LIQ", "DT_PATRIM_LIQ"],
+    nodeIdField: "CNPJ_FUNDO",
+    nodeLabelField: "DENOM_SOCIAL",
+  },
+
+  // --- SICAF · Fornecedores cadastrados (ComprasGov) ---
+  {
+    id: "sicaf_fornecedores",
+    label: "SICAF · Fornecedores",
+    color: "#0e7490",
+    table: "basedosdados.br_comprasgov_sicaf.fornecedores",
+    cnpjColumns: [{ name: "cnpj", type: "full" }],
+    displayFields: ["cnpj", "nomeRazaoSocialFornecedor", "nomeCnae", "porteEmpresaNome", "habilitadoLicitar", "ativo", "nomeMunicipio", "ufSigla"],
+    nodeIdField: "cnpj",
+    nodeLabelField: "nomeRazaoSocialFornecedor",
+  },
+
+  // --- BNDES · Operações Contratadas ---
+  {
+    id: "bndes_operacoes",
+    label: "BNDES · Operações",
+    color: "#155e75",
+    table: "basedosdados.br_bndes_operacoes_contratadas.operacoes_nao_automaticas",
+    cnpjColumns: [{ name: "cnpj_cliente", type: "full" }],
+    displayFields: ["id_contrato", "cnpj_cliente", "razao_social_cliente", "produto", "valor_contratado", "valor_desembolsado", "data_contratacao", "sigla_uf"],
+    nodeIdField: "id_contrato",
+    nodeLabelField: "razao_social_cliente",
+  },
+
+  // --- BCB · Penalidades ---
+  {
+    id: "bcb_penalidades",
+    label: "BCB · Penalidades",
+    color: "#b45309",
+    table: "basedosdados.br_bcb_penalidades.penalidades",
+    cnpjColumns: [{ name: "CPF_CNPJ", type: "mixed" }],
+    displayFields: ["Nome", "CPF_CNPJ", "Tipo_penalidade_1_instancia", "Valor_da_multa_1_instancia", "Data_da_decisao_1_instancia", "Situacao"],
+    nodeIdField: "PAS",
+    nodeLabelField: "Nome",
+  },
+
+  // --- TCE-RJ · Contratos ---
+  {
+    id: "tce_rj_contratos_estado",
+    label: "TCE-RJ · Contratos (Estado)",
+    color: "#334155",
+    table: "basedosdados.br_tce_rj.contratos_estado",
+    cnpjColumns: [{ name: "CPFCNPJ", type: "mixed" }],
+    displayFields: ["Processo", "Fornecedor", "CPFCNPJ", "Objeto", "ValorTotalContrato", "DataContratacao", "Unidade", "StatusContratacao"],
+    nodeIdField: "Processo",
+    nodeLabelField: "Fornecedor",
+  },
+  {
+    id: "tce_rj_contratos_municipio",
+    label: "TCE-RJ · Contratos (Município)",
+    color: "#475569",
+    table: "basedosdados.br_tce_rj.contratos_municipio",
+    cnpjColumns: [{ name: "CNPJCPFContratado", type: "mixed" }],
+    displayFields: ["NumeroContrato", "Contratado", "CNPJCPFContratado", "Objeto", "ValorContrato", "DataAssinaturaContrato", "Ente"],
+    nodeIdField: "NumeroContrato",
+    nodeLabelField: "Contratado",
+  },
+
+  // --- Procon · Reclamações de Consumidor ---
+  {
+    id: "procon_reclamacoes",
+    label: "Procon · Reclamações",
+    color: "#c2410c",
+    table: "basedosdados.br_mjsp_ckan.procon",
+    cnpjColumns: [{ name: "NumeroCNPJ", type: "full", normalize: true }],
+    displayFields: ["strRazaoSocial", "strNomeFantasia", "NumeroCNPJ", "DescricaoAssunto", "DescricaoProblema", "Atendida", "UF", "AnoCalendario"],
+    nodeIdField: "NumeroCNPJ",
+    nodeLabelField: "strRazaoSocial",
   },
 ];
 

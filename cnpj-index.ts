@@ -3,6 +3,9 @@ import { queryParquetDataset, getTableColumns, tableExists, countParquetRows } f
 export interface CnpjColumn {
   name: string;
   type: "basico" | "full" | "mixed";
+  /** Column holds punctuation (dots/slash/dash) and/or a numeric type that drops
+   * leading zeros — strip non-digits and zero-pad before matching. */
+  normalize?: boolean;
 }
 
 export interface DatasetInfo {
@@ -88,15 +91,26 @@ export function socioNodeId(documento: string | null, companyId: string, nome: s
 function buildCnpjRawWhere(cnpjColumns: CnpjColumn[], cnpjRoot: string): string {
   const parts: string[] = [];
   for (const col of cnpjColumns) {
-    const q = `"${col.name}"`;
+    const raw = `"${col.name}"`;
+    // Some mirrored/scraped sources store CNPJ punctuated ("12.345.678/0001-90")
+    // or as a numeric type that drops leading zeros — strip to digits-only first.
+    const stripped = col.normalize
+      ? `regexp_replace(CAST(${raw} AS VARCHAR), '[^0-9]', '', 'g')`
+      : raw;
     if (col.type === "basico") {
-      parts.push(`${q} = '${cnpjRoot}'`);
+      parts.push(`(${stripped} = '${cnpjRoot}')`);
     } else if (col.type === "full") {
-      // digits-only 14-char string; prefix LIKE lets DuckDB use parquet min/max stats
-      parts.push(`${q} LIKE '${cnpjRoot}%'`);
+      // prefix LIKE lets DuckDB use parquet min/max stats on the un-normalized column.
+      // Guard against blank/NULL source values: lpad('', 14, '0') is all zeros and
+      // would otherwise spuriously match an all-zero-ish root (e.g. "00000000").
+      const padded = col.normalize ? `lpad(${stripped}, 14, '0')` : stripped;
+      const notBlank = col.normalize ? `${stripped} <> '' AND ` : "";
+      parts.push(`(${notBlank}${padded} LIKE '${cnpjRoot}%')`);
     } else if (col.type === "mixed") {
-      // CPF (11 digits) or CNPJ (14 digits), stored as digits-only; match only CNPJs
-      parts.push(`(length(${q}) = 14 AND ${q} LIKE '${cnpjRoot}%')`);
+      // CPF (11 digits) or CNPJ (14 digits); match only CNPJs. Length must be
+      // checked on the un-padded digit count, before any zero-padding, or a
+      // stripped 11-digit CPF would be miscounted as a 14-digit CNPJ.
+      parts.push(`(length(${stripped}) = 14 AND ${stripped} LIKE '${cnpjRoot}%')`);
     }
   }
   return parts.length ? `(${parts.join(" OR ")})` : "TRUE";
