@@ -16,7 +16,7 @@ export interface DatasetInfo {
   yearField?: string;
 }
 
-const INDEX_CACHE_PATH = new URL("./cnpj-index-cache.json", import.meta.url).pathname;
+const INDEX_CACHE_PATH = new URL("../cnpj-index-cache.json", import.meta.url).pathname;
 
 interface CnpjIndexCache {
   [tableKey: string]: {

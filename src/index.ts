@@ -29,7 +29,7 @@ function parseCsvLine(line: string): string[] {
 
 function loadCnpjsInteresse(): CnpjInteresse[] {
   try {
-    const csv = readFileSync(resolve(import.meta.dir, "cnpjs_interesse.csv"), "utf-8");
+    const csv = readFileSync(resolve(import.meta.dir, "../data/cnpjs_interesse.csv"), "utf-8");
     return csv.trim().split("\n").slice(1).filter(Boolean).map((line) => {
       const [cnpj_basico, razao_social, porte] = parseCsvLine(line);
       return { cnpj_basico: cnpj_basico.trim(), razao_social: razao_social.trim(), porte: porte.trim() };
@@ -42,7 +42,7 @@ const cnpjsInteresse = loadCnpjsInteresse();
 // --- Config ---
 const PORT = parseInt(process.env.PORT ?? "3003", 10);
 
-const GRAPH_JS_PATH = resolve(import.meta.dir, "public/graph.js");
+const GRAPH_JS_PATH = resolve(import.meta.dir, "../public/graph.js");
 
 const DEFAULT_YEAR = 2023;
 const DEFAULT_LIMIT = 25;
@@ -1192,7 +1192,7 @@ Bun.serve({
           headers: { "Content-Type": "application/javascript; charset=utf-8" },
         });
       } catch {
-        return new Response("graph.js not found — run: bun build graph-client.ts --outfile public/graph.js --target browser", { status: 404 });
+        return new Response("graph.js not found — run: bun build src/graph-client.ts --outfile public/graph.js --target browser", { status: 404 });
       }
     }
 

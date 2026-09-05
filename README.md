@@ -20,7 +20,8 @@ Datative é uma plataforma de analise investigativa para explorar conexoes entre
   - `pack` (circle packing hierarquico, estilo D3 pack)
 - Controle de limite de lookup (10, 20, 30, 40) e cache local para reduzir custo de consulta.
 - Consulta remota via SQL enviado por SSH a um `duckdb` rodando em `beelink`, sem servidor intermediario.
-- Catalogo local de schemas em `schemas.json` para mapear dataset/tabela para as colunas disponiveis.
+- Catalogo local de schemas em `data/schemas.json` para mapear dataset/tabela para as colunas disponiveis.
+- `scripts/generate-static-entities.ts`: pre-computa as redes dos 100 CNPJs/CPFs com maior abrangencia entre datasets (nao maior volume) e grava JSON estatico em `static/`, para publicacao sem servidor (ex.: GitHub Pages).
 
 App local:
 
@@ -29,9 +30,11 @@ App local:
 
 ## Scripts
 
-- `bun run start`: sobe o servidor (`index.ts`)
+- `bun run start`: sobe o servidor (`src/index.ts`)
 - `bun run dev`: modo watch
-- `bun run test`: roda os testes
+- `bun run build:graph`: rebuild de `public/graph.js` a partir de `src/graph-client.ts`
+- `bun run generate:static`: roda `scripts/generate-static-entities.ts`
+- `bun run test`: roda os testes (`tests/`)
 - `bun run typecheck`: roda o typecheck em TypeScript
 
 APIs:
@@ -43,22 +46,26 @@ APIs:
 
 ## Arquitetura de dados
 
-- `schemas.json` define o mapeamento entre `dataset.tabela` e as colunas disponiveis no catalogo.
-- `duckdb-ssh.ts` abre uma conexão SSH multiplexada (`ControlMaster`) para `beelink` e envia SQL via stdin para `duckdb -readonly -json`; o array JSON do stdout vira o result set.
-- `parquet-store.ts` monta o `SELECT`/`WHERE`/`LIMIT` contra as views `"dataset"."tabela"` e delega a execução a `duckdb-ssh.ts`.
-- `cnpj-index.ts` constrói cláusulas `WHERE` SQL por tipo de coluna CNPJ (`basico`, `full`, `mixed`) e delega o filtro ao DuckDB; sem varredura client-side.
-- `index.ts` usa esse backend para tabela, grafo e lookups relacionados.
+- `data/schemas.json` define o mapeamento entre `dataset.tabela` e as colunas disponiveis no catalogo.
+- `src/duckdb-ssh.ts` abre uma conexão SSH multiplexada (`ControlMaster`) para `beelink` e envia SQL via stdin para `duckdb -readonly -json`; o array JSON do stdout vira o result set.
+- `src/parquet-store.ts` monta o `SELECT`/`WHERE`/`LIMIT` contra as views `"dataset"."tabela"` e delega a execução a `duckdb-ssh.ts`.
+- `src/cnpj-index.ts` constrói cláusulas `WHERE` SQL por tipo de coluna CNPJ (`basico`, `full`, `mixed`) e delega o filtro ao DuckDB; sem varredura client-side.
+- `src/index.ts` usa esse backend para tabela, grafo e lookups relacionados.
 
 ## Estrutura de arquivos
 
-- `index.ts`: servidor HTTP, HTML e APIs
-- `graph-client.ts`: logica de visualizacao e interacao do grafo
-- `public/graph.js`: bundle browser gerado
-- `cnpj-datasets.ts`: configuracao de datasets e relacoes
-- `duckdb-ssh.ts`: execução de SQL remoto via SSH no `duckdb` de `beelink`
-- `parquet-store.ts`: construção de SQL sobre as views do catalogo
-- `cnpj-index.ts`: matching e lookup por CNPJ nas tabelas do catalogo
-- `cache.ts`: cache two-layer — L1 em memória (`Map`) + L2 em disco (`.cache/`)
+- `src/index.ts`: servidor HTTP, HTML e APIs
+- `src/graph-client.ts`: logica de visualizacao e interacao do grafo
+- `src/cnpj-datasets.ts`: configuracao de datasets e relacoes
+- `src/duckdb-ssh.ts`: execução de SQL remoto via SSH no `duckdb` de `beelink`
+- `src/parquet-store.ts`: construção de SQL sobre as views do catalogo
+- `src/cnpj-index.ts`: matching e lookup por CNPJ nas tabelas do catalogo
+- `src/cache.ts`: cache two-layer — L1 em memória (`Map`) + L2 em disco (`.cache/`)
+- `data/`: `schemas.json` (catalogo de tabelas) e `cnpjs_interesse.csv` (lista curada da landing page)
+- `scripts/`: `generate-static-entities.ts` (top-100 estatico) e `benchmark.ts`
+- `static/`: saida gerada por `generate-static-entities.ts` (`entities/`, `entities-index.json`)
+- `public/graph.js`: bundle browser gerado a partir de `src/graph-client.ts`
+- `tests/`: testes unitarios (`bun test`)
 
 ## Licenca
 

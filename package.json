@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "bun run index.ts",
-    "dev": "bun --watch run index.ts",
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch run src/index.ts",
+    "build:graph": "bun build src/graph-client.ts --outfile public/graph.js --target browser",
+    "generate:static": "bun run scripts/generate-static-entities.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

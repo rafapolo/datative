@@ -25,8 +25,8 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { spawnSync } from "child_process";
-import { queryParquetDataset, warmUp } from "./parquet-store";
-import { queryByCnpj, DatasetInfo } from "./cnpj-index";
+import { queryParquetDataset, warmUp } from "../src/parquet-store";
+import { queryByCnpj, DatasetInfo } from "../src/cnpj-index";
 
 // ---- Target CNPJs -------------------------------------------------------
 // Facebook — 5806 data sources, large company, present across most datasets.
@@ -244,7 +244,7 @@ async function runScenario(
 
 // ---- Main ---------------------------------------------------------------
 
-const RESULTS_DIR = resolve(import.meta.dir, "benchmarks");
+const RESULTS_DIR = resolve(import.meta.dir, "../benchmarks");
 const RESULTS_FILE = resolve(RESULTS_DIR, "results.json");
 
 const iterations = (() => {

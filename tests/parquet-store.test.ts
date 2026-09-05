@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { normalizeComparableValue, projectRow, rowMatchesFilters } from "./parquet-store";
+import { normalizeComparableValue, projectRow, rowMatchesFilters } from "../src/parquet-store";
 
 describe("parquet-store helpers", () => {
   test("rowMatchesFilters compares values using schema-agnostic string coercion", () => {
