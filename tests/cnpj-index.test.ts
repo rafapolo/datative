@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isMaskedDocument, matchesCnpj, socioNodeId } from "../src/cnpj-index";
+import { isMaskedDocument, matchesCnpj, socioNodeId } from "../scripts/lib/cnpj-index";
 
 describe("isMaskedDocument", () => {
   test("detects ***XXXXXX** format", () => {

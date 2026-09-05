@@ -4,68 +4,55 @@
   <img src="assets/logo.png" alt="Datative Logo" width="200" />
 </div>
 
-Datative é uma plataforma de analise investigativa para explorar conexoes entre empresas, socios e dados publicos a partir do catalogo DuckDB espelhado em `beelink` (o mesmo catalogo do projeto irmao `rodado`), com visualizações iterativas e lookups cruzados por CNPJ.
+Datative é um site estático de investigação que mostra as redes das entidades (CNPJ/CPF) com maior abrangência entre datasets publicos federais — Receita Federal, CGU, TSE, SIAFI e mais. Não há consulta ao vivo: todo o grafo de cada entidade é pré-computado offline e servido como JSON estático.
 
 ![Datative Screenshot](assets/datative.png)
 
 ## Principais capacidades
 
-- Busca de empresa por CNPJ e expansao de vizinhanca (empresa <-> socios).
-- Lookup cruzado em multiplos datasets com deteccao de CNPJ em colunas relevantes.
-- Painel lateral com detalhes por dataset e destaque de linhas ligadas ao no selecionado.
+- Landing page lista as entidades pré-computadas, ordenadas por quantidade de datasets em que aparecem.
+- Visualização de grafo (empresa/pessoa <-> sócios <-> registros de outros datasets), servida a partir de `static/entities/<id>.json`.
 - Layouts de grafo:
   - `radial`
   - `forceatlas2`
   - `collapsible-tree`
   - `pack` (circle packing hierarquico, estilo D3 pack)
-- Controle de limite de lookup (10, 20, 30, 40) e cache local para reduzir custo de consulta.
-- Consulta remota via SQL enviado por SSH a um `duckdb` rodando em `beelink`, sem servidor intermediario.
-- Catalogo local de schemas em `data/schemas.json` para mapear dataset/tabela para as colunas disponiveis.
-- `scripts/generate-static-entities.ts`: pre-computa as redes dos 100 CNPJs/CPFs com maior abrangencia entre datasets (nao maior volume) e grava JSON estatico em `static/`, para publicacao sem servidor (ex.: GitHub Pages).
+- Sem servidor de dados em tempo de request — `src/index.ts` só lê arquivos estáticos.
 
 App local:
 
 - Landing/graph: `http://localhost:3003/`
-- Tabela: `http://localhost:3003/table`
 
 ## Scripts
 
-- `bun run start`: sobe o servidor (`src/index.ts`)
+- `bun run start`: sobe o servidor estático (`src/index.ts`)
 - `bun run dev`: modo watch
 - `bun run build:graph`: rebuild de `public/graph.js` a partir de `src/graph-client.ts`
-- `bun run generate:static`: roda `scripts/generate-static-entities.ts`
+- `bun run generate:static`: roda `scripts/generate-static-entities.ts` (consulta `beelink` via SSH offline e grava `static/`)
 - `bun run test`: roda os testes (`tests/`)
 - `bun run typecheck`: roda o typecheck em TypeScript
 
-APIs:
+API:
 
-- `GET /api/graph/:cnpj`
-- `GET /api/lookup/:cnpj?limit=10|20|30|40`
-- `GET /api/lookup/:cnpj/dataset/:datasetId?fresh=1&limit=...`
-- `GET /api/lookup/related?datasetId=...&foreignKey=...&value=...&limit=...`
+- `GET /api/graph/:id` — lê `static/entities/:id.json` diretamente; 404 se a entidade não foi pré-computada.
 
-## Arquitetura de dados
+## Arquitetura
 
-- `data/schemas.json` define o mapeamento entre `dataset.tabela` e as colunas disponiveis no catalogo.
-- `src/duckdb-ssh.ts` abre uma conexão SSH multiplexada (`ControlMaster`) para `beelink` e envia SQL via stdin para `duckdb -readonly -json`; o array JSON do stdout vira o result set.
-- `src/parquet-store.ts` monta o `SELECT`/`WHERE`/`LIMIT` contra as views `"dataset"."tabela"` e delega a execução a `duckdb-ssh.ts`.
-- `src/cnpj-index.ts` constrói cláusulas `WHERE` SQL por tipo de coluna CNPJ (`basico`, `full`, `mixed`) e delega o filtro ao DuckDB; sem varredura client-side.
-- `src/index.ts` usa esse backend para tabela, grafo e lookups relacionados.
+- `src/index.ts`: servidor HTTP puramente estático — landing page, página de grafo, `/api/graph/:id` lendo `static/`.
+- `src/graph-client.ts` + `src/node-shape-programs.ts`: bundle browser (Sigma 3 + graphology) que renderiza o `{nodes,links}` recebido.
+- `src/cnpj-datasets.ts`: configuração de datasets/cores usada tanto pelo cliente (coloração dos nós) quanto pelo gerador.
+- `scripts/generate-static-entities.ts`: **único** lugar que fala com dados ao vivo. Ranqueia entidades por quantidade de datasets distintos em que aparecem (não por volume de linhas), pré-computa a rede de cada uma no mesmo formato `{nodes,links}` e grava em `static/entities/<id>.json` + `static/entities-index.json`.
+- `scripts/lib/`: camada de acesso a dados usada só pelo gerador (offline) — `duckdb-ssh.ts` (SQL via SSH em `beelink`), `parquet-store.ts` (monta `SELECT`/`WHERE`/`LIMIT` contra as views do catálogo), `cnpj-index.ts` (matching de coluna CNPJ/CPF), `cache.ts` (cache em disco entre execuções do gerador).
+- `data/schemas.json`: catálogo local dataset/tabela → colunas, usado por `scripts/lib/parquet-store.ts`.
 
 ## Estrutura de arquivos
 
-- `src/index.ts`: servidor HTTP, HTML e APIs
-- `src/graph-client.ts`: logica de visualizacao e interacao do grafo
-- `src/cnpj-datasets.ts`: configuracao de datasets e relacoes
-- `src/duckdb-ssh.ts`: execução de SQL remoto via SSH no `duckdb` de `beelink`
-- `src/parquet-store.ts`: construção de SQL sobre as views do catalogo
-- `src/cnpj-index.ts`: matching e lookup por CNPJ nas tabelas do catalogo
-- `src/cache.ts`: cache two-layer — L1 em memória (`Map`) + L2 em disco (`.cache/`)
-- `data/`: `schemas.json` (catalogo de tabelas) e `cnpjs_interesse.csv` (lista curada da landing page)
-- `scripts/`: `generate-static-entities.ts` (top-100 estatico) e `benchmark.ts`
-- `static/`: saida gerada por `generate-static-entities.ts` (`entities/`, `entities-index.json`)
+- `src/`: servidor + cliente de grafo (ver Arquitetura acima)
+- `scripts/`: `generate-static-entities.ts`, `benchmark.ts`, `lib/` (acesso a dados offline)
+- `data/`: `schemas.json` (catálogo de tabelas)
+- `static/`: saída gerada por `generate-static-entities.ts` (`entities/`, `entities-index.json`) — o que o servidor realmente serve
 - `public/graph.js`: bundle browser gerado a partir de `src/graph-client.ts`
-- `tests/`: testes unitarios (`bun test`)
+- `tests/`: testes unitários (`bun test`)
 
 ## Licenca
 

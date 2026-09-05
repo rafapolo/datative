@@ -1912,6 +1912,7 @@ async function init() {
 
   // Group socios under a "Sócios" hub node instead of direct empresa→socio edges
   const socioNodes = data.nodes.filter((n) => n.type === "socio");
+  const socioIds = new Set(socioNodes.map((n) => n.id));
   if (socioNodes.length > 0) {
     const socioGroupId = `group:${rootId}:socios`;
     ensureGroupNode(graph, socioGroupId, "Sócios", NODE_COLORS.socio, rootId);
@@ -1922,17 +1923,23 @@ async function init() {
         graph.addEdge(socioGroupId, n.id, edgeAttrs());
       }
     }
-  } else {
-    // No socios — keep original links (e.g. empresa→empresa for expanded nodes)
-    for (const l of data.links) {
-      knownLinkKeys.add(`${l.source}→${l.target}`);
-      if (
-        graph.hasNode(l.source) &&
-        graph.hasNode(l.target) &&
-        !graph.hasEdge(l.source, l.target)
-      ) {
-        graph.addEdge(l.source, l.target, edgeAttrs());
-      }
+  }
+  // Every other link (cross-dataset edges, empresa→empresa for expanded nodes,
+  // etc.) — skip ones already represented via the sócios group above. This
+  // used to be an else-branch that only ran when there were zero sócios,
+  // which silently dropped every non-sócio edge whenever a company had at
+  // least one partner (the precomputed static graphs always bake in every
+  // cross-dataset hit alongside sócios, unlike the old live-query payload
+  // which only ever contained empresa+sócios up front).
+  for (const l of data.links) {
+    if (socioIds.has(l.source) || socioIds.has(l.target)) continue;
+    knownLinkKeys.add(`${l.source}→${l.target}`);
+    if (
+      graph.hasNode(l.source) &&
+      graph.hasNode(l.target) &&
+      !graph.hasEdge(l.source, l.target)
+    ) {
+      graph.addEdge(l.source, l.target, edgeAttrs());
     }
   }
 

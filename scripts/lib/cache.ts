@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve } from "path";
 
-const CACHE_DIR = resolve(import.meta.dir, "../.cache");
+const CACHE_DIR = resolve(import.meta.dir, "../../.cache");
 const TTL_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
 
 interface CacheEntry<T> {

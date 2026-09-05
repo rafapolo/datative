@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { execRemoteSQL, warmUpSSH } from "./duckdb-ssh";
 
-const SCHEMAS_PATH = resolve(import.meta.dir, "../data/schemas.json");
+const SCHEMAS_PATH = resolve(import.meta.dir, "../../data/schemas.json");
 
 function log(...args: unknown[]) {
   const ts = new Date().toISOString().slice(11, 23);

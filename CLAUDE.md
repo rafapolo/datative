@@ -5,89 +5,71 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-bun run dev    # development with hot-reload
-bun run start  # production
-bun test       # run tests
-bun run typecheck  # TypeScript check
+bun run dev             # development with hot-reload (static server, no SSH)
+bun run start           # production
+bun run build:graph     # rebuild public/graph.js from src/graph-client.ts
+bun run generate:static # regenerate static/ from beelink (the only thing that talks to live data)
+bun test                # run tests
+bun run typecheck       # TypeScript check
 ```
 
-No build step — Bun JIT-compiles TypeScript directly.
+No build step for the server — Bun JIT-compiles TypeScript directly. `public/graph.js` is the one artifact that needs an explicit rebuild.
 
 ## Repo layout
 
-- `src/`: all server/client TypeScript modules (see Key files below)
-- `data/`: `schemas.json` (table catalog) and `cnpjs_interesse.csv` (curated landing-page list)
-- `scripts/`: `generate-static-entities.ts` (top-100 static precompute) and `benchmark.ts`
-- `static/`: output of `generate-static-entities.ts` — `entities/<id>.json` + `entities-index.json`
-- `tests/`: `bun test` suite
-- `public/`: `graph.js`, the built browser bundle
+- `src/`: the running app — pure static file server + browser graph client. No SSH/DuckDB dependency.
+- `scripts/`: offline generation only. `generate-static-entities.ts` (the top-N static precompute) and `benchmark.ts`; `lib/` holds the SSH/DuckDB query layer (`duckdb-ssh.ts`, `parquet-store.ts`, `cnpj-index.ts`, `cache.ts`) used only by these scripts, never imported by `src/`.
+- `data/schemas.json`: table catalog (dataset.table → columns), read by `scripts/lib/parquet-store.ts`.
+- `static/`: output of `generate-static-entities.ts` — `entities/<id>.json` (one `{nodes,links}` network per entity) + `entities-index.json` (manifest). This is what `src/index.ts` actually serves.
+- `tests/`: `bun test` suite.
+- `public/graph.js`: built browser bundle.
 
 ## Architecture
 
-**`src/index.ts`** (~1350 lines) — HTTP server, HTML rendering, all API handlers.
+**The app is a fully static site.** `src/index.ts` (~350 lines) never queries live data — every route either serves a hardcoded HTML shell or reads a file under `static/`. All live querying happens offline, in `scripts/generate-static-entities.ts`, run manually/periodically against beelink.
 
-**Request flow:** `GET /` → parse CNPJ → `queryEmpresa()` + `querySocios()` → SSH DuckDB → render graph page
+**Request flow (live app):** `GET /` → render landing page from `static/entities-index.json` → click an entity → `GET /?cnpj=<id>` renders the graph shell → browser fetches `GET /api/graph/:id` → server does `readFileSync(static/entities/<id>.json)` and returns it verbatim. No route exists for an arbitrary/uncomputed CNPJ — `/api/graph/:id` 404s if the file isn't there.
 
-**Data source:** `basedosdados.duckdb` on a remote host (`polo@beelink`), queried by piping SQL over SSH into the remote `duckdb` CLI (`duckdb-ssh.ts`). This is the same DuckDB catalog the sibling `../rodado` project mirrors and extends (233 datasets / 1029 tables as of 2026-09) — `../rodado/docs/context/bridges.yaml` is the canonical source for which tables share a CNPJ/CPF join key (`bridges.yaml`'s `identity` category) and how dirty each one's column is (punctuation, missing leading zeros). Each dataset/table is a view in that catalog over local parquet files on beelink. Table/column catalog mirrored in `data/schemas.json`.
+**Key files:**
+- `src/index.ts`: `Bun.serve` — landing page, graph page shell, `/api/graph/:id` (reads `static/`), favicon, `graph.js` static serving. That's the entire route table.
+- `src/graph-client.ts` + `src/node-shape-programs.ts`: browser bundle (Sigma 3 + graphology) that renders whatever `{nodes,links}` JSON it's given. Rebuild with `bun run build:graph`.
+- `src/cnpj-datasets.ts`: dataset configs (id, label, color, table, CNPJ/CPF columns, node type, `relatedLookups`) — 40+ entries. Shared by the client (node coloring via `window.__DATASET_COLORS`) and by the generator (which tables to scan/join). No SSH dependency itself — pure config.
 
-**Key files (all under `src/`):**
-- `index.ts`: HTTP server (`Bun.serve`), HTML renderers, query functions
-- `duckdb-ssh.ts`: `execRemoteSQL()` — spawns `ssh` (multiplexed via `ControlMaster`) piping SQL into `duckdb -readonly -json` on beelink, parses JSON stdout
-- `parquet-store.ts`: builds SQL (`SELECT`/`WHERE`/`LIMIT`) against `"dataset"."table"` views, executes via `duckdb-ssh.ts`; `queryParquetDataset()` async generator
-- `cnpj-index.ts`: CNPJ-aware lookup (`queryByCnpj`) across any dataset
-- `cnpj-datasets.ts`: dataset configs — 40+ datasets with CNPJ columns + graph node types
-- `cache.ts`: disk-backed cache (`.cache/`, 5-day TTL) in front of every remote query
-- `graph-client.ts`: browser bundle (Sigma 3 + graphology); rebuild with `bun run build:graph` (`bun build src/graph-client.ts --outfile public/graph.js --target browser`)
+**Note:** `graph-client.ts` still contains click-to-expand UI wired to the old `/api/lookup/*` endpoints (removed). Those calls now 404 harmlessly (the panel just shows nothing) since the precomputed JSON already bakes in all cross-dataset nodes/links at generation time — expanding further live is no longer possible by design. A follow-up pass could strip that dead code from the bundle; not done yet.
 
-`data/schemas.json`: table catalog — 544 tables with column schemas (path field is a legacy S3 remnant, unused for querying; entries added by hand for `../rodado`-only tables use a `rodado://` placeholder path).
+**Stack:** TypeScript (strict) · Bun runtime · Sigma 3 · server-rendered HTML shell + static JSON · Portuguese UI.
 
-**Stack:** TypeScript (strict) · Bun runtime · DuckDB via SSH CLI · Sigma 3 · server-rendered HTML · Portuguese UI
+## Static top-N generator — `scripts/generate-static-entities.ts`
 
-## Static top-100 precompute
+`bun run generate:static` (flags: `--top=100`, `--per-dataset-limit=15`, `--concurrency=6`, `--query-timeout-ms=60000`, `--max-distinct=1000000`, `--force`) is the **only** thing in this repo that talks to beelink. Two passes:
 
-`scripts/generate-static-entities.ts` (`bun run generate:static`) ranks CNPJ/CPF entities by how many **distinct** CNPJ_DATASETS tables they appear in at least once (breadth, not raw row count — a mega-corp dominating one dataset ranks below an entity spread across several), then precomputes each of the top N entities' `{nodes,links}` network (same shape as `/api/graph/:cnpj`) into `static/entities/<id>.json`, plus a manifest at `static/entities-index.json`. Goal: publish this as a static site (e.g. GitHub Pages) with no live server / SSH-to-beelink at request time, for the highest-signal entities; arbitrary-CNPJ lookup still goes through the live SSH path.
+1. **Rank** — for every CNPJ/CPF column in every `CNPJ_DATASETS` entry, run `SELECT DISTINCT <entity-key>` against beelink and accumulate, per entity, the set of distinct tables it appears in at least once. Rank by that **count of distinct datasets** (breadth), not raw row/edge count — a mega-corp dominating one dataset (e.g. huge PGFN dívida ativa volume) ranks below an entity spread across several different datasets, which makes a more varied, more interesting graph even with fewer total edges. This was a deliberate correction mid-project away from raw-degree ranking.
+2. **Build** — for each of the top N entities, fetch its base edges (empresa+sócios, or sócio→companies for a person) plus every cross-dataset hit, and write `static/entities/<id>.json` in the same `{nodes,links}` shape the old `/api/graph/:cnpj` endpoint used to return, plus a summary row in `static/entities-index.json`.
 
-Deliberately excludes `br_me_cnpj.empresas`/`socios`/`estabelecimentos` from the *ranking* scan — those are Receita's own full-history, undeduped base tables (tens of millions of distinct values), so every company appears in them trivially (no ranking signal) and a `SELECT DISTINCT` over them is too large to ship over SSH as JSON. They're still queried per-entity (cheap, targeted) when building each top pick's actual network. Each remote query is wrapped in a timeout (`--query-timeout-ms`, default 60000) since a hung SSH child can't be cancelled, only given up on locally.
+**Two cardinality traps hit and fixed while building this** (both apply to any future change to the ranking pass):
+- **Exclude `br_me_cnpj.empresas`/`socios`/`estabelecimentos` from the ranking scan.** These are Receita's own full-history, undeduped base tables — every company appears in them trivially (no ranking signal), and each holds tens of millions of distinct values. They're still queried per-entity (cheap, targeted `WHERE cnpj_basico = X`) when building each top pick's actual network — just never full-scanned for ranking.
+- **A `COUNT(DISTINCT ...)` pre-check gates the full `SELECT DISTINCT` fetch** (skip above `--max-distinct`, default 1,000,000). Found live: `br_pgfn_dividaativa.divida` (tens of millions of CPF/CNPJ debtors) hung the process for minutes even with a query timeout in place — **a timeout can't help here**, because the SSH child had already closed and returned its full payload; the hang was a single synchronous `JSON.parse` call blocking the whole (single-threaded) event loop, which a `setTimeout` can never preempt. The only fix is to not fetch the giant payload in the first place.
 
-## SSH DuckDB Notes
+Entities in `--per-dataset-limit`-bounded cross-dataset lookups have no such cardinality problem (targeted point lookups, not full-table scans), so those still run against the big tables when building an individual entity's network.
 
-Queries run by piping SQL over SSH into the remote `duckdb` CLI (see `duckdb-ssh.ts`):
+## SSH DuckDB (offline generator only — `scripts/lib/`)
+
+Queries run by piping SQL over SSH into the remote `duckdb` CLI (`scripts/lib/duckdb-ssh.ts`):
 
 ```
 ssh -o ControlMaster=auto -o ControlPath=... -o ControlPersist=10m polo@beelink \
   '~/.local/bin/duckdb -readonly -json ~/rodado/basedosdados.duckdb'
 ```
 
-The default path used to point at `~/baseldosdados-data/basedosdados.duckdb`, a leftover from the S3-era layout that no longer exists on beelink at all — every query was failing until this was repointed at `~/rodado/basedosdados.duckdb` (2026-09-05), the same file `../rodado` mirrors and queries.
+This is the same DuckDB catalog the sibling `../rodado` project mirrors and extends (233 datasets / 1029 tables as of 2026-09) — `../rodado/docs/context/bridges.yaml` is the canonical source for which tables share a CNPJ/CPF join key (`bridges.yaml`'s `identity` category) and how dirty each one's column is (punctuation, missing leading zeros).
+
+The default path used to point at `~/baseldosdados-data/basedosdados.duckdb`, a leftover from an old S3-era layout that no longer exists on beelink at all — every query was failing until this was repointed at `~/rodado/basedosdados.duckdb` (2026-09-05), the same file `../rodado` mirrors and queries.
 
 SQL is written to the process's stdin (avoids shell-escaping the query) and the JSON array on stdout is parsed as the row set. `ControlMaster`/`ControlPersist` reuse one multiplexed SSH connection across all queries so only the remote `duckdb` process spawn is paid per query, not a fresh handshake.
 
-**`-readonly` is required**: without it, each `duckdb <file>` invocation takes an exclusive lock on `basedosdados.duckdb`, so any two concurrent queries (e.g. the `Promise.all` in `/api/graph/:cnpj`) fail with a lock-conflict error.
+**`-readonly` is required**: without it, each `duckdb <file>` invocation takes an exclusive lock on the database, so any two concurrent queries fail with a lock-conflict error.
 
 Env overrides: `DUCKDB_SSH_USER`, `DUCKDB_SSH_HOST`, `DUCKDB_REMOTE_PATH`, `DUCKDB_REMOTE_BIN`, `DUCKDB_SSH_CONTROL_PATH`. Requires SSH key-based (`BatchMode`) access to the host — see `~/.ssh/config` for the `beelink` alias.
-
-**Clustered-by-cnpj layout (critical for lookup speed):** the `br_me_cnpj` tables are the point-lookup hot path (`WHERE cnpj_basico = X`). The original parquet was flat, unsorted files with one row group each, so a point lookup scanned ~87% of every file (empresas lookup ≈ 7.5s). They are now rewritten **partitioned by `substr(cnpj_basico,1,2)`** (100 buckets) under `<table>_part/cnpj_p=NN/`. Because each partition file holds a disjoint `cnpj_basico` range, DuckDB's row-group min/max stats prune a plain `WHERE cnpj_basico = X` down to the single matching file — **no `cnpj_p` predicate needed in queries** (empresas lookup ≈ 0.3s, ~25× faster).
-
-The views hide the partition column so the app schema is unchanged:
-```sql
-CREATE OR REPLACE VIEW br_me_cnpj.empresas AS
-  SELECT * EXCLUDE (cnpj_p)
-  FROM read_parquet('.../br_me_cnpj/empresas_part/**/*.parquet', hive_partitioning=true);
-```
-To rebuild a table's clustered layout (out-of-core, no global sort — cheap partitioned write):
-```sql
-COPY (SELECT *, substr(cnpj_basico,1,2) AS cnpj_p FROM read_parquet('.../<table>/*.parquet'))
-TO '.../<table>_part' (FORMAT parquet, PARTITION_BY (cnpj_p), COMPRESSION zstd, OVERWRITE_OR_IGNORE);
-```
-Use `COMPRESSION zstd` (default SNAPPY bloated empresas 46GB→67GB; ZSTD keeps size ~parity).
-
-**`empresas` is deduped to one row per cnpj_basico.** The raw table was ~2.4B rows but only ~64M distinct cnpj (~38× monthly-snapshot duplication). It is now `empresas_dedup/` (partitioned by `cnpj_p`): one row per cnpj holding the **latest** snapshot's scalar fields (via `arg_max(col, ano*100+mes)`) plus an `anos BIGINT[]` array of every year the company appeared. 46G → ~1.2G; lookup ~0.006s, browse ~0.5s, `razao_social LIKE` search ~1.6s (all were 2–26s before). The view hides `cnpj_p`; the app sees the original columns + `anos`.
-
-Because there's no per-snapshot `ano` column to filter anymore, the `/table` year browse uses `list_contains("anos", Y)` ("companies present in year Y", returning their latest row) — see `queryCompanies` in `src/index.ts`. `socios`/`estabelecimentos`/`simples` are **not** deduped (kept full-history clustered) — deduping `socios` would drop former partners from the graph, and `estabelecimentos` holds the `situacao_cadastral` status timeline.
-
-The build hit OOM as a single `GROUP BY` over 2.4B rows (the `list(DISTINCT …)` aggregate can't spill); the working recipe is a **per-partition loop** (`~/dedup_empresas_loop.sh` on beelink) — dedup each `cnpj_p=NN` bucket separately (~24M rows, trivial memory), writing `empresas_dedup/cnpj_p=NN/data.parquet`.
-
-**Graph hot path batches its two queries:** `/api/graph/:cnpj` uses `queryGraphData()`, which fetches empresa + socios in **one** remote duckdb process via `execRemoteSQLMulti()` (one SSH spawn / one DB open) instead of two, honoring the same per-entity caches.
 
 **br_me_cnpj join key:** `cnpj_basico` (8-digit root) links all tables:
 
@@ -98,9 +80,7 @@ The build hit OOM as a single `GROUP BY` over 2.4B rows (the `list(DISTINCT …)
 | `socios` | `cnpj_basico`, `nome`, `documento`, `ano`, `mes` |
 | `simples` | `cnpj_basico`, `opcao_simples`, `opcao_mei` |
 
-**Full CNPJ** = `cnpj_basico` (8) + `cnpj_ordem` (4) + `cnpj_dv` (2). For cross-dataset joins on `cpf_cnpj_*` columns, filter by string length to exclude CPFs (11 digits).
-
-Key joinable datasets: `br_cgu_licitacao_contrato`, `br_cgu_cartao_pagamento`, `br_tse_eleicoes`, `br_me_exportadoras_importadoras`, `br_ms_cnes`, `br_rf_arrecadacao`.
+**Full CNPJ** = `cnpj_basico` (8) + `cnpj_ordem` (4) + `cnpj_dv` (2). For cross-dataset joins on `cpf_cnpj_*` columns, filter/branch by string length to distinguish CPFs (11 digits) from CNPJs (14 digits).
 
 ## Dirty CNPJ/CPF columns — `CnpjColumn.normalize`
 
@@ -109,10 +89,10 @@ Not every mirrored table stores CNPJ as a clean 14-digit string. `../rodado/docs
 - **Numeric, drops leading zeros**: `br_brasilio_holdings.holdings.cnpj`/`cnpj_socia` are `BIGINT`
 - **Missing leading zeros in an otherwise-clean string**: some `br_mjsp_ckan.procon.NumeroCNPJ` rows
 
-Set `normalize: true` on the `CnpjColumn` entry in `src/cnpj-datasets.ts` for these. `buildCnpjRawWhere` in `src/cnpj-index.ts` then applies `regexp_replace(CAST(col AS VARCHAR), '[^0-9]', '', 'g')` before matching, and for `type: "full"` columns also `lpad(..., 14, '0')` — guarded by a `<> ''` check, since `lpad('', 14, '0')` is 14 zeros and would otherwise spuriously match CNPJ roots like Banco do Brasil's `"00000000"` against blank source values (found live via smoke test against `br_cvm_fundos.fundos.CNPJ_ADMIN`, mostly blank).
+Set `normalize: true` on the `CnpjColumn` entry in `src/cnpj-datasets.ts` for these. `buildCnpjRawWhere` in `scripts/lib/cnpj-index.ts` then applies `regexp_replace(CAST(col AS VARCHAR), '[^0-9]', '', 'g')` before matching, and for `type: "full"` columns also `lpad(..., 14, '0')` — guarded by a `<> ''` check, since `lpad('', 14, '0')` is 14 zeros and would otherwise spuriously match CNPJ roots like Banco do Brasil's `"00000000"` against blank source values.
 
 **`br_brasilio_holdings.holdings`** (company-owns-company edges, not a company-to-record join like the rest) is wired as two dataset entries reading the same table from opposite columns: `brasilio_participacoes` (searched company's `cnpj` column → shows who owns it) and `brasilio_subsidiarias` (searched company's `cnpj_socia` column → shows what it owns). Both use `nodeType: "empresa"` so ownership chains render with the same styling as the primary company node — note the resulting node id is the raw (possibly zero-stripped) numeric CNPJ, so it won't always dedupe against a same-company node reached elsewhere in the graph via a properly zero-padded id.
 
 **Deferred:** `global_icij_offshoreleaks.entities` (ICIJ Offshore Leaks) is in `bridges.yaml`'s identity bridges but joins by fuzzy name match against `razao_social`, not a CNPJ column — it doesn't fit the `CnpjColumn`/prefix-match model and needs its own matching path. Not wired in yet.
 
-When adding a table found only in `../rodado` (not yet in `data/schemas.json`), fetch its schema directly rather than trusting `information_schema.columns` (a query across all 233 datasets there currently throws `Invalid Input Error: Invalid unicode` on some unrelated table's metadata) — use `DESCRIBE SELECT * FROM dataset.table LIMIT 0;` per table instead, then append a matching entry to `data/schemas.json`'s `tables` map (`tableExists()`/`getTableColumns()` in `src/parquet-store.ts` gate every query on that file).
+When adding a table found only in `../rodado` (not yet in `data/schemas.json`), fetch its schema directly rather than trusting `information_schema.columns` (a query across all 233 datasets there currently throws `Invalid Input Error: Invalid unicode` on some unrelated table's metadata) — use `DESCRIBE SELECT * FROM dataset.table LIMIT 0;` per table instead, then append a matching entry to `data/schemas.json`'s `tables` map (`tableExists()`/`getTableColumns()` in `scripts/lib/parquet-store.ts` gate every query on that file).

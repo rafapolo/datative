@@ -18,12 +18,14 @@ var __toESM = (mod, isNodeMode, target) => {
   }
   target = mod != null ? __create(__getProtoOf(mod)) : {};
   const to = isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
-  for (let key of __getOwnPropNames(mod))
-    if (!__hasOwnProp.call(to, key))
-      __defProp(to, key, {
-        get: __accessProp.bind(mod, key),
-        enumerable: true
-      });
+  if (mod && typeof mod === "object" || typeof mod === "function") {
+    for (let key of __getOwnPropNames(mod))
+      if (!__hasOwnProp.call(to, key))
+        __defProp(to, key, {
+          get: __accessProp.bind(mod, key),
+          enumerable: true
+        });
+  }
   if (canCache)
     cache.set(mod, to);
   return to;
@@ -31,14 +33,14 @@ var __toESM = (mod, isNodeMode, target) => {
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
 
 // node_modules/graphology-utils/is-graph.js
-var require_is_graph = __commonJS((exports, module) => {
+var require_is_graph = __commonJS(function(exports, module) {
   module.exports = function isGraph(value) {
     return value !== null && typeof value === "object" && typeof value.addUndirectedEdgeWithKey === "function" && typeof value.dropNode === "function" && typeof value.multi === "boolean";
   };
 });
 
 // node_modules/graphology-utils/getters.js
-var require_getters = __commonJS((exports) => {
+var require_getters = __commonJS(function(exports) {
   function coerceWeight(value) {
     if (typeof value !== "number" || isNaN(value))
       return 1;
@@ -142,7 +144,7 @@ var require_getters = __commonJS((exports) => {
 });
 
 // node_modules/graphology-layout-forceatlas2/iterate.js
-var require_iterate = __commonJS((exports, module) => {
+var require_iterate = __commonJS(function(exports, module) {
   var NODE_X = 0;
   var NODE_Y = 1;
   var NODE_DX = 2;
@@ -548,7 +550,7 @@ var require_iterate = __commonJS((exports, module) => {
 });
 
 // node_modules/graphology-layout-forceatlas2/helpers.js
-var require_helpers = __commonJS((exports) => {
+var require_helpers = __commonJS(function(exports) {
   var PPN = 10;
   var PPE = 3;
   exports.assign = function(target) {
@@ -678,7 +680,7 @@ var require_helpers = __commonJS((exports) => {
 });
 
 // node_modules/graphology-layout-forceatlas2/defaults.js
-var require_defaults = __commonJS((exports, module) => {
+var require_defaults = __commonJS(function(exports, module) {
   module.exports = {
     linLogMode: false,
     outboundAttractionDistribution: false,
@@ -694,7 +696,7 @@ var require_defaults = __commonJS((exports, module) => {
 });
 
 // node_modules/graphology-layout-forceatlas2/index.js
-var require_graphology_layout_forceatlas2 = __commonJS((exports, module) => {
+var require_graphology_layout_forceatlas2 = __commonJS(function(exports, module) {
   var isGraph2 = require_is_graph();
   var createEdgeWeightGetter = require_getters().createEdgeWeightGetter;
   var iterate = require_iterate();
@@ -4545,7 +4547,7 @@ function getPixelColor(gl, frameBuffer, x, y, pixelRatio, downSizingRatio) {
   return [r, g, b, a];
 }
 
-// node_modules/sigma/dist/index-236c62ad.esm.js
+// node_modules/sigma/dist/index-fad77a13.esm.js
 function _defineProperty(e, r, t) {
   return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
     value: t,
@@ -4640,8 +4642,9 @@ function loadProgram(gl, shaders) {
   gl.linkProgram(program);
   var successfullyLinked = gl.getProgramParameter(program, gl.LINK_STATUS);
   if (!successfullyLinked) {
+    var info = gl.getProgramInfoLog(program);
     gl.deleteProgram(program);
-    throw new Error("loadProgram: error while linking the program.");
+    throw new Error("loadProgram: error while linking the program: ".concat(info));
   }
   return program;
 }
@@ -9539,7 +9542,7 @@ var EdgeCurvedDoubleArrowProgram = createEdgeCurveProgram({
   })
 });
 
-// graph-client.ts
+// src/graph-client.ts
 var import_graphology_layout_forceatlas2 = __toESM(require_graphology_layout_forceatlas2(), 1);
 var EMPRESA_COLORS = [
   "#4a72a0",
@@ -11046,6 +11049,7 @@ async function init() {
     }));
   }
   const socioNodes = data.nodes.filter((n2) => n2.type === "socio");
+  const socioIds = new Set(socioNodes.map((n2) => n2.id));
   if (socioNodes.length > 0) {
     const socioGroupId = `group:${rootId}:socios`;
     ensureGroupNode(graph, socioGroupId, "Sócios", NODE_COLORS.socio, rootId);
@@ -11056,12 +11060,13 @@ async function init() {
         graph.addEdge(socioGroupId, n2.id, edgeAttrs());
       }
     }
-  } else {
-    for (const l2 of data.links) {
-      knownLinkKeys.add(`${l2.source}→${l2.target}`);
-      if (graph.hasNode(l2.source) && graph.hasNode(l2.target) && !graph.hasEdge(l2.source, l2.target)) {
-        graph.addEdge(l2.source, l2.target, edgeAttrs());
-      }
+  }
+  for (const l2 of data.links) {
+    if (socioIds.has(l2.source) || socioIds.has(l2.target))
+      continue;
+    knownLinkKeys.add(`${l2.source}→${l2.target}`);
+    if (graph.hasNode(l2.source) && graph.hasNode(l2.target) && !graph.hasEdge(l2.source, l2.target)) {
+      graph.addEdge(l2.source, l2.target, edgeAttrs());
     }
   }
   renderer = new Sigma(graph, container, {

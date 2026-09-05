@@ -22,9 +22,9 @@
  */
 import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import { execRemoteSQL } from "../src/duckdb-ssh";
-import { buildSelectSQL } from "../src/parquet-store";
-import { extractCnpjRoot, socioNodeId, isMaskedDocument } from "../src/cnpj-index";
+import { execRemoteSQL } from "./lib/duckdb-ssh";
+import { buildSelectSQL } from "./lib/parquet-store";
+import { extractCnpjRoot, socioNodeId, isMaskedDocument } from "./lib/cnpj-index";
 import { CNPJ_DATASETS, type CnpjColumn, type CnpjDatasetEntry } from "../src/cnpj-datasets";
 
 function log(...args: unknown[]) {
@@ -113,6 +113,20 @@ function buildDistinctSQL(src: EntitySource): string {
     WHERE ${keyExpr} IS NOT NULL;`;
 }
 
+function buildCountDistinctSQL(src: EntitySource): string {
+  const { keyExpr } = entityKeyExpr(src.column);
+  const [dataset, table] = src.tableKey.split(".");
+  return `SELECT COUNT(DISTINCT ${keyExpr}) AS n FROM "${dataset}"."${table}";`;
+}
+
+// A JSON payload of N distinct values is transferred over SSH AND parsed by a
+// single synchronous JSON.parse call — a timeout can't preempt that (JS is
+// single-threaded), so a high-cardinality table (e.g. PGFN dívida ativa, tens
+// of millions of distinct debtors) hangs the whole process for minutes with no
+// way to cancel it. Check cardinality cheaply first and skip the full fetch
+// above this ceiling instead of risking that hang.
+const MAX_DISTINCT_VALUES = parseInt(args["max-distinct"] ?? "1000000", 10);
+
 const QUERY_TIMEOUT_MS = parseInt(args["query-timeout-ms"] ?? "60000", 10);
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -153,10 +167,22 @@ async function rankEntities(): Promise<EntityRank[]> {
 
   log("ranking pass", { sources: sources.length, concurrency: CONCURRENCY });
   await pMap(sources, CONCURRENCY, async (src, i) => {
-    const sql = buildDistinctSQL(src);
+    const label = `${src.tableKey}.${src.column.name}`;
     const t0 = Date.now();
     try {
-      const rows = await withTimeout(execRemoteSQL(sql), QUERY_TIMEOUT_MS, `${src.tableKey}.${src.column.name}`);
+      const countRows = await withTimeout(execRemoteSQL(buildCountDistinctSQL(src)), QUERY_TIMEOUT_MS, `count ${label}`);
+      const distinctCount = Number(countRows[0]?.n ?? 0);
+      if (distinctCount > MAX_DISTINCT_VALUES) {
+        log(`[${i + 1}/${sources.length}] SKIP (too high cardinality)`, label, { distinctCount });
+        return;
+      }
+    } catch (err) {
+      log(`[${i + 1}/${sources.length}] FAILED (count)`, label, String(err).slice(0, 200));
+      return;
+    }
+    const sql = buildDistinctSQL(src);
+    try {
+      const rows = await withTimeout(execRemoteSQL(sql), QUERY_TIMEOUT_MS, label);
       for (const row of rows) {
         const id = String(row.entity_id ?? "");
         const type = row.entity_type as EntityType | null;

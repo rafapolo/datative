@@ -1,446 +1,37 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { CNPJ_DATASETS, RELATED_DATASETS } from "./cnpj-datasets";
-import { getCache, setCache } from "./cache";
-import { queryParquetDataset, buildSelectSQL, tableExists, getTableColumns, getBytesReceived, resetBytesReceived, warmUp } from "./parquet-store";
-import { execRemoteSQLMulti } from "./duckdb-ssh";
-import { queryByCnpj, extractCnpjRoot, socioNodeId, DatasetInfo, CnpjColumn } from "./cnpj-index";
 
 function log(...args: unknown[]) {
   const ts = new Date().toISOString().slice(11, 23);
   console.log(`[${ts}]`, ...args);
 }
 
-// --- CNPJs de Interesse ---
-interface CnpjInteresse { cnpj_basico: string; razao_social: string; porte: string }
-
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let cur = "";
-  let inQ = false;
-  for (const ch of line) {
-    if (ch === '"') { inQ = !inQ; }
-    else if (ch === "," && !inQ) { result.push(cur); cur = ""; }
-    else { cur += ch; }
-  }
-  result.push(cur);
-  return result;
-}
-
-function loadCnpjsInteresse(): CnpjInteresse[] {
-  try {
-    const csv = readFileSync(resolve(import.meta.dir, "../data/cnpjs_interesse.csv"), "utf-8");
-    return csv.trim().split("\n").slice(1).filter(Boolean).map((line) => {
-      const [cnpj_basico, razao_social, porte] = parseCsvLine(line);
-      return { cnpj_basico: cnpj_basico.trim(), razao_social: razao_social.trim(), porte: porte.trim() };
-    });
-  } catch { return []; }
-}
-
-const cnpjsInteresse = loadCnpjsInteresse();
-
 // --- Config ---
 const PORT = parseInt(process.env.PORT ?? "3003", 10);
-
 const GRAPH_JS_PATH = resolve(import.meta.dir, "../public/graph.js");
+const STATIC_DIR = resolve(import.meta.dir, "../static");
+const ENTITIES_INDEX_PATH = resolve(STATIC_DIR, "entities-index.json");
 
-const DEFAULT_YEAR = 2023;
-const DEFAULT_LIMIT = 25;
-const LOOKUP_LIMIT_DEFAULT = 10;
-const LOOKUP_CACHE_VERSION = "v3";
-
-interface SessionData {
-  bytesReceived: number;
-}
-
-const sessionData: SessionData = {
-  bytesReceived: 0,
-};
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-// --- Query ---
-interface QueryParams {
-  ano: number;
-  limit: number;
-  offset: number;
-  search: string;
-}
-
-interface Company {
-  cnpj_basico: string;
-  razao_social: string;
-  natureza_juridica: string;
-  qualificacao_responsavel: string;
-  capital_social: number | null;
-  porte: string;
-  ente_federativo: string;
-  ano: number;
-}
-
-async function queryCompanies(params: QueryParams): Promise<{ rows: Company[] }> {
-  const cacheKey = `companies_${params.ano}_${params.limit}_${params.offset}_${params.search.toUpperCase().replace(/\s+/g, "_")}`;
-  const cached = getCache<Company[]>(cacheKey);
-  if (cached) { log("queryCompanies cache hit", { cacheKey }); return { rows: cached }; }
-
-  log("queryCompanies", { params });
-  const t0 = Date.now();
-  const rows: Company[] = [];
-
-  // empresas is deduped to one row per cnpj_basico (latest snapshot) with an
-  // `anos` array of every year the company appeared, so "browse by year" is a
-  // membership test rather than an equality on a per-snapshot ano column.
-  const clauses = [`list_contains("anos", ${params.ano})`];
-  if (params.search) {
-    clauses.push(`UPPER("razao_social") LIKE '%${params.search.toUpperCase().replace(/'/g, "''").replace(/%/g, "\\%").replace(/_/g, "\\_")}%'`);
-  }
-  const rawWhere = clauses.join(" AND ");
-
-  for await (const row of queryParquetDataset("br_me_cnpj", "empresas", {
-    columns: ["cnpj_basico", "razao_social", "natureza_juridica", "qualificacao_responsavel", "capital_social", "porte", "ente_federativo", "ano"],
-    rawWhere,
-    orderBy: '"capital_social" DESC NULLS LAST',
-    limit: params.limit,
-    offset: params.offset,
-  })) {
-    rows.push(row as unknown as Company);
-  }
-
-  setCache(cacheKey, rows);
-  log("queryCompanies done", { rows: rows.length, ms: Date.now() - t0 });
-  return { rows };
-}
-
-interface Socio {
-  nome: string;
-  documento: string | null;
-  qualificacao: string;
-}
-
-// Fetches empresa + socios for the graph in a SINGLE remote duckdb process
-// (one SSH spawn / one DB open instead of two). Honors the same per-entity
-// caches as queryEmpresa/querySocios and only fetches the misses.
-async function queryGraphData(cnpjBasico: string): Promise<{ empresa: Company | null; socios: Socio[] }> {
-  const root = extractCnpjRoot(cnpjBasico);
-  const cachedEmp = getCache<Company | null>(`empresa_${cnpjBasico}`);
-  const cachedSoc = getCache<Socio[]>(`socios_${cnpjBasico}`);
-  const empHit = cachedEmp !== null;   // mirror queryEmpresa: cached null == miss
-  const socHit = cachedSoc !== null;
-
-  if (empHit && socHit) {
-    log("queryGraphData cache hit", { cnpjBasico });
-    return { empresa: cachedEmp, socios: cachedSoc as Socio[] };
-  }
-
-  const kinds: Array<"e" | "s"> = [];
-  const sqls: string[] = [];
-  if (!empHit) {
-    kinds.push("e");
-    sqls.push(buildSelectSQL("br_me_cnpj", "empresas", {
-      columns: ["cnpj_basico", "razao_social", "natureza_juridica", "qualificacao_responsavel", "capital_social", "porte", "ente_federativo", "ano"],
-      filters: { cnpj_basico: root },
-      limit: 5,
-    }));
-  }
-  if (!socHit) {
-    kinds.push("s");
-    sqls.push(buildSelectSQL("br_me_cnpj", "socios", {
-      columns: ["cnpj_basico", "nome", "documento", "qualificacao"],
-      rawWhere: `("cnpj_basico" = '${root}')`,
-      limit: 50,
-    }));
-  }
-
-  log("queryGraphData", { cnpjBasico, fetch: kinds });
-  const t0 = Date.now();
-  const results = await execRemoteSQLMulti(sqls);
-  log("queryGraphData done", { ms: Date.now() - t0 });
-
-  let empresa: Company | null = empHit ? cachedEmp : null;
-  let socios: Socio[] = socHit ? (cachedSoc as Socio[]) : [];
-  results.forEach((rows, i) => {
-    if (kinds[i] === "e") {
-      empresa = (rows[0] as unknown as Company) ?? null;
-      setCache(`empresa_${cnpjBasico}`, empresa);
-    } else {
-      socios = rows.map((r) => ({
-        nome: String(r.nome ?? ""),
-        documento: r.documento != null ? String(r.documento) : null,
-        qualificacao: String(r.qualificacao ?? ""),
-      }));
-      setCache(`socios_${cnpjBasico}`, socios);
-    }
-  });
-  return { empresa, socios };
-}
-
-interface LookupResult {
+// --- Precomputed top-entities index (built by scripts/generate-static-entities.ts) ---
+interface EntityIndexEntry {
   id: string;
+  type: "empresa" | "pessoa";
   label: string;
-  count: number;
-  rows: Record<string, unknown>[];
-  cnpjColumnNames?: string[];
-  nodeType?: string;
-  nodeIdField?: string;
-  nodeLabelField?: string;
-  queryError?: string;
+  datasetCount: number;
+  path: string;
 }
 
-function inferLookupNodeFields(ds: (typeof CNPJ_DATASETS)[number]): {
-  nodeIdField?: string;
-  nodeLabelField?: string;
-} {
-  const available = new Set(ds.displayFields);
-  const tableParts = ds.table.split(".");
-  const schemaCols = tableParts.length === 3 
-    ? (getTableColumns(tableParts[1], tableParts[2]) ?? [])
-    : [];
-
-  const findAvailable = (candidates: string[]): string | undefined =>
-    candidates.find((c) => available.has(c));
-
-  const idCandidates = [
-    ...(ds.nodeIdField ? [ds.nodeIdField] : []),
-    ...ds.cnpjColumns.map((c) => c.name),
-    ...schemaCols.filter((c) => /^id(_|$)/i.test(c)),
-    ...schemaCols.filter((c) => /cnpj|cpf|documento|codigo/i.test(c)),
-    ...ds.displayFields,
-  ];
-  const nodeIdField = findAvailable(idCandidates);
-
-  const labelCandidates = [
-    ...(ds.nodeLabelField ? [ds.nodeLabelField] : []),
-    "nome_fantasia",
-    "nome_razao_social",
-    "razao_social",
-    "nome_fornecedor",
-    "nome_contratado",
-    "nome_favorecido",
-    "nome_doador",
-    "nome_estabelecimento",
-    "nome",
-    "descricao",
-    "objeto",
-    ...schemaCols.filter((c) => /^nome/i.test(c)),
-    ...schemaCols.filter((c) => /descricao|objeto|municipio/i.test(c)),
-    ...(nodeIdField ? [nodeIdField] : []),
-  ];
-  const nodeLabelField = findAvailable(labelCandidates);
-
-  return { nodeIdField, nodeLabelField };
-}
-
-async function queryLookupDataset(
-  cnpjBasico: string,
-  datasetId: string,
-  forceFresh = false,
-  limit = LOOKUP_LIMIT_DEFAULT,
-): Promise<{ result: LookupResult }> {
-  const docDigits = cnpjBasico.replace(/\D/g, "");
-  const cnpjRoot = docDigits.slice(0, 8);
-  if (cnpjRoot.length < 8) {
-    throw new Error("Lookup value must have at least 8 digits.");
-  }
-
-  const ds = CNPJ_DATASETS.find((d) => d.id === datasetId);
-  if (!ds) throw new Error(`Dataset not found: ${datasetId}`);
-
-  const dsKey = `lookup_${LOOKUP_CACHE_VERSION}_${docDigits}_${ds.id}_limit_${limit}`;
-  if (!forceFresh) {
-    const cachedDs = getCache<LookupResult>(dsKey);
-    if (cachedDs) return { result: cachedDs };
-  }
-
-  const tableParts = ds.table.split(".");
-  if (tableParts.length !== 3) {
-    throw new Error(`Invalid table reference: ${ds.table}`);
-  }
-  const dataset = tableParts[1];
-  const table = tableParts[2];
-
-  const inferredFields = inferLookupNodeFields(ds);
-
-  log("queryLookupDataset", { datasetId, cnpjRoot, limit });
-  const t0 = Date.now();
+function loadEntitiesIndex(): EntityIndexEntry[] {
   try {
-    const datasetInfo: DatasetInfo = {
-      dataset,
-      table,
-      cnpjColumns: ds.cnpjColumns as CnpjColumn[],
-      displayFields: ds.displayFields,
-      yearField: ds.yearField,
-    };
-    const rows: Record<string, unknown>[] = [];
-    for await (const row of queryByCnpj(datasetInfo, cnpjRoot, limit)) {
-      rows.push(row);
-    }
-
-    const result: LookupResult = {
-      id: ds.id,
-      label: ds.label,
-      count: rows.length,
-      rows,
-      cnpjColumnNames: ds.cnpjColumns.map((c) => c.name),
-      nodeType: ds.nodeType,
-      nodeIdField: ds.nodeIdField ?? inferredFields.nodeIdField,
-      nodeLabelField: ds.nodeLabelField ?? inferredFields.nodeLabelField,
-      queryError: undefined,
-    };
-    setCache(dsKey, result);
-    log("queryLookupDataset done", { datasetId, rows: rows.length, ms: Date.now() - t0 });
-    return { result };
-  } catch (err) {
-    console.error(`[error] queryLookupDataset ${datasetId}`, err);
-    const queryError = err instanceof Error ? err.message : String(err);
-    const failedResult: LookupResult = {
-      id: ds.id,
-      label: ds.label,
-      count: 0,
-      rows: [],
-      cnpjColumnNames: ds.cnpjColumns.map((c) => c.name),
-      nodeType: ds.nodeType,
-      nodeIdField: ds.nodeIdField ?? inferredFields.nodeIdField,
-      nodeLabelField: ds.nodeLabelField ?? inferredFields.nodeLabelField,
-      queryError,
-    };
-    setCache(dsKey, failedResult);
-    return { result: failedResult };
+    return JSON.parse(readFileSync(ENTITIES_INDEX_PATH, "utf-8")) as EntityIndexEntry[];
+  } catch {
+    return [];
   }
 }
 
-async function queryLookup(
-  cnpjBasico: string,
-  limit = LOOKUP_LIMIT_DEFAULT,
-): Promise<{ results: LookupResult[] }> {
-  const docDigits = cnpjBasico.replace(/\D/g, "");
-  if (docDigits.length < 8) {
-    throw new Error("Lookup value must have at least 8 digits.");
-  }
-
-  const topKey = `lookup_${LOOKUP_CACHE_VERSION}_${docDigits}_limit_${limit}`;
-  const cachedAll = getCache<LookupResult[]>(topKey);
-  if (cachedAll && cachedAll.every((r) => !r.queryError)) return { results: cachedAll };
-
-  const perDatasetCached = CNPJ_DATASETS.map((ds) => {
-    const dsKey = `lookup_${LOOKUP_CACHE_VERSION}_${docDigits}_${ds.id}_limit_${limit}`;
-    return { ds, cached: getCache<LookupResult>(dsKey) };
-  });
-
-  if (perDatasetCached.every(({ cached }) => cached !== null)) {
-    const results = perDatasetCached.map(({ cached }) => cached as LookupResult);
-    setCache(topKey, results);
-    return { results };
-  }
-
-  const jobs = perDatasetCached.map(({ ds, cached }) =>
-    cached
-      ? Promise.resolve({ result: cached })
-      : queryLookupDataset(cnpjBasico, ds.id, false, limit),
-  );
-
-  const settled = await Promise.all(jobs);
-  const results = settled.map((s) => s.result);
-  setCache(topKey, results);
-  return { results };
-}
-
-async function queryByField(
-  datasetId: string,
-  foreignKey: string,
-  value: string,
-  forceFresh = false,
-  limit = LOOKUP_LIMIT_DEFAULT,
-): Promise<{ result: LookupResult }> {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(foreignKey)) {
-    throw new Error(`Invalid foreignKey: ${foreignKey}`);
-  }
-
-  const ds = RELATED_DATASETS.find((d) => d.id === datasetId);
-  if (!ds) throw new Error(`Related dataset not found: ${datasetId}`);
-
-  const cacheKey = `related_${datasetId}_${foreignKey}_${value}_limit_${limit}`;
-  if (!forceFresh) {
-    const cached = getCache<LookupResult>(cacheKey);
-    if (cached) return { result: cached };
-  }
-
-  const tableParts = ds.table.split(".");
-  if (tableParts.length !== 3) {
-    throw new Error(`Invalid table reference: ${ds.table}`);
-  }
-  const dataset = tableParts[1];
-  const table = tableParts[2];
-
-  log("queryByField", { datasetId, foreignKey, value, limit });
-  const t0 = Date.now();
-  try {
-    const rows: Record<string, unknown>[] = [];
-    for await (const row of queryParquetDataset(dataset, table, {
-      columns: ds.displayFields,
-      filters: { [foreignKey]: value },
-      limit,
-    })) {
-      rows.push(row);
-    }
-
-    const result: LookupResult = {
-      id: ds.id,
-      label: ds.label,
-      count: rows.length,
-      rows,
-      cnpjColumnNames: [],
-      nodeType: ds.nodeType,
-      nodeIdField: ds.nodeIdField,
-      nodeLabelField: ds.nodeLabelField,
-    };
-    setCache(cacheKey, result);
-    log("queryByField done", { datasetId, rows: rows.length, ms: Date.now() - t0 });
-    return { result };
-  } catch (err) {
-    console.error(`[error] queryByField ${datasetId}`, err);
-    const queryError = err instanceof Error ? err.message : String(err);
-    const failedResult: LookupResult = {
-      id: ds.id, label: ds.label, count: 0, rows: [],
-      cnpjColumnNames: [], nodeType: ds.nodeType,
-      nodeIdField: ds.nodeIdField, nodeLabelField: ds.nodeLabelField, queryError,
-    };
-    return { result: failedResult };
-  }
-}
-
-function classifyError(err: unknown): { kind: "other"; message: string } {
-  const msg = err instanceof Error ? err.message : String(err);
-  return { kind: "other", message: msg };
-}
-
-function flushS3Bytes(): number {
-  const bytes = getBytesReceived();
-  resetBytesReceived();
-  return bytes;
-}
-
-function parseLookupLimit(value: string | null): number {
-  const parsed = Number(value ?? "");
-  if (!Number.isFinite(parsed)) return LOOKUP_LIMIT_DEFAULT;
-  const normalized = Math.trunc(parsed);
-  if (normalized === 10 || normalized === 20 || normalized === 30 || normalized === 40) {
-    return normalized;
-  }
-  return LOOKUP_LIMIT_DEFAULT;
-}
-
-// --- HTML renderer ---
-const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-
-function formatCapital(val: number | null): string {
-  if (val == null || val === 0) return "—";
-  return brl.format(val);
-}
+const entitiesIndex = loadEntitiesIndex();
+const entitiesById = new Map(entitiesIndex.map((e) => [e.id, e]));
 
 function escHtml(s: string): string {
   return s
@@ -450,178 +41,15 @@ function escHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function buildUrl(base: URLSearchParams, overrides: Record<string, string>): string {
-  const p = new URLSearchParams(base);
-  for (const [k, v] of Object.entries(overrides)) {
-    p.set(k, v);
-  }
-  return "/table?" + p.toString();
-}
-
-function renderPage(
-  params: QueryParams,
-  rows: Company[] | null,
-  error: { kind: "other"; message: string } | null
-): string {
-  const sp = new URLSearchParams({
-    ano: String(params.ano),
-    limit: String(params.limit),
-    offset: String(params.offset),
-    search: params.search,
-  });
-
-  const prevOffset = Math.max(0, params.offset - params.limit);
-  const nextOffset = params.offset + params.limit;
-  const hasPrev = params.offset > 0;
-  const hasNext = rows != null && rows.length === params.limit;
-
-  const tableRows =
-    rows == null
-      ? ""
-      : rows.length === 0
-      ? `<tr><td colspan="7" style="text-align:center;color:#888;padding:2rem">Nenhum resultado encontrado.</td></tr>`
-      : rows
-          .map(
-            (r) => `
-        <tr>
-          <td>${escHtml(r.cnpj_basico ?? "")}</td>
-          <td>${escHtml(r.razao_social ?? "")}</td>
-          <td>${escHtml(r.natureza_juridica ?? "")}</td>
-          <td>${escHtml(r.porte ?? "")}</td>
-          <td class="capital-cell">${formatCapital(r.capital_social)}</td>
-          <td>${escHtml(r.ente_federativo ?? "")}</td>
-          <td>${r.ano ?? ""}</td>
-          <td><a href="/?cnpj=${escHtml(r.cnpj_basico ?? "")}" title="Ver grafo" class="graph-link">⬡</a></td>
-        </tr>`
-          )
-          .join("");
-
-  const errorBanner = error
-    ? `<div class="error other">
-        <strong>Erro:</strong> ${escHtml(error.message)}
-      </div>`
-    : "";
-
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
-  <title>DATATIVE — CNPJ Browser</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #f5f7fa; color: #1a1a2e; }
-    header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-    header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.05em; }
-    header span { font-size: 0.85rem; opacity: 0.6; }
-    main { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem; }
-    .filters { background: #fff; border-radius: 8px; padding: 1rem 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
-    .field { display: flex; flex-direction: column; gap: 0.25rem; }
-    label { font-size: 0.75rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
-    input, select { border: 1px solid #ddd; border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; }
-    input:focus, select:focus { outline: 2px solid #4f46e5; border-color: transparent; }
-    .search-field { flex: 1; min-width: 200px; }
-    .search-field input { width: 100%; }
-    button[type=submit] { background: #4f46e5; color: #fff; border: none; border-radius: 6px; padding: 0.45rem 1.2rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
-    button[type=submit]:hover { background: #4338ca; }
-    .error { border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; font-size: 0.9rem; line-height: 1.6; }
-    .error.auth { background: #fef2f2; border: 1px solid #fca5a5; color: #7f1d1d; }
-    .error.billing { background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; }
-    .error.other { background: #f0f9ff; border: 1px solid #7dd3fc; color: #0c4a6e; }
-    .error code { background: rgba(0,0,0,.06); border-radius: 3px; padding: 0 4px; font-family: monospace; font-size: 0.85em; }
-    .table-wrap { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-    thead th { background: #f8f8ff; position: sticky; top: 0; text-align: left; padding: 0.65rem 1rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #555; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
-    tbody tr:hover { background: #f5f7ff; }
-    tbody td { padding: 0.55rem 1rem; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-    .pagination { display: flex; gap: 0.75rem; align-items: center; justify-content: flex-end; margin-top: 1rem; }
-    .pagination a { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 0.4rem 0.9rem; font-size: 0.85rem; font-weight: 600; color: #4f46e5; text-decoration: none; }
-    .pagination a:hover { background: #4f46e5; color: #fff; border-color: #4f46e5; }
-    .pagination .page-info { font-size: 0.8rem; color: #888; }
-    .graph-link { text-decoration: none; font-size: 1rem; color: #4f46e5; opacity: 0.7; }
-    .graph-link:hover { opacity: 1; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>DATATIVE</h1>
-    <span>CNPJ / Receita Federal · S3 Parquet</span>
-    <span style="margin-left:auto;font-size:0.8rem;opacity:0.85">
-      ${formatBytes(sessionData.bytesReceived)} recebidos nesta sessão
-    </span>
-  </header>
-  <main>
-    <form class="filters" method="GET" action="/table">
-      <div class="field">
-        <label for="ano">Ano</label>
-        <input id="ano" name="ano" type="number" min="2000" max="2030" value="${params.ano}" style="width:90px">
-      </div>
-      <div class="field">
-        <label for="limit">Por página</label>
-        <select id="limit" name="limit">
-          ${[25, 50, 100]
-            .map(
-              (n) =>
-                `<option value="${n}"${n === params.limit ? " selected" : ""}>${n}</option>`
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="field search-field">
-        <label for="search">Razão Social</label>
-        <input id="search" name="search" type="text" placeholder="ex: PETROBRAS" value="${escHtml(params.search)}">
-      </div>
-      <input type="hidden" name="offset" value="0">
-      <button type="submit">Buscar</button>
-    </form>
-
-    ${errorBanner}
-
-    ${
-      rows != null
-        ? `<div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>CNPJ Básico</th>
-            <th>Razão Social</th>
-            <th>Natureza Jurídica</th>
-            <th>Porte</th>
-            <th style="text-align:right">Capital Social</th>
-            <th>Ente Federativo</th>
-            <th>Ano</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
-    </div>
-    <div class="pagination">
-      <span class="page-info">Offset ${params.offset} · ${rows.length} linha(s)</span>
-      ${hasPrev ? `<a href="${buildUrl(sp, { offset: String(prevOffset) })}">← Anterior</a>` : ""}
-      ${hasNext ? `<a href="${buildUrl(sp, { offset: String(nextOffset) })}">Próxima →</a>` : ""}
-    </div>`
-        : ""
-    }
-  </main>
-</body>
-</html>`;
-}
-
-// --- Graph API helper ---
-
 // --- / landing page ---
 function renderGraphLanding(): string {
-  const companyRows = cnpjsInteresse
+  const entityRows = entitiesIndex
     .map(
-      (c) =>
-        `<a href="/?cnpj=${escHtml(c.cnpj_basico)}" class="ci-row">` +
-        `<span class="ci-cnpj">${escHtml(c.cnpj_basico)}</span>` +
-        `<span class="ci-name">${escHtml(c.razao_social)}</span>` +
-        `<span class="ci-porte">${escHtml(c.porte)}</span>` +
+      (e) =>
+        `<a href="/?cnpj=${escHtml(e.id)}" class="ci-row">` +
+        `<span class="ci-cnpj">${escHtml(e.id)}</span>` +
+        `<span class="ci-name">${escHtml(e.label)}</span>` +
+        `<span class="ci-porte">${e.datasetCount} datasets</span>` +
         `</a>`
     )
     .join("");
@@ -640,7 +68,7 @@ function renderGraphLanding(): string {
       --gold: #e8b84b; --text: #e4e4f0; --muted: #6868aa;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
+    html, body { height: 100%; overflow: hidden; }
     body {
       font-family: 'DM Sans', sans-serif;
       background-color: var(--bg);
@@ -672,24 +100,15 @@ function renderGraphLanding(): string {
       color: var(--gold);
       text-decoration: none;
     }
-    .nav-links { display: flex; gap: 1.5rem; }
-    .nav-links a {
-      color: var(--text);
-      text-decoration: none;
-      font-family: 'Space Mono', monospace;
-      font-size: 0.68rem;
-      letter-spacing: 0.1em;
-      opacity: 0.4;
-      transition: opacity 0.15s;
-    }
-    .nav-links a:hover { opacity: 1; }
+    .layout { display: flex; flex: 1; overflow: hidden; min-height: 0; }
     main {
-      flex: 1;
+      flex: 0 0 auto;
       display: flex;
       flex-direction: column;
       justify-content: center;
       padding: 0 3rem 2rem;
-      max-width: 820px;
+      max-width: 580px;
+      min-width: 420px;
     }
     .eyebrow {
       font-family: 'Space Mono', monospace;
@@ -725,47 +144,10 @@ function renderGraphLanding(): string {
       color: var(--muted);
       max-width: 460px;
       line-height: 1.7;
-      margin-bottom: 2.8rem;
+      margin-bottom: 1rem;
       font-weight: 300;
       letter-spacing: 0.01em;
     }
-    .form-label {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 0.22em;
-      color: var(--gold);
-      text-transform: uppercase;
-      margin-bottom: 0.6rem;
-    }
-    .search-row { display: flex; gap: 0; max-width: 440px; }
-    input[name=cnpj] {
-      flex: 1;
-      background: transparent;
-      border: 1px solid var(--border);
-      border-right: none;
-      padding: 0.85rem 1.2rem;
-      font-family: 'Space Mono', monospace;
-      font-size: 1rem;
-      color: var(--text);
-      outline: none;
-      transition: border-color 0.2s;
-      letter-spacing: 0.05em;
-    }
-    input[name=cnpj]:focus { border-color: var(--gold); }
-    input[name=cnpj]::placeholder { color: #2a2a4a; }
-    button[type=submit] {
-      background: var(--gold);
-      color: #06060e;
-      border: none;
-      padding: 0.85rem 2rem;
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 1.1rem;
-      letter-spacing: 0.12em;
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-      white-space: nowrap;
-    }
-    button[type=submit]:hover { background: #f5cc6a; }
     footer {
       padding: 0.9rem 3rem;
       border-top: 1px solid var(--border);
@@ -795,19 +177,6 @@ function renderGraphLanding(): string {
       animation: blink 2.5s ease-in-out infinite;
     }
     @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.2; } }
-    /* landing layout */
-    html, body { height: 100%; overflow: hidden; }
-    .layout { display: flex; flex: 1; overflow: hidden; min-height: 0; }
-    main {
-      flex: 0 0 auto;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 0 3rem 2rem;
-      max-width: 580px;
-      min-width: 420px;
-    }
-    /* companies panel */
     .ci-panel {
       flex: 1;
       border-left: 1px solid var(--border);
@@ -880,9 +249,6 @@ function renderGraphLanding(): string {
 <body>
   <nav>
     <a class="nav-brand" href="/">DATA_</a>
-    <div class="nav-links">
-      <a href="/table">BASE DE DADOS →</a>
-    </div>
   </nav>
   <div class="layout">
     <main>
@@ -892,39 +258,37 @@ function renderGraphLanding(): string {
       </h1>
       <div class="gold-rule"></div>
       <p class="tagline">Cruzamento de CNPJs com bases públicas federais — Receita Federal, CGU, TSE, SIAFI e mais.</p>
-      <p class="form-label">[ cnpj básico ]</p>
-      <form class="search-row" method="GET" action="/">
-        <input name="cnpj" type="text" placeholder="00000000" autocomplete="off" autofocus spellcheck="false" maxlength="14">
-        <button type="submit">BUSCAR</button>
-      </form>
+      <p class="tagline">Entidades pré-computadas, sem consulta ao vivo — clique numa entidade abaixo para ver a rede.</p>
     </main>
     <aside class="ci-panel">
       <div class="ci-panel-header">
-        <span class="ci-panel-label">[ cnpjs de interesse ]</span>
-        <span class="ci-panel-count">${cnpjsInteresse.length} empresas</span>
+        <span class="ci-panel-label">[ maior abrangência entre datasets ]</span>
+        <span class="ci-panel-count">${entitiesIndex.length} entidades</span>
       </div>
       <div class="ci-scroll">
-        ${companyRows}
+        ${entityRows || `<div style="padding:1rem 1.2rem;color:var(--muted);font-size:0.8rem">Nenhuma entidade pré-computada ainda — rode <code>bun run generate:static</code>.</div>`}
       </div>
     </aside>
   </div>
   <footer>
     <span class="footer-copy">DATATIVE · CNPJ GRAPH · BASE DOS DADOS</span>
-    <span class="footer-status"><span class="status-dot"></span> SISTEMA ATIVO</span>
+    <span class="footer-status"><span class="status-dot"></span> ESTÁTICO</span>
   </footer>
 </body>
 </html>`;
 }
 
 // --- /graph HTML page ---
-function renderGraphPage(cnpj: string): string {
+function renderGraphPage(id: string): string {
+  const entity = entitiesById.get(id);
+  const label = entity?.label ?? id;
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
-  <title>DATA_ ${escHtml(cnpj)}</title>
+  <title>DATA_ ${escHtml(label)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap">
   <style>
@@ -1113,9 +477,7 @@ function renderGraphPage(cnpj: string): string {
     <nav class="breadcrumb">
       <a href="/">INÍCIO</a>
       <span class="bc-sep">›</span>
-      <a href="/?cnpj=${escHtml(cnpj)}">${escHtml(cnpj)}</a>
-      <span class="bc-sep">›</span>
-      <span class="bc-current" id="bc-label">GRAFO</span>
+      <span class="bc-current" id="bc-label">${escHtml(label)}</span>
     </nav>
     <div class="control-group">
       <label class="control-label" for="layout-select">Layout</label>
@@ -1126,27 +488,18 @@ function renderGraphPage(cnpj: string): string {
         <option value="forceatlas2">Force Atlas 2</option>
       </select>
     </div>
-    <div class="control-group">
-      <label class="control-label" for="query-limit-select">Limit</label>
-      <select id="query-limit-select" class="query-limit-select">
-        <option value="10">10</option>
-        <option value="20">20</option>
-        <option value="30">30</option>
-        <option value="40">40</option>
-      </select>
-    </div>
   </header>
   <div id="graph-container">
     <div id="loading-overlay">
       <div class="spinner"></div>
-      <span class="loading-text">consultando dados</span>
+      <span class="loading-text">carregando rede</span>
     </div>
   </div>
   <footer>
     <span id="status">Carregando…</span>
     <div class="footer-meta">
       <span id="execution-time">Execução · --:--</span>
-      <span>S3 · ${formatBytes(sessionData.bytesReceived)} recebidos</span>
+      <span>estático</span>
     </div>
   </footer>
   <script>
@@ -1156,13 +509,6 @@ function renderGraphPage(cnpj: string): string {
         ...RELATED_DATASETS.map((d) => [d.id, d.color]),
       ])
     )};
-    window.__DATASET_RELATIONS = ${JSON.stringify(
-      Object.fromEntries(
-        CNPJ_DATASETS
-          .filter((d) => d.relatedLookups?.length)
-          .map((d) => [d.id, d.relatedLookups])
-      )
-    )};
   </script>
   <script src="/graph.js"></script>
 </body>
@@ -1170,7 +516,6 @@ function renderGraphPage(cnpj: string): string {
 }
 
 // --- HTTP server ---
-await warmUp();
 Bun.serve({
   port: PORT,
   idleTimeout: 255,
@@ -1192,169 +537,39 @@ Bun.serve({
           headers: { "Content-Type": "application/javascript; charset=utf-8" },
         });
       } catch {
-        return new Response("graph.js not found — run: bun build src/graph-client.ts --outfile public/graph.js --target browser", { status: 404 });
+        return new Response("graph.js not found — run: bun run build:graph", { status: 404 });
       }
     }
-
-
 
     // Graph page (also root)
     if (url.pathname === "/" || url.pathname === "/graph") {
-      const cnpj = (url.searchParams.get("cnpj") ?? "").trim();
-      if (!cnpj) return new Response(renderGraphLanding(), {
+      const id = (url.searchParams.get("cnpj") ?? "").trim();
+      if (!id) return new Response(renderGraphLanding(), {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
-      return new Response(renderGraphPage(cnpj), {
+      return new Response(renderGraphPage(id), {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
 
-    // Lookup API — cross-dataset CNPJ search
-    // Related dataset lookup by arbitrary key
-    if (url.pathname === "/api/lookup/related") {
-      const datasetId = url.searchParams.get("datasetId") ?? "";
-      const foreignKey = url.searchParams.get("foreignKey") ?? "";
-      const value = url.searchParams.get("value") ?? "";
-      const limit = parseLookupLimit(url.searchParams.get("limit"));
-      if (!datasetId || !foreignKey || !value) {
-        return new Response(JSON.stringify({ error: "Missing datasetId, foreignKey or value" }), {
-          status: 400, headers: { "Content-Type": "application/json" },
-        });
-      }
-      try {
-        const { result } = await queryByField(datasetId, foreignKey, value, false, limit);
-        sessionData.bytesReceived += flushS3Bytes();
-        return new Response(JSON.stringify({ result }), {
-          headers: { "Content-Type": "application/json; charset=utf-8" },
-        });
-      } catch (err) {
-        console.error(`[error] GET ${url.pathname}${url.search}`, err);
-        const e = classifyError(err);
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500, headers: { "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    const lookupDatasetMatch = url.pathname.match(
-      /^\/api\/lookup\/([^/]+)\/dataset\/([^/]+)$/,
-    );
-    if (lookupDatasetMatch) {
-      const cnpj = lookupDatasetMatch[1];
-      const datasetId = decodeURIComponent(lookupDatasetMatch[2]);
-      const fresh = url.searchParams.get("fresh") === "1";
-      const limit = parseLookupLimit(url.searchParams.get("limit"));
-      try {
-        const { result } = await queryLookupDataset(
-          cnpj,
-          datasetId,
-          fresh,
-          limit,
-        );
-        sessionData.bytesReceived += flushS3Bytes();
-        return new Response(JSON.stringify({ cnpj, result }), {
-          headers: { "Content-Type": "application/json; charset=utf-8" },
-        });
-      } catch (err) {
-        console.error(`[error] GET ${url.pathname}`, err);
-        const e = classifyError(err);
-        const status = e.message.startsWith("Dataset not found:") ? 404 : 500;
-        return new Response(JSON.stringify({ error: e.message }), {
-          status,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    // Lookup API — cross-dataset CNPJ search
-    const lookupMatch = url.pathname.match(/^\/api\/lookup\/([^/]+)$/);
-    if (lookupMatch) {
-      const cnpj = lookupMatch[1];
-      const limit = parseLookupLimit(url.searchParams.get("limit"));
-      try {
-        const { results } = await queryLookup(cnpj, limit);
-        sessionData.bytesReceived += flushS3Bytes();
-        return new Response(JSON.stringify({ cnpj, results }), {
-          headers: { "Content-Type": "application/json; charset=utf-8" },
-        });
-      } catch (err) {
-        console.error(`[error] GET ${url.pathname}`, err);
-        const e = classifyError(err);
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    // Graph JSON API
+    // Graph JSON — served straight from the precomputed static file, no live query
     const graphMatch = url.pathname.match(/^\/api\/graph\/([^/]+)$/);
     if (graphMatch) {
-      const cnpj = graphMatch[1];
+      const id = graphMatch[1];
       try {
-        const { empresa, socios } = await queryGraphData(cnpj);
-        sessionData.bytesReceived += flushS3Bytes();
-
-        const nodes: Array<{ id: string; label: string; type: string }> = [];
-        const links: Array<{ source: string; target: string }> = [];
-
-        const companyLabel = empresa?.razao_social ?? cnpj;
-        nodes.push({ id: cnpj, label: companyLabel, type: "empresa" });
-
-        for (const s of socios) {
-          const socioId = socioNodeId(s.documento, cnpj, s.nome);
-          if (!nodes.find((n) => n.id === socioId)) {
-            nodes.push({ id: socioId, label: s.nome || socioId, type: "socio" });
-          }
-          links.push({ source: cnpj, target: socioId });
-        }
-
-        return new Response(JSON.stringify({ nodes, links }), {
+        const json = readFileSync(resolve(STATIC_DIR, "entities", `${id}.json`), "utf-8");
+        return new Response(json, {
           headers: { "Content-Type": "application/json; charset=utf-8" },
         });
-      } catch (err) {
-        console.error(`[error] GET ${url.pathname}`, err);
-        const e = classifyError(err);
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
+      } catch {
+        return new Response(JSON.stringify({ error: "Entidade não pré-computada." }), {
+          status: 404,
           headers: { "Content-Type": "application/json" },
         });
       }
     }
 
-    // Table page
-    if (url.pathname !== "/table") {
-      return new Response("Not found", { status: 404 });
-    }
-
-    const ano = parseInt(url.searchParams.get("ano") ?? String(DEFAULT_YEAR), 10);
-    const limit = parseInt(url.searchParams.get("limit") ?? String(DEFAULT_LIMIT), 10);
-    const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
-    const search = (url.searchParams.get("search") ?? "").trim();
-
-    const params: QueryParams = {
-      ano: isNaN(ano) ? DEFAULT_YEAR : ano,
-      limit: [25, 50, 100].includes(limit) ? limit : DEFAULT_LIMIT,
-      offset: isNaN(offset) || offset < 0 ? 0 : offset,
-      search,
-    };
-
-    let rows: Company[] | null = null;
-    let error: { kind: "other"; message: string } | null = null;
-
-    try {
-      const result = await queryCompanies(params);
-      rows = result.rows;
-      sessionData.bytesReceived += flushS3Bytes();
-    } catch (err) {
-      console.error(`[error] GET ${url.pathname}`, err);
-      error = classifyError(err);
-    }
-
-    const html = renderPage(params, rows, error);
-    return new Response(html, {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+    return new Response("Not found", { status: 404 });
   },
 });
 
