@@ -211,8 +211,8 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
     }
     .ci-panel-count {
       font-family: 'Space Mono', monospace;
-      font-size: 0.58rem;
-      color: #2e2e50;
+      font-size: 0.75rem;
+      color: var(--muted);
       letter-spacing: 0.08em;
     }
     .ci-scroll {

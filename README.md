@@ -23,6 +23,10 @@ Datative é um site estático de investigação que mostra as redes das entidade
 - Sem servidor de dados em tempo de request — `src/index.ts` só lê arquivos estáticos.
 
 
+## Peça a análise de uma nova entidade
+
+O site mostra só as 50 empresas e 50 pessoas com maior abrangência entre datasets — mas você pode pedir que uma entidade específica seja analisada. Para isso, [abra uma issue](https://github.com/rafapolo/datative/issues/new) informando o CNPJ ou CPF (só números) da empresa ou pessoa que você quer ver mapeada, junto com o motivo do interesse. Quando a análise for feita, o grafo dessa entidade é publicado e o link é deixado como comentário na própria issue.
+
 ## Scripts
 
 - `bun run start`: sobe o servidor estático (`src/index.ts`)
