@@ -4,7 +4,7 @@
   <img src="assets/logo.png" alt="Datative Logo" width="200" />
 </div>
 
-Datative é um site estático de investigação que mostra as redes das entidades (CNPJ/CPF) com maior abrangência entre datasets publicos federais — Receita Federal, CGU, TSE, SIAFI e mais. Não há consulta ao vivo: todo o grafo de cada entidade é pré-computado offline e servido como JSON estático. Publicado automaticamente no GitHub Pages a cada push em `main`.
+Datative é um site estático de investigação que mostra as redes das entidades (CNPJ/CPF) com maior abrangência entre datasets publicos federais — Receita Federal, CGU, TSE, SIAFI e mais. Não há consulta ao vivo: todo o grafo de cada entidade é pré-computado offline e servido como JSON estático.
 
 ![Datative Screenshot](assets/datative.png)
 
