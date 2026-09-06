@@ -209,7 +209,14 @@ async function rankEntities(): Promise<EntityRank[]> {
 
 // --- Pass 2: precompute each top entity's network ---
 
-interface GraphNode { id: string; label: string; type: string; datasetId?: string; datasetLabel?: string }
+interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  datasetId?: string;
+  datasetLabel?: string;
+  row?: Record<string, unknown>;
+}
 interface GraphLink { source: string; target: string }
 interface EntityNetwork { nodes: GraphNode[]; links: GraphLink[] }
 
@@ -258,7 +265,7 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
       if (col.type === "full") return `(${notBlank}${padded} LIKE '${cnpjBasico}%')`;
       return `(${notBlank}length(${digits}) = 14 AND ${padded} LIKE '${cnpjBasico}%')`;
     });
-    const columns = [...new Set([idField, labelField, ...ds.cnpjColumns.map((c) => c.name)])];
+    const columns = [...new Set([...ds.displayFields, idField, labelField, ...ds.cnpjColumns.map((c) => c.name)])];
     let rows: Record<string, unknown>[] = [];
     try {
       rows = await withTimeout(
@@ -277,7 +284,7 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
     rows.forEach((row, i) => {
       const nodeId = `${ds.id}:${row[idField] ?? i}`;
       const nodeLabel = String(row[labelField] ?? nodeId);
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label });
+      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row });
       links.push({ source: cnpjBasico, target: nodeId });
     });
   });
@@ -324,7 +331,7 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
       const digits = `regexp_replace(CAST(${raw} AS VARCHAR), '[^0-9]', '', 'g')`;
       return `(${digits} = '${documento}')`;
     });
-    const columns = [...new Set([idField, labelField, ...mixedCols.map((c) => c.name)])];
+    const columns = [...new Set([...ds.displayFields, idField, labelField, ...mixedCols.map((c) => c.name)])];
     let rows: Record<string, unknown>[] = [];
     try {
       rows = await withTimeout(
@@ -343,7 +350,7 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
     rows.forEach((row, i) => {
       const nodeId = `${ds.id}:${row[idField] ?? i}`;
       const nodeLabel = String(row[labelField] ?? nodeId);
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label });
+      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row });
       links.push({ source: documento, target: nodeId });
     });
   });

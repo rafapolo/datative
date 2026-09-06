@@ -9577,10 +9577,8 @@ var knownLinkKeys = new Set;
 var nodeTypeMap = new Map;
 var nodeDetailsMap = new Map;
 var knownNodeDetailKeys = new Set;
-var queriedDatasetKeys = new Set;
 var rowSignatureToNodeIds = new Map;
 var renderer = null;
-var isExpanding = false;
 var hoveredNode = null;
 var selectedNode = null;
 var layoutRootId = "";
@@ -9589,8 +9587,7 @@ var currentLookupLimit = 10;
 var currentGraph = null;
 var LOOKUP_LIMIT_OPTIONS = new Set([10, 20, 30, 40]);
 var DATASET_COLORS = window.__DATASET_COLORS ?? {};
-var DATASET_RELATIONS = window.__DATASET_RELATIONS ?? {};
-var expandedRelatedKeys = new Set;
+var DATASET_META = window.__DATASET_META ?? {};
 var autoAddedDatasets = new Set;
 var lookupHistory = [];
 var currentLookupCnpj = "";
@@ -9611,37 +9608,10 @@ function isCnpj(val) {
 function extractBasico(val) {
   return val.replace(/\D/g, "").slice(0, 8);
 }
-function extractLookupBasicoFromNode(nodeId) {
-  const idDigits = nodeId.replace(/\D/g, "");
-  if (idDigits.length === 8)
-    return idDigits;
-  if (idDigits.length === 14)
-    return idDigits.slice(0, 8);
-  const details = nodeDetailsMap.get(nodeId) ?? [];
-  for (const detail of details) {
-    for (const [k2, v2] of Object.entries(detail.attributes)) {
-      if (!/cnpj/i.test(k2))
-        continue;
-      const raw = String(v2 ?? "");
-      const digits = raw.replace(/\D/g, "");
-      if (digits.length === 8)
-        return digits;
-      if (digits.length === 14)
-        return digits.slice(0, 8);
-    }
-  }
-  return null;
-}
 function setStatus(msg) {
   const el = document.getElementById("status");
   if (el)
     el.textContent = msg;
-}
-function setStatusLoading(active) {
-  const el = document.getElementById("status");
-  if (!el)
-    return;
-  el.dataset.loading = active ? "true" : "false";
 }
 function formatElapsed(ms) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -9654,26 +9624,6 @@ function setExecutionTime(ms) {
   if (!el)
     return;
   el.textContent = ms == null ? "Execução · --:--" : `Execução · ${formatElapsed(ms)}`;
-}
-function startStatusTimer(baseMsg) {
-  const startedAt = performance.now();
-  setStatusLoading(true);
-  const update = () => {
-    setStatus(`${baseMsg} ${formatElapsed(performance.now() - startedAt)}`);
-  };
-  update();
-  const intervalId = window.setInterval(update, 1000);
-  return {
-    stop(finalStatus) {
-      window.clearInterval(intervalId);
-      const elapsedMs = Math.max(0, performance.now() - startedAt);
-      setStatusLoading(false);
-      setExecutionTime(elapsedMs);
-      if (finalStatus)
-        setStatus(finalStatus);
-      return elapsedMs;
-    }
-  };
 }
 function debugLog(...args) {
   if (!DEBUG_LOOKUP)
@@ -9723,6 +9673,29 @@ function syncLookupRowHighlight() {
     row.classList.toggle("linked", isLinked);
   }
 }
+function focusLookupSection(datasetId) {
+  const panel = document.getElementById("lookup-panel");
+  const body = document.getElementById("lookup-body");
+  if (!panel || !body)
+    return;
+  const section = body.querySelector(`.lookup-section[data-dataset-id="${datasetId}"]`);
+  if (!section)
+    return;
+  const header = section.querySelector(".lookup-section-header");
+  const bodyDiv = section.querySelector(".lookup-section-body");
+  for (const openBody of body.querySelectorAll(".lookup-section-body.expanded")) {
+    if (openBody !== bodyDiv)
+      openBody.classList.remove("expanded");
+  }
+  for (const openHeader of body.querySelectorAll(".lookup-section-header.expanded")) {
+    if (openHeader !== header)
+      openHeader.classList.remove("expanded");
+  }
+  bodyDiv?.classList.add("expanded");
+  header?.classList.add("expanded");
+  panel.classList.add("open");
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 async function fetchGraph(cnpj) {
   debugLog("GET /api/graph", { cnpj });
   const res = await fetch(`/api/graph/${cnpj}`);
@@ -9733,29 +9706,6 @@ async function fetchGraph(cnpj) {
   }
   debugLog("GET /api/graph done", { cnpj, status: res.status });
   return res.json();
-}
-async function fetchLookupDataset(cnpj, datasetId) {
-  debugLog("GET /api/lookup/:cnpj/dataset/:datasetId", {
-    cnpj,
-    datasetId,
-    limit: currentLookupLimit
-  });
-  const res = await fetch(`/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1&limit=${lookupLimitParam()}`);
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    console.error(`[fetch] ${res.status} /api/lookup/${cnpj}/dataset/${datasetId}`, body);
-    throw new Error(`Lookup dataset API error ${res.status}`);
-  }
-  const payload = await res.json();
-  debugLog("GET dataset done", {
-    cnpj,
-    datasetId,
-    status: res.status,
-    rows: payload.result.rows.length,
-    count: payload.result.count,
-    queryError: payload.result.queryError
-  });
-  return payload.result;
 }
 function assignEmpresaColor(id) {
   if (!empresaColorMap.has(id)) {
@@ -10116,74 +10066,6 @@ function runLayout(graph, _iterations, onDone) {
     renderer?.refresh();
     onDone?.();
   });
-}
-async function expandRelatedDatasets(nodeId, graph) {
-  const details = nodeDetailsMap.get(nodeId) ?? [];
-  for (const detail of details) {
-    const relations = DATASET_RELATIONS[detail.datasetId];
-    if (!relations?.length)
-      continue;
-    for (const rel of relations) {
-      const value = detail.attributes[rel.localKey];
-      if (!value)
-        continue;
-      const expandKey = `${rel.datasetId}:${rel.foreignKey}:${value}`;
-      if (expandedRelatedKeys.has(expandKey))
-        continue;
-      expandedRelatedKeys.add(expandKey);
-      try {
-        const url = `/api/lookup/related?datasetId=${encodeURIComponent(rel.datasetId)}&foreignKey=${encodeURIComponent(rel.foreignKey)}&value=${encodeURIComponent(String(value))}`;
-        const urlWithLimit = `${url}&limit=${lookupLimitParam()}`;
-        const res = await fetch(urlWithLimit);
-        if (!res.ok) {
-          const body = await res.text().catch(() => "(unreadable)");
-          console.error(`[fetch] ${res.status} ${urlWithLimit}`, body);
-          continue;
-        }
-        const { result } = await res.json();
-        if (result.rows.length > 0)
-          addResultsToGraph(result, nodeId, graph);
-      } catch {}
-    }
-  }
-}
-async function expandNode(id, graph) {
-  if (isExpanding)
-    return;
-  isExpanding = true;
-  setStatus(`Carregando conexões de ${id}…`);
-  try {
-    const data = await fetchGraph(id);
-    const newNodes = data.nodes.filter((n2) => !knownNodeIds.has(n2.id));
-    const newLinks = data.links.filter((l2) => {
-      const k2 = `${l2.source}→${l2.target}`;
-      if (knownLinkKeys.has(k2))
-        return false;
-      knownLinkKeys.add(k2);
-      return true;
-    });
-    for (const n2 of newNodes) {
-      knownNodeIds.add(n2.id);
-      nodeTypeMap.set(n2.id, n2.type);
-      graph.addNode(n2.id, nodeAttrs(n2.type, n2.label, n2.type === "empresa" ? n2.id : id));
-    }
-    for (const l2 of newLinks) {
-      if (graph.hasNode(l2.source) && graph.hasNode(l2.target) && !graph.hasEdge(l2.source, l2.target)) {
-        graph.addEdge(l2.source, l2.target, edgeAttrs());
-      }
-    }
-    if (newNodes.length > 0) {
-      runLayout(graph, 150, () => {
-        setStatus(`+${newNodes.length} nó(s) adicionado(s)`);
-      });
-    } else {
-      setStatus("Nenhum nó novo encontrado");
-    }
-  } catch (e3) {
-    setStatus(`Erro: ${e3.message}`);
-  } finally {
-    isExpanding = false;
-  }
 }
 function injectPanelStyles() {
   const style = document.createElement("style");
@@ -10729,26 +10611,23 @@ function renderResultSections(results, cnpj, graph) {
   const sorted = [...results].sort((a3, b3) => (b3.count > 0 ? 1 : 0) - (a3.count > 0 ? 1 : 0));
   for (const result of sorted) {
     const section = document.createElement("div");
+    section.dataset.datasetId = result.id;
     const hasHits = result.count > 0;
     section.className = "lookup-section" + (hasHits ? "" : " empty");
-    const canAddToGraph = true;
-    let datasetAdded = autoAddedDatasets.has(result.id);
+    if (hasHits)
+      section.classList.add("added");
     const header = document.createElement("div");
     header.className = "lookup-section-header";
     const datasetColor = DATASET_COLORS[result.id] ?? "#888888";
-    const actionsHtml = canAddToGraph && hasHits && !datasetAdded ? `<button class="lookup-add-btn" data-id="${result.id}">+ Grafo</button>` : "";
     header.innerHTML = `
       <span class="lookup-section-title">
         <span style="color:${datasetColor};margin-right:0.3em;font-size:0.85em">⦿</span>${result.label}
       </span>
       <div class="lookup-section-actions">
         ${hasHits ? `<span class="lookup-badge">${result.count}</span>` : ""}
-        ${actionsHtml}
         <span class="chevron">▶</span>
       </div>
     `;
-    if (datasetAdded)
-      section.classList.add("added");
     const bodyDiv = document.createElement("div");
     bodyDiv.className = "lookup-section-body";
     if (hasHits && result.rows.length > 0) {
@@ -10799,44 +10678,7 @@ function renderResultSections(results, cnpj, graph) {
       }
       bodyDiv.appendChild(table);
     }
-    const datasetKey = `${cnpj}:${result.id}:${lookupLimitParam()}`;
-    const queryAndAddDataset = async () => {
-      if (!canAddToGraph || datasetAdded || queriedDatasetKeys.has(datasetKey))
-        return;
-      queriedDatasetKeys.add(datasetKey);
-      const btn2 = header.querySelector(".lookup-add-btn");
-      if (btn2) {
-        btn2.textContent = "Consultando...";
-        btn2.disabled = true;
-      }
-      try {
-        const freshResult = await fetchLookupDataset(cnpj, result.id);
-        if (freshResult.queryError) {
-          throw new Error(freshResult.queryError);
-        }
-        addResultsToGraph(freshResult, cnpj, graph);
-        if (!freshResult.rows.length) {
-          if (btn2)
-            btn2.remove();
-          setStatus(`Dataset "${result.label}" não retornou registros para ${cnpj}.`);
-        } else {
-          datasetAdded = true;
-          section.classList.add("added");
-          if (btn2)
-            btn2.remove();
-        }
-      } catch (e3) {
-        queriedDatasetKeys.delete(datasetKey);
-        if (btn2) {
-          btn2.textContent = "+ Grafo";
-          btn2.disabled = false;
-        }
-        setStatus(`Erro ao consultar dataset ${result.label}: ${e3.message}`);
-      }
-    };
-    header.addEventListener("click", (e3) => {
-      if (e3.target.classList.contains("lookup-add-btn"))
-        return;
+    header.addEventListener("click", () => {
       debugLog("lookup section click", {
         datasetId: result.id,
         datasetLabel: result.label,
@@ -10850,25 +10692,13 @@ function renderResultSections(results, cnpj, graph) {
         if (openHeader !== header)
           openHeader.classList.remove("expanded");
       }
-      const isExpanded = bodyDiv.classList.toggle("expanded");
-      header.classList.toggle("expanded", isExpanded);
-      if (isExpanded)
-        queryAndAddDataset();
+      bodyDiv.classList.toggle("expanded");
+      header.classList.toggle("expanded");
     });
     if (!firstExpanded && hasHits) {
       firstExpanded = true;
       bodyDiv.classList.add("expanded");
       header.classList.add("expanded");
-      queryAndAddDataset();
-    }
-    const btn = header.querySelector(".lookup-add-btn");
-    if (btn) {
-      btn.addEventListener("click", (e3) => {
-        e3.stopPropagation();
-        if (datasetAdded)
-          return;
-        header.click();
-      });
     }
     section.appendChild(header);
     section.appendChild(bodyDiv);
@@ -10876,140 +10706,18 @@ function renderResultSections(results, cnpj, graph) {
   }
   syncLookupRowHighlight();
 }
-function addResultsToGraph(result, companyCnpj, graph) {
-  const newNodes = [];
-  const groupId = `group:${companyCnpj}:${result.id}`;
-  const groupColor = DATASET_COLORS[result.id] ?? "#888888";
-  ensureGroupNode(graph, groupId, result.label, groupColor, companyCnpj);
-  const seenInBatch = new Set;
-  for (const [idx, row] of result.rows.entries()) {
-    let nodeId = inferNodeId(result, row, companyCnpj, idx);
-    const nodeLabel = inferNodeLabel(result, row, nodeId);
-    const nodeType = result.nodeType ?? "registro";
-    if (!nodeId)
-      continue;
-    if (seenInBatch.has(nodeId)) {
-      nodeId = `${result.id}:${companyCnpj}:${idx}`;
-    }
-    seenInBatch.add(nodeId);
-    trackNodeDetail(nodeId, result.id, result.label, companyCnpj, row);
-    const signature = rowSignature(result.id, row);
-    if (!rowSignatureToNodeIds.has(signature)) {
-      rowSignatureToNodeIds.set(signature, new Set);
-    }
-    rowSignatureToNodeIds.get(signature).add(nodeId);
-    if (!knownNodeIds.has(nodeId)) {
-      knownNodeIds.add(nodeId);
-      nodeTypeMap.set(nodeId, nodeType);
-      graph.addNode(nodeId, nodeAttrs(nodeType, nodeLabel, { datasetId: result.id }));
-      newNodes.push({ id: nodeId, label: nodeLabel });
-    }
-    const edgeKey = `${groupId}→${nodeId}`;
-    if (!knownLinkKeys.has(edgeKey) && graph.hasNode(groupId) && graph.hasNode(nodeId)) {
-      knownLinkKeys.add(edgeKey);
-      if (!graph.hasEdge(groupId, nodeId)) {
-        graph.addEdge(groupId, nodeId, edgeAttrs());
-      }
-    }
-  }
-  if (newNodes.length > 0) {
-    runLayout(graph, 100, () => {
-      setStatus(`+${newNodes.length} nó(s) de "${result.label}" adicionado(s)`);
-      syncLookupRowHighlight();
-    });
-  } else {
-    setStatus(`Nenhum nó novo para "${result.label}".`);
-    syncLookupRowHighlight();
-  }
-}
-function inferNodeId(result, row, companyCnpj, rowIndex) {
-  if (result.nodeIdField) {
-    const direct = String(row[result.nodeIdField] ?? "").trim();
-    if (direct)
-      return direct;
-  }
-  for (const cnpjCol of result.cnpjColumnNames ?? []) {
-    const raw = String(row[cnpjCol] ?? "").trim();
-    if (!raw)
-      continue;
-    const normalized = raw.replace(/\D/g, "");
-    if (normalized.length >= 8)
-      return normalized;
-  }
-  const stable = Object.entries(row).map(([k2, v2]) => `${k2}=${valueText(v2)}`).join("|");
-  return `${result.id}:${companyCnpj}:${rowIndex}:${stable}`;
-}
-function inferNodeLabel(result, row, fallbackId) {
-  if (result.nodeLabelField) {
-    const direct = String(row[result.nodeLabelField] ?? "").trim();
-    if (direct)
-      return direct;
-  }
-  const preferred = [
-    "nome_fornecedor",
-    "nome_contratado",
-    "nome_favorecido",
-    "nome_doador",
-    "nome",
-    "razao_social",
-    "nome_razao_social",
-    "nome_fantasia",
-    "objeto",
-    "descricao"
-  ];
-  for (const key of preferred) {
-    const value = String(row[key] ?? "").trim();
-    if (value)
-      return value;
-  }
-  return fallbackId;
-}
-async function openLookupPanel(cnpj, graph, skipHistory = false, prefetched) {
+function openLookupPanel(cnpj, graph, results) {
   const panel = document.getElementById("lookup-panel");
-  const body = document.getElementById("lookup-body");
   const title = document.getElementById("lookup-title");
   const backBtn = document.getElementById("lookup-back");
-  if (!skipHistory) {}
   currentLookupCnpj = cnpj;
   currentLookupLabel = cnpj;
   title.textContent = `CNPJ: ${cnpj}`;
   backBtn.style.display = lookupHistory.length > 0 ? "inline-block" : "none";
-  body.innerHTML = `<div class="lookup-skeleton">Consultando ${30}+ bases de dados…</div>`;
   panel.classList.add("open");
-  const lookupPanelStatusTimer = prefetched ? null : startStatusTimer("Consultando bases de dados…");
-  const newBack = backBtn.cloneNode(true);
-  backBtn.replaceWith(newBack);
-  newBack.addEventListener("click", () => {
-    const prev = lookupHistory.pop();
-    if (prev)
-      openLookupPanel(prev.cnpj, graph, true);
-  });
-  if (prefetched) {
-    setStatus("Bases consultadas");
-    renderResultSections(prefetched, cnpj, graph);
-    return;
-  }
-  try {
-    debugLog("GET /api/lookup/:cnpj", { cnpj, limit: currentLookupLimit });
-    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (!res.ok) {
-      const body2 = await res.text().catch(() => "(unreadable)");
-      console.error(`[fetch] ${res.status} /api/lookup/${cnpj}`, body2);
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const data = await res.json();
-    debugLog("GET /api/lookup done", {
-      cnpj,
-      status: res.status,
-      datasets: data.results.length
-    });
-    const hits = data.results.filter((result) => result.count > 0).length;
-    lookupPanelStatusTimer?.stop(`${hits} base(s) com referência`);
-    renderResultSections(data.results, cnpj, graph);
-  } catch (e3) {
-    lookupPanelStatusTimer?.stop(`Erro ao consultar bases: ${e3.message}`);
-    body.innerHTML = `<div class="lookup-error">Erro ao consultar: ${e3.message}</div>`;
-  }
+  const hits = results.filter((result) => result.count > 0).length;
+  setStatus(`${hits} base(s) com referência`);
+  renderResultSections(results, cnpj, graph);
 }
 async function init() {
   const params = new URLSearchParams(location.search);
@@ -11047,6 +10755,14 @@ async function init() {
       empresaId: rootId,
       isRoot: n2.id === rootId
     }));
+    if (n2.datasetId && n2.row) {
+      trackNodeDetail(n2.id, n2.datasetId, n2.datasetLabel ?? n2.datasetId, rootId, n2.row);
+      const signature = rowSignature(n2.datasetId, n2.row);
+      if (!rowSignatureToNodeIds.has(signature)) {
+        rowSignatureToNodeIds.set(signature, new Set);
+      }
+      rowSignatureToNodeIds.get(signature).add(n2.id);
+    }
   }
   const socioNodes = data.nodes.filter((n2) => n2.type === "socio");
   const socioIds = new Set(socioNodes.map((n2) => n2.id));
@@ -11188,38 +10904,33 @@ async function init() {
     });
   }
   const overlay = document.getElementById("loading-overlay");
-  const loadingText = overlay?.querySelector(".loading-text");
-  if (loadingText)
-    loadingText.textContent = "cruzando bases de dados…";
-  const lookupStatusTimer = startStatusTimer("Cruzando com bases de dados…");
-  let lookupResults = [];
-  try {
-    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (!res.ok) {
-      const body = await res.text().catch(() => "(unreadable)");
-      console.error(`[fetch] ${res.status} /api/lookup/${cnpj}`, body);
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const payload = await res.json();
-    lookupResults = payload.results;
-    for (const result of lookupResults) {
-      if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
-        addResultsToGraph(result, cnpj, graph);
-        autoAddedDatasets.add(result.id);
-        queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
-      }
-    }
-    const hits = lookupResults.filter((r2) => r2.count > 0).length;
-    lookupStatusTimer.stop(`${hits} base(s) com referência`);
-    runLayout(graph, 300);
-  } catch (e3) {
-    lookupStatusTimer.stop(`Erro ao cruzar bases: ${e3.message}`);
-  } finally {
-    if (overlay)
-      overlay.style.display = "none";
-    openLookupPanel(cnpj, graph, false, lookupResults);
-    showNodeDetails(cnpj, graph);
+  const nodesByDataset = new Map;
+  for (const n2 of data.nodes) {
+    if (!n2.datasetId)
+      continue;
+    if (!nodesByDataset.has(n2.datasetId))
+      nodesByDataset.set(n2.datasetId, []);
+    nodesByDataset.get(n2.datasetId).push(n2);
   }
+  const lookupResults = Object.entries(DATASET_META).map(([id, meta]) => {
+    const nodes = nodesByDataset.get(id) ?? [];
+    if (nodes.length > 0)
+      autoAddedDatasets.add(id);
+    return {
+      id,
+      label: meta.label,
+      count: nodes.length,
+      rows: nodes.map((n2) => n2.row ?? { [meta.nodeLabelField ?? "label"]: n2.label }),
+      cnpjColumnNames: meta.cnpjColumnNames,
+      nodeType: meta.nodeType,
+      nodeIdField: meta.nodeIdField,
+      nodeLabelField: meta.nodeLabelField
+    };
+  });
+  if (overlay)
+    overlay.style.display = "none";
+  openLookupPanel(rootId, graph, lookupResults);
+  showNodeDetails(rootId, graph);
   let draggedNode = null;
   let isDragging = false;
   let dragOffset = { dx: 0, dy: 0 };
@@ -11269,20 +10980,11 @@ async function init() {
     syncLookupRowHighlight();
     const nodeType = nodeTypeMap.get(node);
     if (nodeType === "group") {
-      showNodeDetails(node, graph);
-      return;
+      const datasetId = node.startsWith("group:") ? node.split(":").slice(2).join(":") : "";
+      if (datasetId && datasetId !== "socios")
+        focusLookupSection(datasetId);
     }
-    if (nodeType === "empresa") {
-      expandNode(node, graph);
-      openLookupPanel(node, graph);
-      showNodeDetails(node, graph);
-    } else {
-      const basico = extractLookupBasicoFromNode(node);
-      if (basico)
-        openLookupPanel(basico, graph);
-      showNodeDetails(node, graph);
-      expandRelatedDatasets(node, graph);
-    }
+    showNodeDetails(node, graph);
   });
 }
 init().catch((e3) => setStatus(`Erro fatal: ${e3.message}`));

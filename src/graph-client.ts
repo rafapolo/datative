@@ -10,6 +10,7 @@ interface GraphNode {
   type: string;
   datasetId?: string;
   datasetLabel?: string;
+  row?: Record<string, unknown>;
 }
 
 interface GraphLink {
@@ -32,16 +33,6 @@ interface LookupResult {
   nodeIdField?: string;
   nodeLabelField?: string;
   queryError?: string;
-}
-
-interface LookupResponse {
-  cnpj: string;
-  results: LookupResult[];
-}
-
-interface LookupDatasetResponse {
-  cnpj: string;
-  result: LookupResult;
 }
 
 interface NodeDetailEntry {
@@ -87,10 +78,8 @@ const knownLinkKeys = new Set<string>();
 const nodeTypeMap = new Map<string, string>();
 const nodeDetailsMap = new Map<string, NodeDetailEntry[]>();
 const knownNodeDetailKeys = new Set<string>();
-const queriedDatasetKeys = new Set<string>();
 const rowSignatureToNodeIds = new Map<string, Set<string>>();
 let renderer: Sigma | null = null;
-let isExpanding = false;
 let hoveredNode: string | null = null;
 let selectedNode: string | null = null;
 let layoutRootId = "";
@@ -105,23 +94,24 @@ const DATASET_COLORS: Record<string, string> =
   (window as unknown as { __DATASET_COLORS?: Record<string, string> })
     .__DATASET_COLORS ?? {};
 
-interface RelatedLookupConfig {
-  datasetId: string;
-  localKey: string;
-  foreignKey: string;
+interface DatasetMeta {
+  label: string;
+  color: string;
+  cnpjColumnNames: string[];
+  nodeType?: string;
+  nodeIdField?: string;
+  nodeLabelField?: string;
 }
-// Related dataset expansion rules injected server-side
-const DATASET_RELATIONS: Record<string, RelatedLookupConfig[]> =
-  (
-    window as unknown as {
-      __DATASET_RELATIONS?: Record<string, RelatedLookupConfig[]>;
-    }
-  ).__DATASET_RELATIONS ?? {};
 
-// Tracks already-expanded related lookups to avoid duplicate fetches
-const expandedRelatedKeys = new Set<string>();
+// Dataset config injected server-side via window.__DATASET_META — lets the
+// panel list every wired dataset (including zero-hit ones) without a live
+// query, since the precomputed graph JSON only carries nodes for hits.
+const DATASET_META: Record<string, DatasetMeta> =
+  (window as unknown as { __DATASET_META?: Record<string, DatasetMeta> })
+    .__DATASET_META ?? {};
 
-// Tracks which dataset IDs were auto-added on init (to avoid duplicate adds from panel)
+// Tracks which dataset IDs have at least one precomputed hit, so their
+// section starts marked "added" in the panel.
 const autoAddedDatasets = new Set<string>();
 
 // --- Breadcrumb / drill-down state ---
@@ -156,24 +146,6 @@ function isCnpj(val: string): boolean {
 
 function extractBasico(val: string): string {
   return val.replace(/\D/g, "").slice(0, 8);
-}
-
-function extractLookupBasicoFromNode(nodeId: string): string | null {
-  const idDigits = nodeId.replace(/\D/g, "");
-  if (idDigits.length === 8) return idDigits;
-  if (idDigits.length === 14) return idDigits.slice(0, 8);
-
-  const details = nodeDetailsMap.get(nodeId) ?? [];
-  for (const detail of details) {
-    for (const [k, v] of Object.entries(detail.attributes)) {
-      if (!/cnpj/i.test(k)) continue;
-      const raw = String(v ?? "");
-      const digits = raw.replace(/\D/g, "");
-      if (digits.length === 8) return digits;
-      if (digits.length === 14) return digits.slice(0, 8);
-    }
-  }
-  return null;
 }
 
 function setStatus(msg: string) {
@@ -278,6 +250,35 @@ function syncLookupRowHighlight() {
   }
 }
 
+// Expands and scrolls to a dataset's section in the side panel — triggered by
+// clicking that dataset's hub node in the graph (accordion: collapses any
+// other open section, matching the header-click behavior in renderResultSections).
+function focusLookupSection(datasetId: string) {
+  const panel = document.getElementById("lookup-panel");
+  const body = document.getElementById("lookup-body");
+  if (!panel || !body) return;
+  const section = body.querySelector<HTMLElement>(
+    `.lookup-section[data-dataset-id="${datasetId}"]`,
+  );
+  if (!section) return;
+  const header = section.querySelector<HTMLElement>(".lookup-section-header");
+  const bodyDiv = section.querySelector<HTMLElement>(".lookup-section-body");
+  for (const openBody of body.querySelectorAll<HTMLElement>(
+    ".lookup-section-body.expanded",
+  )) {
+    if (openBody !== bodyDiv) openBody.classList.remove("expanded");
+  }
+  for (const openHeader of body.querySelectorAll<HTMLElement>(
+    ".lookup-section-header.expanded",
+  )) {
+    if (openHeader !== header) openHeader.classList.remove("expanded");
+  }
+  bodyDiv?.classList.add("expanded");
+  header?.classList.add("expanded");
+  panel.classList.add("open");
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 async function fetchGraph(cnpj: string): Promise<GraphData> {
   debugLog("GET /api/graph", { cnpj });
   const res = await fetch(`/api/graph/${cnpj}`);
@@ -288,35 +289,6 @@ async function fetchGraph(cnpj: string): Promise<GraphData> {
   }
   debugLog("GET /api/graph done", { cnpj, status: res.status });
   return res.json() as Promise<GraphData>;
-}
-
-async function fetchLookupDataset(
-  cnpj: string,
-  datasetId: string,
-): Promise<LookupResult> {
-  debugLog("GET /api/lookup/:cnpj/dataset/:datasetId", {
-    cnpj,
-    datasetId,
-    limit: currentLookupLimit,
-  });
-  const res = await fetch(
-    `/api/lookup/${cnpj}/dataset/${encodeURIComponent(datasetId)}?fresh=1&limit=${lookupLimitParam()}`,
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    console.error(`[fetch] ${res.status} /api/lookup/${cnpj}/dataset/${datasetId}`, body);
-    throw new Error(`Lookup dataset API error ${res.status}`);
-  }
-  const payload = (await res.json()) as LookupDatasetResponse;
-  debugLog("GET dataset done", {
-    cnpj,
-    datasetId,
-    status: res.status,
-    rows: payload.result.rows.length,
-    count: payload.result.count,
-    queryError: payload.result.queryError,
-  });
-  return payload.result;
 }
 
 function assignEmpresaColor(id: string): string {
@@ -841,81 +813,6 @@ function runLayout(graph: Graph, _iterations: number, onDone?: () => void) {
     renderer?.refresh();
     onDone?.();
   });
-}
-
-async function expandRelatedDatasets(nodeId: string, graph: Graph) {
-  const details = nodeDetailsMap.get(nodeId) ?? [];
-  for (const detail of details) {
-    const relations = DATASET_RELATIONS[detail.datasetId];
-    if (!relations?.length) continue;
-    for (const rel of relations) {
-      const value = detail.attributes[rel.localKey];
-      if (!value) continue;
-      const expandKey = `${rel.datasetId}:${rel.foreignKey}:${value}`;
-      if (expandedRelatedKeys.has(expandKey)) continue;
-      expandedRelatedKeys.add(expandKey);
-      try {
-        const url = `/api/lookup/related?datasetId=${encodeURIComponent(rel.datasetId)}&foreignKey=${encodeURIComponent(rel.foreignKey)}&value=${encodeURIComponent(String(value))}`;
-        const urlWithLimit = `${url}&limit=${lookupLimitParam()}`;
-        const res = await fetch(urlWithLimit);
-        if (!res.ok) {
-          const body = await res.text().catch(() => "(unreadable)");
-          console.error(`[fetch] ${res.status} ${urlWithLimit}`, body);
-          continue;
-        }
-        const { result } = (await res.json()) as { result: LookupResult };
-        if (result.rows.length > 0) addResultsToGraph(result, nodeId, graph);
-      } catch {
-        // silently skip failed related lookups
-      }
-    }
-  }
-}
-
-async function expandNode(id: string, graph: Graph) {
-  if (isExpanding) return;
-  isExpanding = true;
-  setStatus(`Carregando conexões de ${id}…`);
-  try {
-    const data = await fetchGraph(id);
-    const newNodes = data.nodes.filter((n) => !knownNodeIds.has(n.id));
-    const newLinks = data.links.filter((l) => {
-      const k = `${l.source}→${l.target}`;
-      if (knownLinkKeys.has(k)) return false;
-      knownLinkKeys.add(k);
-      return true;
-    });
-
-    for (const n of newNodes) {
-      knownNodeIds.add(n.id);
-      nodeTypeMap.set(n.id, n.type);
-      graph.addNode(
-        n.id,
-        nodeAttrs(n.type, n.label, n.type === "empresa" ? n.id : id),
-      );
-    }
-    for (const l of newLinks) {
-      if (
-        graph.hasNode(l.source) &&
-        graph.hasNode(l.target) &&
-        !graph.hasEdge(l.source, l.target)
-      ) {
-        graph.addEdge(l.source, l.target, edgeAttrs());
-      }
-    }
-
-    if (newNodes.length > 0) {
-      runLayout(graph, 150, () => {
-        setStatus(`+${newNodes.length} nó(s) adicionado(s)`);
-      });
-    } else {
-      setStatus("Nenhum nó novo encontrado");
-    }
-  } catch (e) {
-    setStatus(`Erro: ${(e as Error).message}`);
-  } finally {
-    isExpanding = false;
-  }
 }
 
 // --- Lookup Panel ---
@@ -1509,19 +1406,15 @@ function renderResultSections(
 
   for (const result of sorted) {
     const section = document.createElement("div");
+    section.dataset.datasetId = result.id;
     const hasHits = result.count > 0;
     section.className = "lookup-section" + (hasHits ? "" : " empty");
-    const canAddToGraph = true;
-    let datasetAdded = autoAddedDatasets.has(result.id);
+    if (hasHits) section.classList.add("added");
 
     const header = document.createElement("div");
     header.className = "lookup-section-header";
 
     const datasetColor = DATASET_COLORS[result.id] ?? "#888888";
-    const actionsHtml =
-      canAddToGraph && hasHits && !datasetAdded
-        ? `<button class="lookup-add-btn" data-id="${result.id}">+ Grafo</button>`
-        : "";
 
     header.innerHTML = `
       <span class="lookup-section-title">
@@ -1529,11 +1422,9 @@ function renderResultSections(
       </span>
       <div class="lookup-section-actions">
         ${hasHits ? `<span class="lookup-badge">${result.count}</span>` : ""}
-        ${actionsHtml}
         <span class="chevron">▶</span>
       </div>
     `;
-    if (datasetAdded) section.classList.add("added");
 
     const bodyDiv = document.createElement("div");
     bodyDiv.className = "lookup-section-body";
@@ -1590,54 +1481,13 @@ function renderResultSections(
       bodyDiv.appendChild(table);
     }
 
-    // Toggle body on header click
-    const datasetKey = `${cnpj}:${result.id}:${lookupLimitParam()}`;
-    const queryAndAddDataset = async () => {
-      if (!canAddToGraph || datasetAdded || queriedDatasetKeys.has(datasetKey))
-        return;
-      queriedDatasetKeys.add(datasetKey);
-      const btn = header.querySelector<HTMLButtonElement>(".lookup-add-btn");
-      if (btn) {
-        btn.textContent = "Consultando...";
-        btn.disabled = true;
-      }
-      try {
-        const freshResult = await fetchLookupDataset(cnpj, result.id);
-        if (freshResult.queryError) {
-          throw new Error(freshResult.queryError);
-        }
-        addResultsToGraph(freshResult, cnpj, graph);
-        if (!freshResult.rows.length) {
-          if (btn) btn.remove();
-          setStatus(
-            `Dataset "${result.label}" não retornou registros para ${cnpj}.`,
-          );
-        } else {
-          datasetAdded = true;
-          section.classList.add("added");
-          if (btn) btn.remove();
-        }
-      } catch (e) {
-        queriedDatasetKeys.delete(datasetKey);
-        if (btn) {
-          btn.textContent = "+ Grafo";
-          btn.disabled = false;
-        }
-        setStatus(
-          `Erro ao consultar dataset ${result.label}: ${(e as Error).message}`,
-        );
-      }
-    };
-
-    header.addEventListener("click", (e) => {
-      if ((e.target as HTMLElement).classList.contains("lookup-add-btn"))
-        return;
+    // Toggle body on header click — accordion: keep only one section expanded.
+    header.addEventListener("click", () => {
       debugLog("lookup section click", {
         datasetId: result.id,
         datasetLabel: result.label,
         cnpj,
       });
-      // Accordion behavior: keep only one dataset expanded at a time.
       for (const openBody of body.querySelectorAll<HTMLElement>(
         ".lookup-section-body.expanded",
       )) {
@@ -1648,9 +1498,8 @@ function renderResultSections(
       )) {
         if (openHeader !== header) openHeader.classList.remove("expanded");
       }
-      const isExpanded = bodyDiv.classList.toggle("expanded");
-      header.classList.toggle("expanded", isExpanded);
-      if (isExpanded) void queryAndAddDataset();
+      bodyDiv.classList.toggle("expanded");
+      header.classList.toggle("expanded");
     });
 
     // Auto-expand first dataset that already has hits.
@@ -1658,17 +1507,6 @@ function renderResultSections(
       firstExpanded = true;
       bodyDiv.classList.add("expanded");
       header.classList.add("expanded");
-      void queryAndAddDataset();
-    }
-
-    // "Add to graph" button
-    const btn = header.querySelector<HTMLButtonElement>(".lookup-add-btn");
-    if (btn) {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (datasetAdded) return;
-        header.click();
-      });
     }
 
     section.appendChild(header);
@@ -1678,187 +1516,28 @@ function renderResultSections(
   syncLookupRowHighlight();
 }
 
-function addResultsToGraph(
-  result: LookupResult,
-  companyCnpj: string,
-  graph: Graph,
-) {
-  const newNodes: Array<{ id: string; label: string }> = [];
-
-  const groupId = `group:${companyCnpj}:${result.id}`;
-  const groupColor = DATASET_COLORS[result.id] ?? "#888888";
-  ensureGroupNode(graph, groupId, result.label, groupColor, companyCnpj);
-
-  // Track IDs seen within this batch so duplicate-CNPJ rows each get their own node
-  const seenInBatch = new Set<string>();
-
-  for (const [idx, row] of result.rows.entries()) {
-    let nodeId = inferNodeId(result, row, companyCnpj, idx);
-    const nodeLabel = inferNodeLabel(result, row, nodeId);
-    const nodeType = result.nodeType ?? "registro";
-    if (!nodeId) continue;
-
-    // If this exact nodeId already appeared earlier in the same batch, make it unique
-    if (seenInBatch.has(nodeId)) {
-      nodeId = `${result.id}:${companyCnpj}:${idx}`;
-    }
-    seenInBatch.add(nodeId);
-
-    trackNodeDetail(nodeId, result.id, result.label, companyCnpj, row);
-    const signature = rowSignature(result.id, row);
-    if (!rowSignatureToNodeIds.has(signature)) {
-      rowSignatureToNodeIds.set(signature, new Set<string>());
-    }
-    rowSignatureToNodeIds.get(signature)!.add(nodeId);
-    if (!knownNodeIds.has(nodeId)) {
-      knownNodeIds.add(nodeId);
-      nodeTypeMap.set(nodeId, nodeType);
-      graph.addNode(
-        nodeId,
-        nodeAttrs(nodeType, nodeLabel, { datasetId: result.id }),
-      );
-      newNodes.push({ id: nodeId, label: nodeLabel });
-    }
-    const edgeKey = `${groupId}→${nodeId}`;
-    if (
-      !knownLinkKeys.has(edgeKey) &&
-      graph.hasNode(groupId) &&
-      graph.hasNode(nodeId)
-    ) {
-      knownLinkKeys.add(edgeKey);
-      if (!graph.hasEdge(groupId, nodeId)) {
-        graph.addEdge(groupId, nodeId, edgeAttrs());
-      }
-    }
-  }
-
-  if (newNodes.length > 0) {
-    runLayout(graph, 100, () => {
-      setStatus(`+${newNodes.length} nó(s) de "${result.label}" adicionado(s)`);
-      syncLookupRowHighlight();
-    });
-  } else {
-    setStatus(`Nenhum nó novo para "${result.label}".`);
-    syncLookupRowHighlight();
-  }
-}
-
-function inferNodeId(
-  result: LookupResult,
-  row: Record<string, unknown>,
-  companyCnpj: string,
-  rowIndex: number,
-): string {
-  if (result.nodeIdField) {
-    const direct = String(row[result.nodeIdField] ?? "").trim();
-    if (direct) return direct;
-  }
-
-  for (const cnpjCol of result.cnpjColumnNames ?? []) {
-    const raw = String(row[cnpjCol] ?? "").trim();
-    if (!raw) continue;
-    const normalized = raw.replace(/\D/g, "");
-    if (normalized.length >= 8) return normalized;
-  }
-
-  const stable = Object.entries(row)
-    .map(([k, v]) => `${k}=${valueText(v)}`)
-    .join("|");
-  return `${result.id}:${companyCnpj}:${rowIndex}:${stable}`;
-}
-
-function inferNodeLabel(
-  result: LookupResult,
-  row: Record<string, unknown>,
-  fallbackId: string,
-): string {
-  if (result.nodeLabelField) {
-    const direct = String(row[result.nodeLabelField] ?? "").trim();
-    if (direct) return direct;
-  }
-
-  const preferred = [
-    "nome_fornecedor",
-    "nome_contratado",
-    "nome_favorecido",
-    "nome_doador",
-    "nome",
-    "razao_social",
-    "nome_razao_social",
-    "nome_fantasia",
-    "objeto",
-    "descricao",
-  ];
-  for (const key of preferred) {
-    const value = String(row[key] ?? "").trim();
-    if (value) return value;
-  }
-
-  return fallbackId;
-}
-
-async function openLookupPanel(
+// `results` is always the precomputed set built from the static graph JSON —
+// there is no live endpoint left to fall back to, so a missing/empty set just
+// renders an empty panel rather than attempting (and failing) a fetch.
+function openLookupPanel(
   cnpj: string,
   graph: Graph,
-  skipHistory = false,
-  prefetched?: LookupResult[],
+  results: LookupResult[],
 ) {
   const panel = document.getElementById("lookup-panel") as HTMLElement;
-  const body = document.getElementById("lookup-body")!;
   const title = document.getElementById("lookup-title")!;
   const backBtn = document.getElementById("lookup-back") as HTMLButtonElement;
-
-  if (!skipHistory) {
-    // will be set after we know the label
-  }
 
   currentLookupCnpj = cnpj;
   currentLookupLabel = cnpj; // updated below if razao_social available
 
   title.textContent = `CNPJ: ${cnpj}`;
   backBtn.style.display = lookupHistory.length > 0 ? "inline-block" : "none";
-
-  body.innerHTML = `<div class="lookup-skeleton">Consultando ${30}+ bases de dados…</div>`;
   panel.classList.add("open");
-  const lookupPanelStatusTimer = prefetched
-    ? null
-    : startStatusTimer("Consultando bases de dados…");
 
-  // Wire back button (idempotent — replaces any prior listener via clone)
-  const newBack = backBtn.cloneNode(true) as HTMLButtonElement;
-  backBtn.replaceWith(newBack);
-  newBack.addEventListener("click", () => {
-    const prev = lookupHistory.pop();
-    if (prev) openLookupPanel(prev.cnpj, graph, true);
-  });
-
-  if (prefetched) {
-    setStatus("Bases consultadas");
-    renderResultSections(prefetched, cnpj, graph);
-    return;
-  }
-
-  try {
-    debugLog("GET /api/lookup/:cnpj", { cnpj, limit: currentLookupLimit });
-    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (!res.ok) {
-      const body = await res.text().catch(() => "(unreadable)");
-      console.error(`[fetch] ${res.status} /api/lookup/${cnpj}`, body);
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const data = (await res.json()) as LookupResponse;
-    debugLog("GET /api/lookup done", {
-      cnpj,
-      status: res.status,
-      datasets: data.results.length,
-    });
-    const hits = data.results.filter((result) => result.count > 0).length;
-    lookupPanelStatusTimer?.stop(`${hits} base(s) com referência`);
-    renderResultSections(data.results, cnpj, graph);
-  } catch (e) {
-    lookupPanelStatusTimer?.stop(`Erro ao consultar bases: ${(e as Error).message}`);
-    body.innerHTML = `<div class="lookup-error">Erro ao consultar: ${(e as Error).message}</div>`;
-  }
+  const hits = results.filter((result) => result.count > 0).length;
+  setStatus(`${hits} base(s) com referência`);
+  renderResultSections(results, cnpj, graph);
 }
 
 // --- Init ---
@@ -1912,6 +1591,14 @@ async function init() {
             isRoot: n.id === rootId,
           }),
     );
+    if (n.datasetId && n.row) {
+      trackNodeDetail(n.id, n.datasetId, n.datasetLabel ?? n.datasetId, rootId, n.row);
+      const signature = rowSignature(n.datasetId, n.row);
+      if (!rowSignatureToNodeIds.has(signature)) {
+        rowSignatureToNodeIds.set(signature, new Set<string>());
+      }
+      rowSignatureToNodeIds.get(signature)!.add(n.id);
+    }
   }
 
   // Group socios under a "Sócios" hub node instead of direct empresa→socio edges
@@ -1930,10 +1617,9 @@ async function init() {
   }
 
   // Group every cross-dataset node under a per-dataset hub node (e.g. "CGU ·
-  // Contratos"), mirroring the old live /api/lookup expand-panel behavior
-  // (addResultsToGraph) instead of wiring each dataset hit straight to the
-  // root company — otherwise a company with dozens of hits across ~40
-  // datasets renders as one indistinguishable starburst off the root.
+  // Contratos") instead of wiring each dataset hit straight to the root
+  // company — otherwise a company with dozens of hits across ~40 datasets
+  // renders as one indistinguishable starburst off the root.
   const datasetGroupIds = new Set<string>();
   for (const n of data.nodes) {
     if (!n.datasetId) continue;
@@ -2074,42 +1760,37 @@ async function init() {
     });
   }
 
-  // Auto-fetch all dataset lookups and populate graph with colored nodes
+  // Build the lookup panel straight from the precomputed graph JSON — every
+  // dataset node was already added to the graph above (grouped under its
+  // per-dataset hub), so this only assembles the side-panel table view, no
+  // fetch involved. Datasets with no hits still get a row (count 0, empty)
+  // to match the old panel's full dataset listing.
   const overlay = document.getElementById("loading-overlay");
-  const loadingText = overlay?.querySelector(
-    ".loading-text",
-  ) as HTMLElement | null;
-  if (loadingText) loadingText.textContent = "cruzando bases de dados…";
-  const lookupStatusTimer = startStatusTimer("Cruzando com bases de dados…");
-  let lookupResults: LookupResult[] = [];
-  try {
-    const res = await fetch(`/api/lookup/${cnpj}?limit=${lookupLimitParam()}`);
-    if (!res.ok) {
-      const body = await res.text().catch(() => "(unreadable)");
-      console.error(`[fetch] ${res.status} /api/lookup/${cnpj}`, body);
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const payload = (await res.json()) as LookupResponse;
-    lookupResults = payload.results;
-    for (const result of lookupResults) {
-      if (result.count > 0 && result.rows.length > 0 && !result.queryError) {
-        addResultsToGraph(result, cnpj, graph);
-        autoAddedDatasets.add(result.id);
-        queriedDatasetKeys.add(`${cnpj}:${result.id}:${lookupLimitParam()}`);
-      }
-    }
-    const hits = lookupResults.filter((r) => r.count > 0).length;
-    lookupStatusTimer.stop(`${hits} base(s) com referência`);
-    runLayout(graph, 300);
-  } catch (e) {
-    lookupStatusTimer.stop(`Erro ao cruzar bases: ${(e as Error).message}`);
-  } finally {
-    if (overlay) overlay.style.display = "none";
-    // Open panels after everything is loaded
-    void openLookupPanel(cnpj, graph, false, lookupResults);
-    showNodeDetails(cnpj, graph);
+  const nodesByDataset = new Map<string, GraphNode[]>();
+  for (const n of data.nodes) {
+    if (!n.datasetId) continue;
+    if (!nodesByDataset.has(n.datasetId)) nodesByDataset.set(n.datasetId, []);
+    nodesByDataset.get(n.datasetId)!.push(n);
   }
+  const lookupResults: LookupResult[] = Object.entries(DATASET_META).map(
+    ([id, meta]) => {
+      const nodes = nodesByDataset.get(id) ?? [];
+      if (nodes.length > 0) autoAddedDatasets.add(id);
+      return {
+        id,
+        label: meta.label,
+        count: nodes.length,
+        rows: nodes.map((n) => n.row ?? { [meta.nodeLabelField ?? "label"]: n.label }),
+        cnpjColumnNames: meta.cnpjColumnNames,
+        nodeType: meta.nodeType,
+        nodeIdField: meta.nodeIdField,
+        nodeLabelField: meta.nodeLabelField,
+      };
+    },
+  );
+  if (overlay) overlay.style.display = "none";
+  openLookupPanel(rootId, graph, lookupResults);
+  showNodeDetails(rootId, graph);
 
   // Node dragging
   let draggedNode: string | null = null;
@@ -2170,19 +1851,12 @@ async function init() {
 
     const nodeType = nodeTypeMap.get(node);
     if (nodeType === "group") {
-      showNodeDetails(node, graph);
-      return;
+      const datasetId = node.startsWith("group:")
+        ? node.split(":").slice(2).join(":")
+        : "";
+      if (datasetId && datasetId !== "socios") focusLookupSection(datasetId);
     }
-    if (nodeType === "empresa") {
-      expandNode(node, graph);
-      openLookupPanel(node, graph);
-      showNodeDetails(node, graph);
-    } else {
-      const basico = extractLookupBasicoFromNode(node);
-      if (basico) openLookupPanel(basico, graph);
-      showNodeDetails(node, graph);
-      void expandRelatedDatasets(node, graph);
-    }
+    showNodeDetails(node, graph);
   });
 }
 

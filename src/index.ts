@@ -509,6 +509,21 @@ function renderGraphPage(id: string): string {
         ...RELATED_DATASETS.map((d) => [d.id, d.color]),
       ])
     )};
+    window.__DATASET_META = ${JSON.stringify(
+      Object.fromEntries(
+        CNPJ_DATASETS.map((d) => [
+          d.id,
+          {
+            label: d.label,
+            color: d.color,
+            cnpjColumnNames: d.cnpjColumns.map((c) => c.name),
+            nodeType: d.nodeType,
+            nodeIdField: d.nodeIdField,
+            nodeLabelField: d.nodeLabelField,
+          },
+        ])
+      )
+    )};
   </script>
   <script src="/graph.js"></script>
 </body>
