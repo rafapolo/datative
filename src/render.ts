@@ -50,19 +50,24 @@ function renderEntityRow(e: EntityIndexEntry, links: LinkScheme): string {
   );
 }
 
-function renderEntitySection(title: string, entities: EntityIndexEntry[], links: LinkScheme): string {
-  if (entities.length === 0) return "";
-  return (
-    `<div class="ci-section-header"><span>${escHtml(title)}</span><span>${entities.length}</span></div>` +
-    entities.map((e) => renderEntityRow(e, links)).join("")
-  );
+function renderEntityPanel(title: string, entities: EntityIndexEntry[], links: LinkScheme): string {
+  const rows = entities.length
+    ? entities.map((e) => renderEntityRow(e, links)).join("")
+    : `<div style="padding:1rem 1.2rem;color:var(--muted);font-size:0.8rem">Nenhuma entidade pré-computada ainda — rode <code>bun run generate:static</code>.</div>`;
+  return `<aside class="ci-panel">
+      <div class="ci-panel-header">
+        <span class="ci-panel-label">${escHtml(title)}</span>
+        <span class="ci-panel-count">${entities.length}</span>
+      </div>
+      <div class="ci-scroll">
+        ${rows}
+      </div>
+    </aside>`;
 }
 
 export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: LinkScheme): string {
   const empresas = entitiesIndex.filter((e) => e.type === "empresa");
   const pessoas = entitiesIndex.filter((e) => e.type === "pessoa");
-  const entityRows =
-    renderEntitySection("Empresas", empresas, links) + renderEntitySection("Pessoas", pessoas, links);
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -76,8 +81,18 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
     :root {
       --bg: #06060e; --surface: #0d0d20; --border: #1c1c38;
       --gold: #e8b84b; --text: #e4e4f0; --muted: #6868aa;
+      --scroll-thumb: #3d3d70;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--surface); }
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: var(--surface); }
+    *::-webkit-scrollbar-thumb {
+      background: var(--scroll-thumb);
+      border-radius: 6px;
+      border: 2px solid var(--surface);
+    }
+    *::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     html, body { height: 100%; overflow: hidden; }
     body {
       font-family: 'DM Sans', sans-serif;
@@ -169,13 +184,13 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
     .footer-copy {
       font-family: 'Space Mono', monospace;
       font-size: 0.58rem;
-      color: #252540;
+      color: var(--muted);
       letter-spacing: 0.1em;
     }
     .footer-status {
       font-family: 'Space Mono', monospace;
       font-size: 0.58rem;
-      color: #303050;
+      color: var(--muted);
       display: flex;
       align-items: center;
       gap: 0.4rem;
@@ -239,7 +254,7 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
     }
     .ci-scroll::-webkit-scrollbar { width: 4px; }
     .ci-scroll::-webkit-scrollbar-track { background: transparent; }
-    .ci-scroll::-webkit-scrollbar-thumb { background: #1c1c38; border-radius: 2px; }
+    .ci-scroll::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 2px; }
     .ci-row {
       display: flex;
       align-items: baseline;
@@ -260,6 +275,7 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
     .ci-name {
       font-size: 0.78rem;
       color: #9090c0;
+      text-transform: uppercase;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -267,8 +283,8 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
     }
     .ci-porte {
       font-family: 'Space Mono', monospace;
-      font-size: 0.58rem;
-      color: #2e2e50;
+      font-size: 0.75rem;
+      color: var(--muted);
       flex-shrink: 0;
     }
   </style>
@@ -287,18 +303,11 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
       <p class="tagline">Cruzamento de CNPJs com bases públicas federais — Receita Federal, CGU, TSE, SIAFI e mais.</p>
       <p class="tagline">Entidades pré-computadas, sem consulta ao vivo — clique numa entidade abaixo para ver a rede.</p>
     </main>
-    <aside class="ci-panel">
-      <div class="ci-panel-header">
-        <span class="ci-panel-label">[ maior abrangência entre datasets ]</span>
-        <span class="ci-panel-count">${entitiesIndex.length} entidades</span>
-      </div>
-      <div class="ci-scroll">
-        ${entityRows || `<div style="padding:1rem 1.2rem;color:var(--muted);font-size:0.8rem">Nenhuma entidade pré-computada ainda — rode <code>bun run generate:static</code>.</div>`}
-      </div>
-    </aside>
+    ${renderEntityPanel("Empresas", empresas, links)}
+    ${renderEntityPanel("Pessoas", pessoas, links)}
   </div>
   <footer>
-    <span class="footer-copy">DATATIVE · CNPJ GRAPH · BASE DOS DADOS</span>
+    <span class="footer-copy">DATATIVE · CNPJ GRAPH</span>
     <span class="footer-status"><span class="status-dot"></span> ESTÁTICO</span>
   </footer>
 </body>
@@ -325,8 +334,18 @@ export function renderGraphPage(
     :root {
       --bg: #06060e; --surface: #0d0d20; --border: #1c1c38;
       --gold: #e8b84b; --text: #e4e4f0; --muted: #6868aa;
+      --scroll-thumb: #3d3d70;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--surface); }
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: var(--surface); }
+    *::-webkit-scrollbar-thumb {
+      background: var(--scroll-thumb);
+      border-radius: 6px;
+      border: 2px solid var(--surface);
+    }
+    *::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     html, body { height: 100%; overflow: hidden; }
     body {
       font-family: 'DM Sans', sans-serif;
