@@ -11,9 +11,11 @@ Datative é um site estático de investigação que mostra as redes das entidade
 ## Principais capacidades
 
 - Landing page lista as entidades pré-computadas, ordenadas por quantidade de datasets em que aparecem.
-- Visualização de grafo (empresa/pessoa <-> sócios <-> registros de outros datasets), servida a partir de `static/entities/<id>.json`.
+- Visualização de grafo (empresa/pessoa <-> sócios <-> registros de outros datasets), servida a partir de `static/entities/<id>.json`. Cada dataset com hits vira um nó-hub colorido (ex. "CGU · Contratos") com seus registros pendurados embaixo.
+- Painel lateral com uma seção por dataset (tabela de colunas originais, linha a linha) — clicar no nó-hub de um dataset no grafo foca/expande a seção correspondente no painel.
 - Layouts de grafo:
   - `radial`
+  - `radial-compact` ("Radial Compacto") — mesmo layout, mas limita quantos registros de cada dataset aparecem no anel (o resto vira um nó "+N mais"), para grafos com muitos hits por dataset
   - `forceatlas2`
   - `collapsible-tree`
   - `pack` (circle packing hierarquico, estilo D3 pack)
@@ -38,10 +40,10 @@ API:
 
 ## Arquitetura
 
-- `src/index.ts`: servidor HTTP puramente estático — landing page, página de grafo, `/api/graph/:id` lendo `static/`.
-- `src/graph-client.ts` + `src/node-shape-programs.ts`: bundle browser (Sigma 3 + graphology) que renderiza o `{nodes,links}` recebido.
-- `src/cnpj-datasets.ts`: configuração de datasets/cores usada tanto pelo cliente (coloração dos nós) quanto pelo gerador.
-- `scripts/generate-static-entities.ts`: **único** lugar que fala com dados ao vivo. Ranqueia entidades por quantidade de datasets distintos em que aparecem (não por volume de linhas), pré-computa a rede de cada uma no mesmo formato `{nodes,links}` e grava em `static/entities/<id>.json` + `static/entities-index.json`.
+- `src/index.ts`: servidor HTTP puramente estático — landing page, página de grafo, `/api/graph/:id` lendo `static/`. Também injeta `window.__DATASET_COLORS`/`window.__DATASET_META` (label, cor, campos id/label por dataset) a partir de `cnpj-datasets.ts`, para o cliente montar o painel sem nenhum fetch adicional.
+- `src/graph-client.ts` + `src/node-shape-programs.ts`: bundle browser (Sigma 3 + graphology). Agrupa cada dataset com hits sob um nó-hub (mesmo padrão visual de antes, quando isso vinha de `/api/lookup/*` ao vivo) e monta o painel lateral diretamente do JSON já carregado — não há mais nenhuma chamada de rede além do `GET /api/graph/:id` inicial.
+- `src/cnpj-datasets.ts`: configuração de datasets/cores usada tanto pelo cliente (coloração dos nós, metadados do painel) quanto pelo gerador.
+- `scripts/generate-static-entities.ts`: **único** lugar que fala com dados ao vivo. Ranqueia entidades por quantidade de datasets distintos em que aparecem (não por volume de linhas), pré-computa a rede de cada uma no mesmo formato `{nodes,links}` (cada nó de dataset carrega a linha SQL original em `row`, usada pelo painel) e grava em `static/entities/<id>.json` + `static/entities-index.json`.
 - `scripts/lib/`: camada de acesso a dados usada só pelo gerador (offline) — `duckdb-ssh.ts` (SQL via SSH em `beelink`), `parquet-store.ts` (monta `SELECT`/`WHERE`/`LIMIT` contra as views do catálogo), `cnpj-index.ts` (matching de coluna CNPJ/CPF), `cache.ts` (cache em disco entre execuções do gerador).
 - `data/schemas.json`: catálogo local dataset/tabela → colunas, usado por `scripts/lib/parquet-store.ts`.
 

@@ -8,8 +8,14 @@
  * sanctions + ...), because the latter makes a more varied, more interesting
  * static graph even with fewer total edges.
  *
- * For each of the top N entities, precomputes its full network in the same
- * {nodes, links} shape /api/graph/:cnpj returns, and writes:
+ * Ranked SEPARATELY per entity type (empresa vs pessoa) and top N taken from
+ * each — a mixed top-N would be almost entirely companies, since a person
+ * rarely accumulates the same dataset breadth as a bank. --top=50 therefore
+ * means "top 50 companies AND top 50 people", not "top 50 total".
+ *
+ * For each entity, precomputes its full network (person-centered for pessoa,
+ * company-centered for empresa) in the same {nodes, links} shape
+ * /api/graph/:cnpj used to return, and writes:
  *   static/entities/<id>.json      — one network per entity
  *   static/entities-index.json     — [{ id, type, label, datasetCount, path }]
  *
@@ -18,7 +24,7 @@
  * offline instead of doing it per-request.
  *
  * Usage:
- *   bun run scripts/generate-static-entities.ts [--top=100] [--per-dataset-limit=15] [--concurrency=6] [--force]
+ *   bun run scripts/generate-static-entities.ts [--top=50] [--per-dataset-limit=15] [--concurrency=6] [--force]
  */
 import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
@@ -38,7 +44,7 @@ const args = Object.fromEntries(
     return [k, v ?? "true"];
   }),
 );
-const TOP_N = parseInt(args.top ?? "100", 10);
+const TOP_N = parseInt(args.top ?? "50", 10);
 const PER_DATASET_LIMIT = parseInt(args["per-dataset-limit"] ?? "15", 10);
 const CONCURRENCY = parseInt(args.concurrency ?? "6", 10);
 const FORCE = args.force === "true";
@@ -302,8 +308,9 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
     rawWhere: `"documento" = '${documento}'`,
     limit: PER_DATASET_LIMIT,
   }));
-  const label = String(socioRows[0]?.nome ?? documento);
-  addNode({ id: documento, label, type: "socio" });
+  let label = String(socioRows[0]?.nome ?? documento);
+  const rootNode: GraphNode = { id: documento, label, type: "socio" };
+  addNode(rootNode);
 
   const companyIds = [...new Set(socioRows.map((r) => String(r.cnpj_basico)))];
   if (companyIds.length) {
@@ -355,6 +362,22 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
     });
   });
 
+  // br_me_cnpj.socios masks most CPFs for privacy, so the lookup above often
+  // finds nothing even when this CPF was ranked via an unmasked mixed column
+  // elsewhere (CGU/TSE/etc). Fall back to the first cross-dataset hit's own
+  // name field rather than showing the raw CPF digits as the entity's label.
+  if (label === documento) {
+    const preferred = ["nome_favorecido", "nome_contratado", "nome_fornecedor", "nome_doador", "nome", "razao_social", "nome_razao_social", "nome_fantasia"];
+    outer: for (const n of nodes) {
+      if (!n.row) continue;
+      for (const key of preferred) {
+        const value = n.row[key];
+        if (value) { label = String(value); break outer; }
+      }
+    }
+    rootNode.label = label;
+  }
+
   return { label, network: { nodes, links } };
 }
 
@@ -372,7 +395,14 @@ async function main() {
   const ranked = await rankEntities();
   log("ranked entities", { total: ranked.length });
 
-  const top = ranked.filter((r) => r.type === "empresa" || !isMaskedDocument(r.id)).slice(0, TOP_N);
+  // Ranked separately per type and capped at TOP_N each — a mixed top-N would
+  // be almost entirely companies (a person rarely accumulates the same
+  // dataset breadth as a bank), so pessoa entities would never make the cut.
+  const eligible = ranked.filter((r) => r.type === "empresa" || !isMaskedDocument(r.id));
+  const topEmpresas = eligible.filter((r) => r.type === "empresa").slice(0, TOP_N);
+  const topPessoas = eligible.filter((r) => r.type === "pessoa").slice(0, TOP_N);
+  log("split by type", { empresas: topEmpresas.length, pessoas: topPessoas.length });
+  const top = [...topEmpresas, ...topPessoas];
   const index: IndexEntry[] = [];
 
   for (let i = 0; i < top.length; i++) {

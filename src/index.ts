@@ -42,17 +42,29 @@ function escHtml(s: string): string {
 }
 
 // --- / landing page ---
+function renderEntityRow(e: EntityIndexEntry): string {
+  return (
+    `<a href="/?cnpj=${escHtml(e.id)}" class="ci-row">` +
+    `<span class="ci-cnpj">${escHtml(e.id)}</span>` +
+    `<span class="ci-name">${escHtml(e.label)}</span>` +
+    `<span class="ci-porte">${e.datasetCount} datasets</span>` +
+    `</a>`
+  );
+}
+
+function renderEntitySection(title: string, entities: EntityIndexEntry[]): string {
+  if (entities.length === 0) return "";
+  return (
+    `<div class="ci-section-header"><span>${escHtml(title)}</span><span>${entities.length}</span></div>` +
+    entities.map(renderEntityRow).join("")
+  );
+}
+
 function renderGraphLanding(): string {
-  const entityRows = entitiesIndex
-    .map(
-      (e) =>
-        `<a href="/?cnpj=${escHtml(e.id)}" class="ci-row">` +
-        `<span class="ci-cnpj">${escHtml(e.id)}</span>` +
-        `<span class="ci-name">${escHtml(e.label)}</span>` +
-        `<span class="ci-porte">${e.datasetCount} datasets</span>` +
-        `</a>`
-    )
-    .join("");
+  const empresas = entitiesIndex.filter((e) => e.type === "empresa");
+  const pessoas = entitiesIndex.filter((e) => e.type === "pessoa");
+  const entityRows =
+    renderEntitySection("Empresas", empresas) + renderEntitySection("Pessoas", pessoas);
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -209,6 +221,23 @@ function renderGraphLanding(): string {
       flex: 1;
       overflow-y: auto;
       padding: 0.25rem 0;
+    }
+    .ci-section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 0.5rem 1.2rem 0.3rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      opacity: 0.75;
+    }
+    .ci-section-header span:last-child {
+      color: #2e2e50;
+      letter-spacing: 0.05em;
+      text-transform: none;
     }
     .ci-scroll::-webkit-scrollbar { width: 4px; }
     .ci-scroll::-webkit-scrollbar-track { background: transparent; }
