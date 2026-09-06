@@ -209,7 +209,7 @@ async function rankEntities(): Promise<EntityRank[]> {
 
 // --- Pass 2: precompute each top entity's network ---
 
-interface GraphNode { id: string; label: string; type: string }
+interface GraphNode { id: string; label: string; type: string; datasetId?: string; datasetLabel?: string }
 interface GraphLink { source: string; target: string }
 interface EntityNetwork { nodes: GraphNode[]; links: GraphLink[] }
 
@@ -277,7 +277,7 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
     rows.forEach((row, i) => {
       const nodeId = `${ds.id}:${row[idField] ?? i}`;
       const nodeLabel = String(row[labelField] ?? nodeId);
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro" });
+      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label });
       links.push({ source: cnpjBasico, target: nodeId });
     });
   });
@@ -343,7 +343,7 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
     rows.forEach((row, i) => {
       const nodeId = `${ds.id}:${row[idField] ?? i}`;
       const nodeLabel = String(row[labelField] ?? nodeId);
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro" });
+      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label });
       links.push({ source: documento, target: nodeId });
     });
   });

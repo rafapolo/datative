@@ -8,6 +8,8 @@ interface GraphNode {
   id: string;
   label: string;
   type: string;
+  datasetId?: string;
+  datasetLabel?: string;
 }
 
 interface GraphLink {
@@ -1903,10 +1905,12 @@ async function init() {
     nodeTypeMap.set(n.id, n.type);
     graph.addNode(
       n.id,
-      nodeAttrs(n.type, n.label, {
-        empresaId: rootId,
-        isRoot: n.id === rootId,
-      }),
+      n.datasetId
+        ? nodeAttrs(n.type, n.label, { datasetId: n.datasetId })
+        : nodeAttrs(n.type, n.label, {
+            empresaId: rootId,
+            isRoot: n.id === rootId,
+          }),
     );
   }
 
@@ -1924,15 +1928,33 @@ async function init() {
       }
     }
   }
-  // Every other link (cross-dataset edges, empresa→empresa for expanded nodes,
-  // etc.) — skip ones already represented via the sócios group above. This
-  // used to be an else-branch that only ran when there were zero sócios,
-  // which silently dropped every non-sócio edge whenever a company had at
-  // least one partner (the precomputed static graphs always bake in every
-  // cross-dataset hit alongside sócios, unlike the old live-query payload
-  // which only ever contained empresa+sócios up front).
+
+  // Group every cross-dataset node under a per-dataset hub node (e.g. "CGU ·
+  // Contratos"), mirroring the old live /api/lookup expand-panel behavior
+  // (addResultsToGraph) instead of wiring each dataset hit straight to the
+  // root company — otherwise a company with dozens of hits across ~40
+  // datasets renders as one indistinguishable starburst off the root.
+  const datasetGroupIds = new Set<string>();
+  for (const n of data.nodes) {
+    if (!n.datasetId) continue;
+    const groupId = `group:${rootId}:${n.datasetId}`;
+    if (!datasetGroupIds.has(groupId)) {
+      datasetGroupIds.add(groupId);
+      const groupColor = DATASET_COLORS[n.datasetId] ?? "#888888";
+      ensureGroupNode(graph, groupId, n.datasetLabel ?? n.datasetId, groupColor, rootId);
+    }
+    const edgeKey = `${groupId}→${n.id}`;
+    knownLinkKeys.add(edgeKey);
+    if (graph.hasNode(groupId) && graph.hasNode(n.id) && !graph.hasEdge(groupId, n.id)) {
+      graph.addEdge(groupId, n.id, edgeAttrs());
+    }
+  }
+
+  // Any remaining link not covered by the sócios/dataset grouping above
+  // (e.g. empresa→empresa edges from holdings/ownership hits).
+  const groupedIds = new Set<string>([...socioIds, ...data.nodes.filter((n) => n.datasetId).map((n) => n.id)]);
   for (const l of data.links) {
-    if (socioIds.has(l.source) || socioIds.has(l.target)) continue;
+    if (groupedIds.has(l.source) || groupedIds.has(l.target)) continue;
     knownLinkKeys.add(`${l.source}→${l.target}`);
     if (
       graph.hasNode(l.source) &&

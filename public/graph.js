@@ -11043,7 +11043,7 @@ async function init() {
   for (const n2 of data.nodes) {
     knownNodeIds.add(n2.id);
     nodeTypeMap.set(n2.id, n2.type);
-    graph.addNode(n2.id, nodeAttrs(n2.type, n2.label, {
+    graph.addNode(n2.id, n2.datasetId ? nodeAttrs(n2.type, n2.label, { datasetId: n2.datasetId }) : nodeAttrs(n2.type, n2.label, {
       empresaId: rootId,
       isRoot: n2.id === rootId
     }));
@@ -11061,8 +11061,25 @@ async function init() {
       }
     }
   }
+  const datasetGroupIds = new Set;
+  for (const n2 of data.nodes) {
+    if (!n2.datasetId)
+      continue;
+    const groupId = `group:${rootId}:${n2.datasetId}`;
+    if (!datasetGroupIds.has(groupId)) {
+      datasetGroupIds.add(groupId);
+      const groupColor = DATASET_COLORS[n2.datasetId] ?? "#888888";
+      ensureGroupNode(graph, groupId, n2.datasetLabel ?? n2.datasetId, groupColor, rootId);
+    }
+    const edgeKey = `${groupId}→${n2.id}`;
+    knownLinkKeys.add(edgeKey);
+    if (graph.hasNode(groupId) && graph.hasNode(n2.id) && !graph.hasEdge(groupId, n2.id)) {
+      graph.addEdge(groupId, n2.id, edgeAttrs());
+    }
+  }
+  const groupedIds = new Set([...socioIds, ...data.nodes.filter((n2) => n2.datasetId).map((n2) => n2.id)]);
   for (const l2 of data.links) {
-    if (socioIds.has(l2.source) || socioIds.has(l2.target))
+    if (groupedIds.has(l2.source) || groupedIds.has(l2.target))
       continue;
     knownLinkKeys.add(`${l2.source}→${l2.target}`);
     if (graph.hasNode(l2.source) && graph.hasNode(l2.target) && !graph.hasEdge(l2.source, l2.target)) {
