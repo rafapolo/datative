@@ -10132,6 +10132,29 @@ function runLayout(graph, _iterations, onDone) {
 function injectPanelStyles() {
   const style = document.createElement("style");
   style.textContent = `
+    #lookup-panel, #node-details-panel {
+      scrollbar-width: thin;
+      scrollbar-color: #42427a #0a0f22;
+    }
+    #lookup-panel *::-webkit-scrollbar,
+    #node-details-panel *::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    #lookup-panel *::-webkit-scrollbar-track,
+    #node-details-panel *::-webkit-scrollbar-track {
+      background: #0a0f22;
+    }
+    #lookup-panel *::-webkit-scrollbar-thumb,
+    #node-details-panel *::-webkit-scrollbar-thumb {
+      background: #42427a;
+      border-radius: 6px;
+      border: 2px solid #0a0f22;
+    }
+    #lookup-panel *::-webkit-scrollbar-thumb:hover,
+    #node-details-panel *::-webkit-scrollbar-thumb:hover {
+      background: #4f46e5;
+    }
     #lookup-panel {
       position: fixed;
       top: 46px;
@@ -10366,30 +10389,31 @@ function injectPanelStyles() {
     }
     #node-details-panel {
       position: fixed;
-      top: 80px;
-      right: 20px;
+      top: 46px;
+      right: 0;
       width: 360px;
       max-width: min(360px, 90vw);
-      max-height: 70vh;
+      /* Grows to fit its content, capped at the full space below the
+         toolbar/above the footer — #node-details-body's overflow-y:auto
+         only kicks in past that cap, so scrolling is a fallback, not
+         the default for typical short node-detail cards. */
+      max-height: calc(100vh - 46px - 30px);
       background: #0c1024;
       color: #e0e0e0;
       display: flex;
       flex-direction: column;
       z-index: 1200;
-      border: 1px solid #23234a;
-      border-radius: 10px;
-      transform: scale(0.96);
-      opacity: 0;
-      pointer-events: none;
-      transition: transform 0.15s ease, opacity 0.15s ease;
-      box-shadow: 0 14px 34px rgba(0,0,0,0.5);
+      border-left: 1px solid #23234a;
+      border-bottom: 1px solid #23234a;
+      border-radius: 0 0 0 10px;
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+      box-shadow: -4px 4px 20px rgba(0,0,0,0.45);
       font-family: system-ui, sans-serif;
       font-size: 0.82rem;
     }
     #node-details-panel.open {
-      transform: scale(1);
-      opacity: 1;
-      pointer-events: auto;
+      transform: translateX(0);
     }
     #node-details-header {
       display: flex;
@@ -10398,10 +10422,8 @@ function injectPanelStyles() {
       padding: 0.75rem 0.9rem;
       border-bottom: 1px solid #23234a;
       background: #080814;
-      cursor: grab;
       user-select: none;
     }
-    #node-details-header:active { cursor: grabbing; }
     #node-details-title {
       color: #93c5fd;
       font-weight: 700;
@@ -10538,40 +10560,6 @@ function injectPanelStyles() {
   `;
   document.head.appendChild(style);
 }
-function makeDraggable(panel, handleId) {
-  const handle = document.getElementById(handleId);
-  let dragging = false;
-  let startX = 0, startY = 0, startLeft = 0, startTop = 0;
-  handle.addEventListener("mousedown", (e3) => {
-    if (isMobileViewport())
-      return;
-    if (!panel.classList.contains("open"))
-      return;
-    if (e3.target.closest("button"))
-      return;
-    const rect = panel.getBoundingClientRect();
-    panel.style.left = rect.left + "px";
-    panel.style.top = rect.top + "px";
-    panel.style.right = "auto";
-    panel.style.transform = "none";
-    panel.style.transition = "none";
-    dragging = true;
-    startX = e3.clientX;
-    startY = e3.clientY;
-    startLeft = rect.left;
-    startTop = rect.top;
-    e3.preventDefault();
-  });
-  document.addEventListener("mousemove", (e3) => {
-    if (!dragging)
-      return;
-    panel.style.left = startLeft + (e3.clientX - startX) + "px";
-    panel.style.top = startTop + (e3.clientY - startY) + "px";
-  });
-  document.addEventListener("mouseup", () => {
-    dragging = false;
-  });
-}
 function makeResizable(panel, edge, onResize) {
   const resizer = document.createElement("div");
   resizer.className = "panel-resizer";
@@ -10651,15 +10639,7 @@ function makeResizable(panel, edge, onResize) {
     vResizing = false;
   });
 }
-function resetPanelPosition(panel) {
-  panel.style.left = "";
-  panel.style.right = "";
-  panel.style.top = "";
-  panel.style.transform = "";
-  panel.style.transition = "";
-}
 function closePanel(panel) {
-  resetPanelPosition(panel);
   panel.classList.remove("open");
 }
 function updateGraphLayout() {
@@ -10671,22 +10651,9 @@ function updateGraphLayout() {
   container.style.marginLeft = offset ? `${offset}px` : "";
   container.style.width = offset ? `calc(100% - ${offset}px)` : "";
   renderer?.resize();
+  renderer?.refresh({ skipIndexation: true });
 }
 window.addEventListener("resize", updateGraphLayout);
-function positionFloatingPanel(panel) {
-  resetPanelPosition(panel);
-  if (isMobileViewport())
-    return;
-  const margin = 12;
-  const topBound = 46 + margin;
-  const width = panel.offsetWidth || 360;
-  const height = panel.offsetHeight || 320;
-  const x = Math.min(Math.max(margin, window.innerWidth - width - 24), window.innerWidth - width - margin);
-  const y = Math.min(Math.max(topBound, 80), window.innerHeight - height - margin);
-  panel.style.left = `${x}px`;
-  panel.style.top = `${y}px`;
-  panel.style.right = "auto";
-}
 function createPanel() {
   const panel = document.createElement("aside");
   panel.id = "lookup-panel";
@@ -10721,7 +10688,6 @@ function createNodeDetailsPanel() {
   document.getElementById("node-details-close").addEventListener("click", () => {
     closePanel(panel);
   });
-  makeDraggable(panel, "node-details-header");
   makeResizable(panel, "left");
   return panel;
 }
@@ -10770,10 +10736,7 @@ function showNodeDetails(nodeId, graph) {
     if (isMobileViewport()) {
       closePanel(document.getElementById("lookup-panel"));
     }
-    const wasOpen = panel.classList.contains("open");
     panel.classList.add("open");
-    if (!wasOpen)
-      positionFloatingPanel(panel);
   };
   if (details.length === 0) {
     openPanel();
