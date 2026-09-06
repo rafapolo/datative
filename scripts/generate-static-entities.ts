@@ -45,7 +45,18 @@ const args = Object.fromEntries(
   }),
 );
 const TOP_N = parseInt(args.top ?? "50", 10);
+// Caps how many of a dataset's matching rows render as graph nodes/edges —
+// keeps the visualization from turning into a starburst on a dataset with
+// hundreds of hits. The lookup panel's row table is NOT capped by this: it
+// fetches up to PANEL_LIMIT rows regardless, so the table always reflects the
+// true hit count even when the graph only shows a subset.
 const PER_DATASET_LIMIT = parseInt(args["per-dataset-limit"] ?? "15", 10);
+// SQL fetch limit for the panel's row table. Generous but not unbounded —
+// a handful of high-volume datasets (e.g. TSE despesas_candidato) could
+// plausibly return thousands of rows for one heavily-referenced CNPJ, and an
+// actually-unbounded fetch risks the same cardinality/JSON-size problem the
+// ranking pass's COUNT(DISTINCT) guard exists for (see MAX_DISTINCT below).
+const PANEL_LIMIT = parseInt(args["panel-limit"] ?? "500", 10);
 const CONCURRENCY = parseInt(args.concurrency ?? "6", 10);
 const FORCE = args.force === "true";
 
@@ -222,6 +233,10 @@ interface GraphNode {
   datasetId?: string;
   datasetLabel?: string;
   row?: Record<string, unknown>;
+  // false for rows beyond PER_DATASET_LIMIT within a dataset — still carries
+  // `row` for the client's lookup panel table, but the client must not add it
+  // as a visual graph node/edge. Omitted (implicitly true) for every other node.
+  inGraph?: boolean;
 }
 interface GraphLink { source: string; target: string }
 interface EntityNetwork { nodes: GraphNode[]; links: GraphLink[] }
@@ -278,7 +293,7 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
         execRemoteSQL(buildSelectSQL(parts[1], parts[2], {
           columns,
           rawWhere: `(${clauses.join(" OR ")})`,
-          limit: PER_DATASET_LIMIT,
+          limit: PANEL_LIMIT,
         })),
         QUERY_TIMEOUT_MS,
         `${ds.id} lookup for ${cnpjBasico}`,
@@ -290,8 +305,9 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
     rows.forEach((row, i) => {
       const nodeId = `${ds.id}:${row[idField] ?? i}`;
       const nodeLabel = String(row[labelField] ?? nodeId);
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row });
-      links.push({ source: cnpjBasico, target: nodeId });
+      const inGraph = i < PER_DATASET_LIMIT;
+      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row, ...(inGraph ? {} : { inGraph: false }) });
+      if (inGraph) links.push({ source: cnpjBasico, target: nodeId });
     });
   });
 
@@ -345,7 +361,7 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
         execRemoteSQL(buildSelectSQL(parts[1], parts[2], {
           columns,
           rawWhere: `(${clauses.join(" OR ")})`,
-          limit: PER_DATASET_LIMIT,
+          limit: PANEL_LIMIT,
         })),
         QUERY_TIMEOUT_MS,
         `${ds.id} lookup for ${documento}`,
@@ -357,8 +373,9 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
     rows.forEach((row, i) => {
       const nodeId = `${ds.id}:${row[idField] ?? i}`;
       const nodeLabel = String(row[labelField] ?? nodeId);
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row });
-      links.push({ source: documento, target: nodeId });
+      const inGraph = i < PER_DATASET_LIMIT;
+      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row, ...(inGraph ? {} : { inGraph: false }) });
+      if (inGraph) links.push({ source: documento, target: nodeId });
     });
   });
 

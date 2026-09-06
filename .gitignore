@@ -9,3 +9,4 @@ gcp-credentials.json
 tmp/
 package-lock.json
 cnpj-index-cache.json
+dist/

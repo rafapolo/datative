@@ -11,6 +11,10 @@ interface GraphNode {
   datasetId?: string;
   datasetLabel?: string;
   row?: Record<string, unknown>;
+  // false = beyond the generator's per-dataset graph cap: keep in the lookup
+  // panel's row table (it still carries `row`), but never add as a visual
+  // graph node/edge. Omitted (implicitly true) for every other node.
+  inGraph?: boolean;
 }
 
 interface GraphLink {
@@ -291,14 +295,18 @@ function focusLookupSection(datasetId: string) {
 }
 
 async function fetchGraph(cnpj: string): Promise<GraphData> {
-  debugLog("GET /api/graph", { cnpj });
-  const res = await fetch(`/api/graph/${cnpj}`);
+  // Relative (no leading slash) so it resolves the same way whether the page
+  // is served at "/" (dev server) or published under a subpath, e.g. GitHub
+  // Pages project pages serve at "/<repo>/" (scripts/build-site.ts's output).
+  const url = `entities/${cnpj}.json`;
+  debugLog("GET", { url });
+  const res = await fetch(url);
   if (!res.ok) {
     const body = await res.text().catch(() => "(unreadable)");
-    console.error(`[fetch] ${res.status} /api/graph/${cnpj}`, body);
+    console.error(`[fetch] ${res.status} ${url}`, body);
     throw new Error(`API error ${res.status}`);
   }
-  debugLog("GET /api/graph done", { cnpj, status: res.status });
+  debugLog("GET done", { url, status: res.status });
   return res.json() as Promise<GraphData>;
 }
 
@@ -919,10 +927,10 @@ function injectPanelStyles() {
     #lookup-panel {
       position: fixed;
       top: 46px;
-      right: 0;
-      width: 420px;
+      left: 0;
+      width: 30vw;
       min-width: 320px;
-      max-width: 85vw;
+      max-width: min(480px, 85vw);
       height: calc(100vh - 46px - 30px);
       min-height: calc(100vh - 46px - 30px);
       max-height: calc(100vh - 46px - 30px);
@@ -932,9 +940,9 @@ function injectPanelStyles() {
       flex-direction: column;
       overflow: hidden;
       z-index: 1000;
-      transform: translateX(100%);
+      transform: translateX(-100%);
       transition: transform 0.25s ease;
-      box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+      box-shadow: 4px 0 20px rgba(0,0,0,0.5);
       font-family: system-ui, sans-serif;
       font-size: 0.85rem;
     }
@@ -1153,7 +1161,7 @@ function injectPanelStyles() {
     #node-details-panel {
       position: fixed;
       top: 46px;
-      left: 0;
+      right: 0;
       width: 360px;
       height: calc(100vh - 46px - 30px);
       background: #0c1024;
@@ -1161,9 +1169,9 @@ function injectPanelStyles() {
       display: flex;
       flex-direction: column;
       z-index: 1000;
-      transform: translateX(-100%);
+      transform: translateX(100%);
       transition: transform 0.25s ease;
-      box-shadow: 4px 0 20px rgba(0,0,0,0.45);
+      box-shadow: -4px 0 20px rgba(0,0,0,0.45);
       font-family: system-ui, sans-serif;
       font-size: 0.82rem;
     }
@@ -1372,7 +1380,7 @@ function createPanel(): HTMLElement {
   });
 
   makeDraggable(panel, "lookup-header");
-  makeResizable(panel, "left");
+  makeResizable(panel, "right");
 
   return panel;
 }
@@ -1397,7 +1405,7 @@ function createNodeDetailsPanel(): HTMLElement {
     });
 
   makeDraggable(panel, "node-details-header");
-  makeResizable(panel, "right");
+  makeResizable(panel, "left");
 
   return panel;
 }
@@ -1639,7 +1647,11 @@ function openLookupPanel(
 // --- Init ---
 async function init() {
   const params = new URLSearchParams(location.search);
-  const cnpj = params.get("cnpj");
+  // Dev server: id comes from the ?cnpj= query param (one shared page, "/").
+  // Static build (scripts/build-site.ts): each entity gets its own HTML file
+  // with no query string, so the id is baked in as window.__ENTITY_ID__.
+  const cnpj = params.get("cnpj") ??
+    (window as unknown as { __ENTITY_ID__?: string }).__ENTITY_ID__ ?? null;
   currentLookupLimit = sanitizeLookupLimit(params.get("qlimit"));
   const container = document.getElementById(
     "graph-container",
@@ -1675,7 +1687,12 @@ async function init() {
   // Update breadcrumb with company name
   const bcLabel = document.getElementById("bc-label");
   if (bcLabel && rootNode?.label) bcLabel.textContent = rootNode.label;
+  // n.inGraph === false: overflow row beyond the generator's per-dataset cap.
+  // Still shows up in the lookup panel's table (built separately from
+  // data.nodes below), but must not become a visual node — skip entirely
+  // here so it's never added to Sigma, grouped under a hub, or clickable.
   for (const n of data.nodes) {
+    if (n.inGraph === false) continue;
     knownNodeIds.add(n.id);
     nodeTypeMap.set(n.id, n.type);
     graph.addNode(
@@ -1874,11 +1891,12 @@ async function init() {
     });
   }
 
-  // Build the lookup panel straight from the precomputed graph JSON — every
-  // dataset node was already added to the graph above (grouped under its
-  // per-dataset hub), so this only assembles the side-panel table view, no
-  // fetch involved. Datasets with no hits still get a row (count 0, empty)
-  // to match the old panel's full dataset listing.
+  // Build the lookup panel straight from the precomputed graph JSON — no
+  // fetch involved. Deliberately includes inGraph:false nodes too (the
+  // generator's overflow rows beyond its per-dataset graph cap): the panel's
+  // row count/table always reflects every hit, even for datasets where only
+  // a subset became visual graph nodes above. Datasets with no hits still
+  // get a row (count 0, empty) to match the old panel's full dataset listing.
   const overlay = document.getElementById("loading-overlay");
   const nodesByDataset = new Map<string, GraphNode[]>();
   for (const n of data.nodes) {

@@ -9700,14 +9700,15 @@ function focusLookupSection(datasetId) {
   section.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 async function fetchGraph(cnpj) {
-  debugLog("GET /api/graph", { cnpj });
-  const res = await fetch(`/api/graph/${cnpj}`);
+  const url = `entities/${cnpj}.json`;
+  debugLog("GET", { url });
+  const res = await fetch(url);
   if (!res.ok) {
     const body = await res.text().catch(() => "(unreadable)");
-    console.error(`[fetch] ${res.status} /api/graph/${cnpj}`, body);
+    console.error(`[fetch] ${res.status} ${url}`, body);
     throw new Error(`API error ${res.status}`);
   }
-  debugLog("GET /api/graph done", { cnpj, status: res.status });
+  debugLog("GET done", { url, status: res.status });
   return res.json();
 }
 function assignEmpresaColor(id) {
@@ -10142,7 +10143,7 @@ function injectPanelStyles() {
     #lookup-panel {
       position: fixed;
       top: 46px;
-      right: 0;
+      left: 0;
       width: 420px;
       min-width: 320px;
       max-width: 85vw;
@@ -10155,9 +10156,9 @@ function injectPanelStyles() {
       flex-direction: column;
       overflow: hidden;
       z-index: 1000;
-      transform: translateX(100%);
+      transform: translateX(-100%);
       transition: transform 0.25s ease;
-      box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+      box-shadow: 4px 0 20px rgba(0,0,0,0.5);
       font-family: system-ui, sans-serif;
       font-size: 0.85rem;
     }
@@ -10376,7 +10377,7 @@ function injectPanelStyles() {
     #node-details-panel {
       position: fixed;
       top: 46px;
-      left: 0;
+      right: 0;
       width: 360px;
       height: calc(100vh - 46px - 30px);
       background: #0c1024;
@@ -10384,9 +10385,9 @@ function injectPanelStyles() {
       display: flex;
       flex-direction: column;
       z-index: 1000;
-      transform: translateX(-100%);
+      transform: translateX(100%);
       transition: transform 0.25s ease;
-      box-shadow: 4px 0 20px rgba(0,0,0,0.45);
+      box-shadow: -4px 0 20px rgba(0,0,0,0.45);
       font-family: system-ui, sans-serif;
       font-size: 0.82rem;
     }
@@ -10581,7 +10582,7 @@ function createPanel() {
     lookupHistory.length = 0;
   });
   makeDraggable(panel, "lookup-header");
-  makeResizable(panel, "left");
+  makeResizable(panel, "right");
   return panel;
 }
 function createNodeDetailsPanel() {
@@ -10600,7 +10601,7 @@ function createNodeDetailsPanel() {
     panel.classList.remove("open");
   });
   makeDraggable(panel, "node-details-header");
-  makeResizable(panel, "right");
+  makeResizable(panel, "left");
   return panel;
 }
 function showNodeDetails(nodeId, graph) {
@@ -10790,7 +10791,7 @@ function openLookupPanel(cnpj, graph, results) {
 }
 async function init() {
   const params = new URLSearchParams(location.search);
-  const cnpj = params.get("cnpj");
+  const cnpj = params.get("cnpj") ?? window.__ENTITY_ID__ ?? null;
   currentLookupLimit = sanitizeLookupLimit(params.get("qlimit"));
   const container = document.getElementById("graph-container");
   if (!cnpj) {
@@ -10818,6 +10819,8 @@ async function init() {
   if (bcLabel && rootNode?.label)
     bcLabel.textContent = rootNode.label;
   for (const n2 of data.nodes) {
+    if (n2.inGraph === false)
+      continue;
     knownNodeIds.add(n2.id);
     nodeTypeMap.set(n2.id, n2.type);
     graph.addNode(n2.id, n2.datasetId ? nodeAttrs(n2.type, n2.label, { datasetId: n2.datasetId }) : nodeAttrs(n2.type, n2.label, {

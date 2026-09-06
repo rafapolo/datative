@@ -6,6 +6,7 @@
     "start": "bun run src/index.ts",
     "dev": "bun --watch run src/index.ts",
     "build:graph": "bun build src/graph-client.ts --outfile public/graph.js --target browser",
+    "build:site": "bun run scripts/build-site.ts",
     "generate:static": "bun run scripts/generate-static-entities.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
