@@ -97,6 +97,14 @@ let currentLookupLimit = 10;
 let currentGraph: Graph | null = null;
 const LOOKUP_LIMIT_OPTIONS = new Set([10, 20, 30, 40]);
 
+// Below this viewport width, both side panels collapse into full-width
+// bottom sheets (see the `@media` block in injectPanelStyles) — kept as a
+// JS constant too so drag/resize/positioning logic can agree with the CSS.
+const MOBILE_BREAKPOINT_PX = 768;
+function isMobileViewport(): boolean {
+  return window.innerWidth <= MOBILE_BREAKPOINT_PX;
+}
+
 // Populated by radialCompactLayout: leaves beyond COMPACT_MAX_LEAVES per hub
 // are hidden (node + incident edges) rather than crammed into the same arc,
 // and one of them is repurposed to display a "+N mais" marker in its place.
@@ -1160,23 +1168,30 @@ function injectPanelStyles() {
     }
     #node-details-panel {
       position: fixed;
-      top: 46px;
-      right: 0;
+      top: 80px;
+      right: 20px;
       width: 360px;
-      height: calc(100vh - 46px - 30px);
+      max-width: min(360px, 90vw);
+      max-height: 70vh;
       background: #0c1024;
       color: #e0e0e0;
       display: flex;
       flex-direction: column;
-      z-index: 1000;
-      transform: translateX(100%);
-      transition: transform 0.25s ease;
-      box-shadow: -4px 0 20px rgba(0,0,0,0.45);
+      z-index: 1200;
+      border: 1px solid #23234a;
+      border-radius: 10px;
+      transform: scale(0.96);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.5);
       font-family: system-ui, sans-serif;
       font-size: 0.82rem;
     }
     #node-details-panel.open {
-      transform: translateX(0);
+      transform: scale(1);
+      opacity: 1;
+      pointer-events: auto;
     }
     #node-details-header {
       display: flex;
@@ -1215,6 +1230,7 @@ function injectPanelStyles() {
       overflow-y: auto;
       padding: 0.55rem 0.7rem 0.8rem;
       flex: 1;
+      min-height: 0;
     }
     .node-detail-meta {
       border: 1px solid #1f2a44;
@@ -1270,6 +1286,51 @@ function injectPanelStyles() {
       font-style: italic;
       padding: 0.4rem 0.2rem;
     }
+    .panel-resizer {
+      display: block;
+    }
+    @media (max-width: ${MOBILE_BREAKPOINT_PX}px) {
+      #lookup-panel,
+      #node-details-panel {
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: 78vh !important;
+        border-radius: 14px 14px 0 0;
+        border: none;
+        border-top: 1px solid #23234a;
+        transform: translateY(100%) !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        box-shadow: 0 -8px 24px rgba(0,0,0,0.5) !important;
+      }
+      #lookup-panel.open,
+      #node-details-panel.open {
+        transform: translateY(0) !important;
+      }
+      #lookup-header,
+      #node-details-header {
+        cursor: default;
+      }
+      #lookup-close,
+      #node-details-close,
+      #lookup-back {
+        min-width: 44px;
+        min-height: 44px;
+      }
+      .lookup-section-header {
+        min-height: 44px;
+      }
+      .panel-resizer {
+        display: none;
+      }
+    }
   `;
   document.head.appendChild(style);
 }
@@ -1283,6 +1344,7 @@ function makeDraggable(panel: HTMLElement, handleId: string) {
     startTop = 0;
 
   handle.addEventListener("mousedown", (e) => {
+    if (isMobileViewport()) return; // bottom sheets aren't draggable
     if (!panel.classList.contains("open")) return;
     // Don't drag when clicking buttons inside the header
     if ((e.target as HTMLElement).closest("button")) return;
@@ -1313,6 +1375,7 @@ function makeDraggable(panel: HTMLElement, handleId: string) {
 
 function makeResizable(panel: HTMLElement, edge: "left" | "right") {
   const resizer = document.createElement("div");
+  resizer.className = "panel-resizer";
   resizer.style.cssText = `
     position: absolute;
     ${edge}: 0;
@@ -1330,6 +1393,7 @@ function makeResizable(panel: HTMLElement, edge: "left" | "right") {
     startW = 0;
 
   resizer.addEventListener("mousedown", (e) => {
+    if (isMobileViewport()) return; // bottom sheets aren't resizable
     resizing = true;
     startX = e.clientX;
     startW = panel.offsetWidth;
@@ -1360,6 +1424,40 @@ function resetPanelPosition(panel: HTMLElement) {
   panel.style.transition = "";
 }
 
+function closePanel(panel: HTMLElement) {
+  resetPanelPosition(panel);
+  panel.classList.remove("open");
+}
+
+// Anchors the floating node-details card near wherever it was triggered
+// (a graph node click or a lookup-table row click) instead of always
+// docking to a fixed screen edge — clamped so it never runs off-viewport.
+// On mobile it's a no-op: the CSS bottom-sheet rules take over entirely.
+function positionFloatingPanel(
+  panel: HTMLElement,
+  anchor?: { x: number; y: number },
+) {
+  resetPanelPosition(panel);
+  if (isMobileViewport()) return;
+
+  const margin = 12;
+  const topBound = 46 + margin; // below the top toolbar
+  // offsetWidth/Height (not getBoundingClientRect) — unaffected by the
+  // open/close scale() transform, so clamping uses the settled layout size.
+  const width = panel.offsetWidth || 360;
+  const height = panel.offsetHeight || 320;
+
+  let x = anchor ? anchor.x + 16 : window.innerWidth - width - 24;
+  let y = anchor ? anchor.y + 16 : 80;
+
+  x = Math.min(Math.max(margin, x), window.innerWidth - width - margin);
+  y = Math.min(Math.max(topBound, y), window.innerHeight - height - margin);
+
+  panel.style.left = `${x}px`;
+  panel.style.top = `${y}px`;
+  panel.style.right = "auto";
+}
+
 function createPanel(): HTMLElement {
   const panel = document.createElement("aside");
   panel.id = "lookup-panel";
@@ -1374,8 +1472,7 @@ function createPanel(): HTMLElement {
   document.body.appendChild(panel);
 
   document.getElementById("lookup-close")!.addEventListener("click", () => {
-    resetPanelPosition(panel);
-    panel.classList.remove("open");
+    closePanel(panel);
     lookupHistory.length = 0;
   });
 
@@ -1400,8 +1497,7 @@ function createNodeDetailsPanel(): HTMLElement {
   document
     .getElementById("node-details-close")!
     .addEventListener("click", () => {
-      resetPanelPosition(panel);
-      panel.classList.remove("open");
+      closePanel(panel);
     });
 
   makeDraggable(panel, "node-details-header");
@@ -1410,7 +1506,11 @@ function createNodeDetailsPanel(): HTMLElement {
   return panel;
 }
 
-function showNodeDetails(nodeId: string, graph: Graph) {
+function showNodeDetails(
+  nodeId: string,
+  graph: Graph,
+  anchor?: { x: number; y: number },
+) {
   const panel = document.getElementById("node-details-panel") as HTMLElement;
   const title = document.getElementById("node-details-title")!;
   const body = document.getElementById("node-details-body")!;
@@ -1460,8 +1560,16 @@ function showNodeDetails(nodeId: string, graph: Graph) {
   meta.innerHTML = `<tbody>${metaRows.join("")}</tbody>`;
   body.appendChild(meta);
 
-  if (details.length === 0) {
+  const openAnchored = () => {
+    if (isMobileViewport()) {
+      closePanel(document.getElementById("lookup-panel") as HTMLElement);
+    }
     panel.classList.add("open");
+    positionFloatingPanel(panel, anchor);
+  };
+
+  if (details.length === 0) {
+    openAnchored();
     return;
   }
 
@@ -1491,7 +1599,7 @@ function showNodeDetails(nodeId: string, graph: Graph) {
     body.appendChild(card);
   }
 
-  panel.classList.add("open");
+  openAnchored();
 }
 
 function renderResultSections(
@@ -1569,14 +1677,14 @@ function renderResultSections(
           }
           tr.appendChild(td);
         }
-        tr.addEventListener("click", () => {
+        tr.addEventListener("click", (e) => {
           const nodeIds = rowSignatureToNodeIds.get(signature);
           if (!nodeIds || nodeIds.size === 0 || !currentGraph) return;
           const nodeId = [...nodeIds][0];
           selectedNode = nodeId;
           hoveredNode = null;
           renderer?.refresh({ skipIndexation: true });
-          showNodeDetails(nodeId, currentGraph);
+          showNodeDetails(nodeId, currentGraph, { x: e.clientX, y: e.clientY });
           syncLookupRowHighlight();
         });
         tbody.appendChild(tr);
@@ -1637,6 +1745,9 @@ function openLookupPanel(
 
   title.textContent = `CNPJ: ${cnpj}`;
   backBtn.style.display = lookupHistory.length > 0 ? "inline-block" : "none";
+  if (isMobileViewport()) {
+    closePanel(document.getElementById("node-details-panel") as HTMLElement);
+  }
   panel.classList.add("open");
 
   const hits = results.filter((result) => result.count > 0).length;
@@ -1975,7 +2086,7 @@ async function init() {
     syncLookupRowHighlight();
   });
 
-  renderer.on("clickNode", ({ node }) => {
+  renderer.on("clickNode", ({ node, event }) => {
     selectedNode = selectedNode === node ? null : node;
     hoveredNode = null;
     renderer!.refresh({ skipIndexation: true });
@@ -1988,7 +2099,12 @@ async function init() {
         : "";
       if (datasetId && datasetId !== "socios") focusLookupSection(datasetId);
     }
-    showNodeDetails(node, graph);
+    const original = event.original;
+    const anchor =
+      "clientX" in original
+        ? { x: original.clientX, y: original.clientY }
+        : undefined;
+    showNodeDetails(node, graph, anchor);
   });
 }
 
