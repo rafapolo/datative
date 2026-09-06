@@ -26,11 +26,12 @@
  * Usage:
  *   bun run scripts/generate-static-entities.ts [--top=50] [--per-dataset-limit=15] [--concurrency=6] [--force]
  */
-import { mkdirSync, writeFileSync, existsSync } from "fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { execRemoteSQL } from "./lib/duckdb-ssh";
 import { buildSelectSQL } from "./lib/parquet-store";
 import { extractCnpjRoot, socioNodeId, isMaskedDocument } from "./lib/cnpj-index";
+import { hashCpf, isPersonalDocColumn, sanitizeCpfValue, sanitizeRow } from "./lib/cpf-privacy";
 import { CNPJ_DATASETS, type CnpjColumn, type CnpjDatasetEntry } from "../src/cnpj-datasets";
 
 function log(...args: unknown[]) {
@@ -248,6 +249,27 @@ function inferNodeFields(ds: CnpjDatasetEntry): { idField: string; labelField: s
   };
 }
 
+// Builds a cross-dataset hit's node id/label, masking the underlying value
+// only when the source field is itself a known document column (never a
+// blanket scan — see isPersonalDocColumn) so unrelated 11-digit ids/free text
+// in other fields are left untouched.
+function safeNodeIdAndLabel(
+  ds: CnpjDatasetEntry,
+  row: Record<string, unknown>,
+  idField: string,
+  labelField: string,
+  fallbackIndex: number,
+): { nodeId: string; nodeLabel: string } {
+  const docColumns = ds.cnpjColumns.map((c) => c.name);
+  const rawId = row[idField] ?? fallbackIndex;
+  const idValue = isPersonalDocColumn(idField, docColumns) ? sanitizeCpfValue(rawId) : rawId;
+  const nodeId = `${ds.id}:${idValue}`;
+  const rawLabel = row[labelField];
+  const labelValue = isPersonalDocColumn(labelField, docColumns) ? sanitizeCpfValue(rawLabel) : rawLabel;
+  const nodeLabel = String(labelValue ?? nodeId);
+  return { nodeId, nodeLabel };
+}
+
 async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string; network: EntityNetwork }> {
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
@@ -303,10 +325,10 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
       return;
     }
     rows.forEach((row, i) => {
-      const nodeId = `${ds.id}:${row[idField] ?? i}`;
-      const nodeLabel = String(row[labelField] ?? nodeId);
+      const { nodeId, nodeLabel } = safeNodeIdAndLabel(ds, row, idField, labelField, i);
       const inGraph = i < PER_DATASET_LIMIT;
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row, ...(inGraph ? {} : { inGraph: false }) });
+      const safeRow = sanitizeRow(row, ds.cnpjColumns.map((c) => c.name));
+      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row: safeRow, ...(inGraph ? {} : { inGraph: false }) });
       if (inGraph) links.push({ source: cnpjBasico, target: nodeId });
     });
   });
@@ -314,7 +336,7 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
   return { label, network: { nodes, links } };
 }
 
-async function buildPessoaNetwork(documento: string): Promise<{ label: string; network: EntityNetwork }> {
+async function buildPessoaNetwork(documento: string, publicId: string): Promise<{ label: string; network: EntityNetwork }> {
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
   const addNode = (n: GraphNode) => { if (!nodes.find((x) => x.id === n.id)) nodes.push(n); };
@@ -324,8 +346,8 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
     rawWhere: `"documento" = '${documento}'`,
     limit: PER_DATASET_LIMIT,
   }));
-  let label = String(socioRows[0]?.nome ?? documento);
-  const rootNode: GraphNode = { id: documento, label, type: "socio" };
+  let label = String(socioRows[0]?.nome ?? sanitizeCpfValue(documento));
+  const rootNode: GraphNode = { id: publicId, label, type: "socio" };
   addNode(rootNode);
 
   const companyIds = [...new Set(socioRows.map((r) => String(r.cnpj_basico)))];
@@ -338,7 +360,7 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
     const labelByCnpj = new Map(empresaRows.map((r) => [String(r.cnpj_basico), String(r.razao_social ?? r.cnpj_basico)]));
     for (const cnpjBasico of companyIds) {
       addNode({ id: cnpjBasico, label: labelByCnpj.get(cnpjBasico) ?? cnpjBasico, type: "empresa" });
-      links.push({ source: documento, target: cnpjBasico });
+      links.push({ source: publicId, target: cnpjBasico });
     }
   }
 
@@ -371,11 +393,11 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
       return;
     }
     rows.forEach((row, i) => {
-      const nodeId = `${ds.id}:${row[idField] ?? i}`;
-      const nodeLabel = String(row[labelField] ?? nodeId);
+      const { nodeId, nodeLabel } = safeNodeIdAndLabel(ds, row, idField, labelField, i);
       const inGraph = i < PER_DATASET_LIMIT;
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row, ...(inGraph ? {} : { inGraph: false }) });
-      if (inGraph) links.push({ source: documento, target: nodeId });
+      const safeRow = sanitizeRow(row, mixedCols.map((c) => c.name));
+      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row: safeRow, ...(inGraph ? {} : { inGraph: false }) });
+      if (inGraph) links.push({ source: publicId, target: nodeId });
     });
   });
 
@@ -383,7 +405,7 @@ async function buildPessoaNetwork(documento: string): Promise<{ label: string; n
   // finds nothing even when this CPF was ranked via an unmasked mixed column
   // elsewhere (CGU/TSE/etc). Fall back to the first cross-dataset hit's own
   // name field rather than showing the raw CPF digits as the entity's label.
-  if (label === documento) {
+  if (label === sanitizeCpfValue(documento)) {
     const preferred = ["nome_favorecido", "nome_contratado", "nome_fornecedor", "nome_doador", "nome", "razao_social", "nome_razao_social", "nome_fantasia"];
     outer: for (const n of nodes) {
       if (!n.row) continue;
@@ -424,20 +446,30 @@ async function main() {
 
   for (let i = 0; i < top.length; i++) {
     const entity = top[i];
-    const outPath = resolve(ENTITIES_DIR, `${entity.id}.json`);
+    // Pessoa entities are keyed publicly by a hash of the CPF, never the raw
+    // digits — the raw id is only used internally below to query beelink.
+    const publicId = entity.type === "pessoa" ? hashCpf(entity.id) : entity.id;
+    const outPath = resolve(ENTITIES_DIR, `${publicId}.json`);
     if (!FORCE && existsSync(outPath)) {
-      log(`[${i + 1}/${top.length}] skip (exists)`, entity.type, entity.id);
+      log(`[${i + 1}/${top.length}] skip (exists)`, entity.type, publicId);
+      try {
+        const network = JSON.parse(readFileSync(outPath, "utf8")) as EntityNetwork;
+        const rootLabel = network.nodes.find((n) => n.id === publicId)?.label ?? publicId;
+        index.push({ id: publicId, type: entity.type, label: rootLabel, datasetCount: entity.datasetCount, path: `entities/${publicId}.json` });
+      } catch (err) {
+        log(`[${i + 1}/${top.length}] WARN could not index existing file`, publicId, String(err).slice(0, 150));
+      }
       continue;
     }
-    log(`[${i + 1}/${top.length}] building`, entity.type, entity.id, { datasetCount: entity.datasetCount });
+    log(`[${i + 1}/${top.length}] building`, entity.type, publicId, { datasetCount: entity.datasetCount });
     try {
       const { label, network } = entity.type === "empresa"
         ? await buildEmpresaNetwork(entity.id)
-        : await buildPessoaNetwork(entity.id);
+        : await buildPessoaNetwork(entity.id, publicId);
       writeFileSync(outPath, JSON.stringify(network));
-      index.push({ id: entity.id, type: entity.type, label, datasetCount: entity.datasetCount, path: `entities/${entity.id}.json` });
+      index.push({ id: publicId, type: entity.type, label, datasetCount: entity.datasetCount, path: `entities/${publicId}.json` });
     } catch (err) {
-      log(`[${i + 1}/${top.length}] FAILED`, entity.id, String(err).slice(0, 200));
+      log(`[${i + 1}/${top.length}] FAILED`, publicId, String(err).slice(0, 200));
     }
   }
 

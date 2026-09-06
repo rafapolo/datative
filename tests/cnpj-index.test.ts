@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { isMaskedDocument, matchesCnpj, socioNodeId } from "../scripts/lib/cnpj-index";
+import { hashCpf } from "../scripts/lib/cpf-privacy";
 
 describe("isMaskedDocument", () => {
   test("detects ***XXXXXX** format", () => {
@@ -89,5 +90,19 @@ describe("socioNodeId", () => {
     const idA = socioNodeId(null, "11111111", "ACME");
     const idB = socioNodeId(null, "22222222", "ACME");
     expect(idA).not.toBe(idB);
+  });
+
+  test("full CPF → hashed, never returned in plaintext", () => {
+    const cpf = "12345678901";
+    const id = socioNodeId(cpf, company, "JOAO SILVA");
+    expect(id).toBe(hashCpf(cpf));
+    expect(id).not.toContain(cpf);
+  });
+
+  test("full CPF → same hash across different companies (global dedup)", () => {
+    const cpf = "12345678901";
+    const idA = socioNodeId(cpf, "11111111", "JOAO SILVA");
+    const idB = socioNodeId(cpf, "22222222", "JOAO SILVA");
+    expect(idA).toBe(idB);
   });
 });

@@ -1,4 +1,5 @@
 import { queryParquetDataset, getTableColumns, tableExists, countParquetRows } from "./parquet-store";
+import { hashCpf } from "./cpf-privacy";
 
 export interface CnpjColumn {
   name: string;
@@ -67,13 +68,17 @@ export function matchesCnpj(
   return false;
 }
 
-// Masked CPF format: ***XXXXXX** (6 visible digits, never a full 11-digit CPF).
-// Full CNPJs (14 digits) are never masked.
+// A CPF (11 digits) is hashed — never used as a node id in plaintext, since
+// node ids get rendered verbatim (details panel "ID" row, DOM attributes).
+// A full CNPJ (14 digits, a company listed as its own "sócio") is public and
+// passes through unchanged for global deduplication across companies.
 // Masked/null docs are scoped to companyId to prevent false graph merges
 // when different people share the same placeholder (e.g. ***000000**).
 export function socioNodeId(documento: string | null, companyId: string, nome: string): string {
   if (!documento) return `${companyId}:name:${nome}`;
   if (isMaskedDocument(documento)) return `${companyId}:masked:${documento}:${nome}`;
+  const digits = documento.replace(/\D/g, "");
+  if (digits.length === 11) return hashCpf(digits);
   return documento; // full CNPJ → global deduplication across companies
 }
 
