@@ -288,6 +288,34 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
       color: var(--muted);
       flex-shrink: 0;
     }
+    /* Below this, the desktop 3-column row (logo | Empresas | Pessoas) has no
+       room to breathe — stack them instead. The page still never scrolls as
+       a whole (html/body keep overflow:hidden); each stacked section gets
+       its own bounded height and internal scroll, same "fixed viewport,
+       panels manage their own scroll" model as the graph page's mobile
+       bottom sheets. */
+    @media (max-width: 768px) {
+      nav { padding: 0.8rem 1rem; }
+      .layout { flex-direction: column; }
+      main {
+        flex: 0 0 auto;
+        padding: 1rem 1.2rem 0.75rem;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .eyebrow { font-size: 0.56rem; margin-bottom: 0.4rem; }
+      .wordmark { font-size: clamp(2.5rem, 14vw, 3.5rem); }
+      .gold-rule { margin: 0.9rem 0; }
+      .tagline { font-size: 0.82rem; margin-bottom: 0.5rem; }
+      .tagline:last-of-type { display: none; }
+      .ci-panel {
+        flex: 1;
+        min-height: 0;
+        border-left: none;
+        border-top: 1px solid var(--border);
+      }
+      footer { padding: 0.6rem 1rem; }
+    }
   </style>
 </head>
 <body>
@@ -523,6 +551,19 @@ export function renderGraphPage(
       color: #6b7aaa;
       letter-spacing: 0.15em;
       text-transform: uppercase;
+    }
+    @media (max-width: 768px) {
+      header { padding: 0 0.75rem; gap: 0.6rem; }
+      .h-brand { font-size: 1rem; }
+      .breadcrumb { font-size: 0.56rem; }
+      .breadcrumb .bc-current { max-width: 110px; }
+      .control-label { display: none; }
+      #layout-select {
+        font-size: 0.56rem;
+        padding: 0.15rem 0.3rem;
+      }
+      footer { padding: 0 0.75rem; }
+      #status { max-width: 130px; }
     }
   </style>
 </head>

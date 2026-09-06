@@ -1200,12 +1200,13 @@ function injectPanelStyles() {
       top: 46px;
       right: 0;
       width: max-content;
-      min-width: 320px;
+      min-width: 200px;
       max-width: min(520px, 92vw);
-      /* Grows to fit its content both ways: width up to the cap above
-         (a two-column key/value row rarely needs the full 520px, so most
-         cards end up narrower than that), and height capped at the full
-         space below the toolbar/above the footer — #node-details-body's
+      /* Starts as compact as its content allows (just enough for the header
+         title + close button at minimum) and only grows — width up to the
+         cap above (a two-column key/value row rarely needs the full 520px,
+         so most cards end up narrower than that), and height capped at the
+         full space below the toolbar/above the footer — #node-details-body's
          overflow-y:auto only kicks in past that cap, so scrolling is a
          fallback, not the default for typical short node-detail cards. */
       max-height: calc(100vh - 46px - 30px);
