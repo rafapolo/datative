@@ -1124,6 +1124,15 @@ function injectPanelStyles() {
       color: #e6f0ff;
       box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.45);
     }
+    /* Row has no corresponding graph node (beyond the per-dataset graph cap) —
+       clicking it can't highlight anything, so dim it to signal that upfront. */
+    .lookup-table tbody tr.row-no-node td {
+      color: #5c6584;
+      cursor: default;
+    }
+    .lookup-table tbody tr.row-no-node:hover td {
+      color: #5c6584;
+    }
     .lookup-skeleton {
       padding: 1rem;
       color: #44446a;
@@ -1675,6 +1684,11 @@ function renderResultSections(
         const signature = rowSignature(result.id, row);
         tr.dataset.rowSignature = signature;
         tr.dataset.datasetId = result.id;
+        // Rows beyond the generator's per-dataset graph cap (inGraph:false)
+        // never got a Sigma node, so clicking them can't highlight anything
+        // in the graph — mark them visually so that's clear before the click.
+        const hasNode = (rowSignatureToNodeIds.get(signature)?.size ?? 0) > 0;
+        if (!hasNode) tr.classList.add("row-no-node");
         for (const col of cols) {
           const val = row[col];
           const text = val == null ? "—" : String(val);
