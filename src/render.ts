@@ -557,7 +557,6 @@ export function renderGraphPage(
     <span id="status">Carregando…</span>
     <div class="footer-meta">
       <a href="https://github.com/rafapolo/datative" target="_blank" rel="noopener noreferrer">GITHUB</a>
-      <span>estático</span>
     </div>
   </footer>
   <script>

@@ -950,7 +950,7 @@ function injectPanelStyles() {
       position: fixed;
       top: 46px;
       left: 0;
-      width: 30vw;
+      width: 33vw;
       min-width: 320px;
       max-width: 90vw;
       height: calc(100vh - 46px - 30px);
@@ -1182,12 +1182,15 @@ function injectPanelStyles() {
       position: fixed;
       top: 46px;
       right: 0;
-      width: 360px;
-      max-width: min(360px, 90vw);
-      /* Grows to fit its content, capped at the full space below the
-         toolbar/above the footer — #node-details-body's overflow-y:auto
-         only kicks in past that cap, so scrolling is a fallback, not
-         the default for typical short node-detail cards. */
+      width: max-content;
+      min-width: 320px;
+      max-width: min(520px, 92vw);
+      /* Grows to fit its content both ways: width up to the cap above
+         (a two-column key/value row rarely needs the full 520px, so most
+         cards end up narrower than that), and height capped at the full
+         space below the toolbar/above the footer — #node-details-body's
+         overflow-y:auto only kicks in past that cap, so scrolling is a
+         fallback, not the default for typical short node-detail cards. */
       max-height: calc(100vh - 46px - 30px);
       background: #0c1024;
       color: #e0e0e0;
@@ -1290,7 +1293,7 @@ function injectPanelStyles() {
     }
     .node-detail-table td {
       color: #dbeafe;
-      font-size: 9px;
+      font-size: 0.75rem;
     }
     .node-detail-empty {
       color: #9ca3af;
