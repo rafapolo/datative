@@ -16,17 +16,6 @@ export interface DatasetInfo {
   yearField?: string;
 }
 
-const INDEX_CACHE_PATH = new URL("../../cnpj-index-cache.json", import.meta.url).pathname;
-
-interface CnpjIndexCache {
-  [tableKey: string]: {
-    cnpj_basico_files: Record<string, string[]>;
-    lastUpdated: string;
-  };
-}
-
-const indexCache: CnpjIndexCache = {};
-
 export function extractCnpjRoot(cnpj: string): string {
   const digits = cnpj.replace(/\D/g, "");
   if (digits.length >= 8) {

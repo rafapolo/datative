@@ -1,13 +1,17 @@
-# Task: Contract Concentration
-**Status:** TODO
+# Analysis: Contract Concentration
 **Priority:** P1
-**User Story:** US2
 **Pattern ID:** `contract_concentration`
-**Cache key:** `patterns_concentration_{cnpj}_{year}`
 
 ---
 
-## Query
+## Why it's suspicious
+
+A supplier capturing an unusually high share of a single agency's budget in a
+given year suggests possible favoritism or lack of competition.
+
+---
+
+## Query (BigQuery-flavored; needs DuckDB translation)
 
 Two aggregations in a single query using conditional sums:
 
@@ -30,28 +34,19 @@ HAVING agency_total >= @min_agency_spend
    AND supplier_spend / agency_total >= @threshold
 ```
 
-Parameters: `cnpj`, `ano`, `threshold = CONCENTRATION_THRESHOLD`, `min_agency_spend = CONCENTRATION_MIN_SPEND`
-
----
-
-## Output → `ConcentrationFlag[]`
+Parameters: `cnpj`, `ano`, `threshold = 0.40`, `min_agency_spend = 50_000` (BRL)
 
 One flag per agency that exceeds the concentration threshold.
 
 ---
 
-## UI
+## Acceptance scenarios
 
-- Section title (PT-BR): **"Alta Concentração de Contratos"**
-- Show per flag: agency name, supplier share as percentage, supplier spend vs. agency total
-- Severity: orange for 40–60%, red for >60%
-
----
-
-## Acceptance Criteria
-
-- [ ] Returns flag when supplier holds ≥ 40% of agency spend AND agency total ≥ R$ 50.000
-- [ ] Returns empty when no agency exceeds threshold
-- [ ] Inner subquery limits scan to relevant agencies — no full-table scan on the outer query
-- [ ] Partition filter `ano` present on both inner and outer queries
-- [ ] Integrated into `runPatterns()` via `Promise.allSettled`
+- Given a CNPJ holding ≥ 40% of an agency's total contract spend for the year,
+  and the agency's total exceeds R$ 50.000 → flag with agency name, supplier
+  share %, and both spend figures
+- Given concentration below 40% in all agencies → no flag
+- Given agency total below R$ 50.000 → excluded from analysis (avoid noise
+  from micro-units)
+- Inner subquery limits scan to relevant agencies; `ano` filter on both inner
+  and outer queries — no full-table scan

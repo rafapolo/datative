@@ -11,10 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@duckdb/node-api": "^1.5.5-r.4",
     "@sigma/edge-curve": "^3.1.0",
     "graphology": "^0.26.0",
-    "graphology-layout": "^0.6.1",
     "graphology-layout-forceatlas2": "^0.10.1",
     "sigma": "^3.0.3"
   },
