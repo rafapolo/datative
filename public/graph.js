@@ -9620,18 +9620,6 @@ function setStatus(msg) {
   if (el)
     el.textContent = msg;
 }
-function formatElapsed(ms) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = String(totalSeconds % 60).padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
-function setExecutionTime(ms) {
-  const el = document.getElementById("execution-time");
-  if (!el)
-    return;
-  el.textContent = ms == null ? "Execução · --:--" : `Execução · ${formatElapsed(ms)}`;
-}
 function debugLog(...args) {
   if (!DEBUG_LOOKUP)
     return;
@@ -10150,7 +10138,7 @@ function injectPanelStyles() {
       left: 0;
       width: 30vw;
       min-width: 320px;
-      max-width: min(480px, 85vw);
+      max-width: 90vw;
       height: calc(100vh - 46px - 30px);
       min-height: calc(100vh - 46px - 30px);
       max-height: calc(100vh - 46px - 30px);
@@ -10177,10 +10165,8 @@ function injectPanelStyles() {
       background: #080814;
       border-bottom: 1px solid #23234a;
       flex-shrink: 0;
-      cursor: grab;
       user-select: none;
     }
-    #lookup-header:active { cursor: grabbing; }
     #lookup-title {
       font-weight: 700;
       font-size: 0.9rem;
@@ -10501,6 +10487,9 @@ function injectPanelStyles() {
     .panel-resizer {
       display: block;
     }
+    .panel-resizer-v {
+      display: none;
+    }
     @media (max-width: ${MOBILE_BREAKPOINT_PX}px) {
       #lookup-panel,
       #node-details-panel {
@@ -10511,9 +10500,9 @@ function injectPanelStyles() {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
-        height: auto !important;
-        min-height: 0 !important;
-        max-height: 78vh !important;
+        height: auto;
+        min-height: 0;
+        max-height: 78vh;
         border-radius: 14px 14px 0 0;
         border: none;
         border-top: 1px solid #23234a;
@@ -10541,6 +10530,9 @@ function injectPanelStyles() {
       }
       .panel-resizer {
         display: none;
+      }
+      .panel-resizer-v {
+        display: block;
       }
     }
   `;
@@ -10618,6 +10610,45 @@ function makeResizable(panel, edge) {
   document.addEventListener("mouseup", () => {
     resizing = false;
   });
+  const vResizer = document.createElement("div");
+  vResizer.className = "panel-resizer-v";
+  vResizer.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 10px;
+    cursor: ns-resize;
+    z-index: 10;
+    background: transparent;
+  `;
+  panel.appendChild(vResizer);
+  let vResizing = false;
+  let startY = 0, startH = 0;
+  vResizer.addEventListener("mousedown", (e3) => {
+    if (!isMobileViewport())
+      return;
+    vResizing = true;
+    startY = e3.clientY;
+    startH = panel.getBoundingClientRect().height;
+    panel.style.transition = "none";
+    e3.preventDefault();
+    e3.stopPropagation();
+  });
+  document.addEventListener("mousemove", (e3) => {
+    if (!vResizing)
+      return;
+    const dy = startY - e3.clientY;
+    const newH = startH + dy;
+    const minH = window.innerHeight * 0.2;
+    const maxH = window.innerHeight * 0.92;
+    if (newH >= minH && newH <= maxH) {
+      panel.style.maxHeight = newH + "px";
+    }
+  });
+  document.addEventListener("mouseup", () => {
+    vResizing = false;
+  });
 }
 function resetPanelPosition(panel) {
   panel.style.left = "";
@@ -10630,7 +10661,7 @@ function closePanel(panel) {
   resetPanelPosition(panel);
   panel.classList.remove("open");
 }
-function positionFloatingPanel(panel, anchor) {
+function positionFloatingPanel(panel) {
   resetPanelPosition(panel);
   if (isMobileViewport())
     return;
@@ -10638,10 +10669,8 @@ function positionFloatingPanel(panel, anchor) {
   const topBound = 46 + margin;
   const width = panel.offsetWidth || 360;
   const height = panel.offsetHeight || 320;
-  let x = anchor ? anchor.x + 16 : window.innerWidth - width - 24;
-  let y = anchor ? anchor.y + 16 : 80;
-  x = Math.min(Math.max(margin, x), window.innerWidth - width - margin);
-  y = Math.min(Math.max(topBound, y), window.innerHeight - height - margin);
+  const x = Math.min(Math.max(margin, window.innerWidth - width - 24), window.innerWidth - width - margin);
+  const y = Math.min(Math.max(topBound, window.innerHeight - height - 24), window.innerHeight - height - margin);
   panel.style.left = `${x}px`;
   panel.style.top = `${y}px`;
   panel.style.right = "auto";
@@ -10662,7 +10691,6 @@ function createPanel() {
     closePanel(panel);
     lookupHistory.length = 0;
   });
-  makeDraggable(panel, "lookup-header");
   makeResizable(panel, "right");
   return panel;
 }
@@ -10684,7 +10712,7 @@ function createNodeDetailsPanel() {
   makeResizable(panel, "left");
   return panel;
 }
-function showNodeDetails(nodeId, graph, anchor) {
+function showNodeDetails(nodeId, graph) {
   const panel = document.getElementById("node-details-panel");
   const title = document.getElementById("node-details-title");
   const body = document.getElementById("node-details-body");
@@ -10725,15 +10753,17 @@ function showNodeDetails(nodeId, graph, anchor) {
   ];
   meta.innerHTML = `<tbody>${metaRows.join("")}</tbody>`;
   body.appendChild(meta);
-  const openAnchored = () => {
+  const openPanel = () => {
     if (isMobileViewport()) {
       closePanel(document.getElementById("lookup-panel"));
     }
+    const wasOpen = panel.classList.contains("open");
     panel.classList.add("open");
-    positionFloatingPanel(panel, anchor);
+    if (!wasOpen)
+      positionFloatingPanel(panel);
   };
   if (details.length === 0) {
-    openAnchored();
+    openPanel();
     return;
   }
   for (const detail of details) {
@@ -10759,7 +10789,7 @@ function showNodeDetails(nodeId, graph, anchor) {
     card.appendChild(table);
     body.appendChild(card);
   }
-  openAnchored();
+  openPanel();
 }
 function renderResultSections(results, cnpj, graph) {
   const body = document.getElementById("lookup-body");
@@ -10820,7 +10850,7 @@ function renderResultSections(results, cnpj, graph) {
           }
           tr.appendChild(td);
         }
-        tr.addEventListener("click", (e3) => {
+        tr.addEventListener("click", () => {
           const nodeIds = rowSignatureToNodeIds.get(signature);
           if (!nodeIds || nodeIds.size === 0 || !currentGraph)
             return;
@@ -10828,7 +10858,7 @@ function renderResultSections(results, cnpj, graph) {
           selectedNode = nodeId;
           hoveredNode = null;
           renderer?.refresh({ skipIndexation: true });
-          showNodeDetails(nodeId, currentGraph, { x: e3.clientX, y: e3.clientY });
+          showNodeDetails(nodeId, currentGraph);
           syncLookupRowHighlight();
         });
         tbody.appendChild(tr);
@@ -10891,7 +10921,6 @@ async function init() {
   injectPanelStyles();
   createPanel();
   createNodeDetailsPanel();
-  setExecutionTime(null);
   setStatus("Carregando dados…");
   let data;
   try {
@@ -11151,7 +11180,7 @@ async function init() {
     renderer.refresh({ skipIndexation: true });
     syncLookupRowHighlight();
   });
-  renderer.on("clickNode", ({ node, event }) => {
+  renderer.on("clickNode", ({ node }) => {
     selectedNode = selectedNode === node ? null : node;
     hoveredNode = null;
     renderer.refresh({ skipIndexation: true });
@@ -11162,9 +11191,7 @@ async function init() {
       if (datasetId && datasetId !== "socios")
         focusLookupSection(datasetId);
     }
-    const original = event.original;
-    const anchor = "clientX" in original ? { x: original.clientX, y: original.clientY } : undefined;
-    showNodeDetails(node, graph, anchor);
+    showNodeDetails(node, graph);
   });
 }
 init().catch((e3) => setStatus(`Erro fatal: ${e3.message}`));

@@ -189,14 +189,6 @@ function formatElapsed(ms: number): string {
   return `${minutes}:${seconds}`;
 }
 
-function setExecutionTime(ms: number | null) {
-  const el = document.getElementById("execution-time");
-  if (!el) return;
-  el.textContent = ms == null
-    ? "Execução · --:--"
-    : `Execução · ${formatElapsed(ms)}`;
-}
-
 function startStatusTimer(baseMsg: string) {
   const startedAt = performance.now();
   setStatusLoading(true);
@@ -211,7 +203,6 @@ function startStatusTimer(baseMsg: string) {
       window.clearInterval(intervalId);
       const elapsedMs = Math.max(0, performance.now() - startedAt);
       setStatusLoading(false);
-      setExecutionTime(elapsedMs);
       if (finalStatus) setStatus(finalStatus);
       return elapsedMs;
     },
@@ -938,7 +929,7 @@ function injectPanelStyles() {
       left: 0;
       width: 30vw;
       min-width: 320px;
-      max-width: min(480px, 85vw);
+      max-width: 90vw;
       height: calc(100vh - 46px - 30px);
       min-height: calc(100vh - 46px - 30px);
       max-height: calc(100vh - 46px - 30px);
@@ -965,10 +956,8 @@ function injectPanelStyles() {
       background: #080814;
       border-bottom: 1px solid #23234a;
       flex-shrink: 0;
-      cursor: grab;
       user-select: none;
     }
-    #lookup-header:active { cursor: grabbing; }
     #lookup-title {
       font-weight: 700;
       font-size: 0.9rem;
@@ -1289,6 +1278,9 @@ function injectPanelStyles() {
     .panel-resizer {
       display: block;
     }
+    .panel-resizer-v {
+      display: none;
+    }
     @media (max-width: ${MOBILE_BREAKPOINT_PX}px) {
       #lookup-panel,
       #node-details-panel {
@@ -1299,9 +1291,9 @@ function injectPanelStyles() {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
-        height: auto !important;
-        min-height: 0 !important;
-        max-height: 78vh !important;
+        height: auto;
+        min-height: 0;
+        max-height: 78vh;
         border-radius: 14px 14px 0 0;
         border: none;
         border-top: 1px solid #23234a;
@@ -1329,6 +1321,9 @@ function injectPanelStyles() {
       }
       .panel-resizer {
         display: none;
+      }
+      .panel-resizer-v {
+        display: block;
       }
     }
   `;
@@ -1393,7 +1388,7 @@ function makeResizable(panel: HTMLElement, edge: "left" | "right") {
     startW = 0;
 
   resizer.addEventListener("mousedown", (e) => {
-    if (isMobileViewport()) return; // bottom sheets aren't resizable
+    if (isMobileViewport()) return; // bottom sheets resize by height, see below
     resizing = true;
     startX = e.clientX;
     startW = panel.offsetWidth;
@@ -1414,6 +1409,51 @@ function makeResizable(panel: HTMLElement, edge: "left" | "right") {
   document.addEventListener("mouseup", () => {
     resizing = false;
   });
+
+  // On mobile the panel is a full-width bottom sheet, so "resizable" means
+  // its height — a drag bar along the top edge instead of a side edge.
+  const vResizer = document.createElement("div");
+  vResizer.className = "panel-resizer-v";
+  vResizer.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 10px;
+    cursor: ns-resize;
+    z-index: 10;
+    background: transparent;
+  `;
+  panel.appendChild(vResizer);
+
+  let vResizing = false;
+  let startY = 0,
+    startH = 0;
+
+  vResizer.addEventListener("mousedown", (e) => {
+    if (!isMobileViewport()) return;
+    vResizing = true;
+    startY = e.clientY;
+    startH = panel.getBoundingClientRect().height;
+    panel.style.transition = "none";
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!vResizing) return;
+    const dy = startY - e.clientY; // dragging up grows the sheet
+    const newH = startH + dy;
+    const minH = window.innerHeight * 0.2;
+    const maxH = window.innerHeight * 0.92;
+    if (newH >= minH && newH <= maxH) {
+      panel.style.maxHeight = newH + "px";
+    }
+  });
+
+  document.addEventListener("mouseup", () => {
+    vResizing = false;
+  });
 }
 
 function resetPanelPosition(panel: HTMLElement) {
@@ -1433,10 +1473,11 @@ function closePanel(panel: HTMLElement) {
 // (a graph node click or a lookup-table row click) instead of always
 // docking to a fixed screen edge — clamped so it never runs off-viewport.
 // On mobile it's a no-op: the CSS bottom-sheet rules take over entirely.
-function positionFloatingPanel(
-  panel: HTMLElement,
-  anchor?: { x: number; y: number },
-) {
+// Default spawn point for the floating node-details card: bottom-right
+// corner. It stays draggable from there — repositioning only happens when
+// the panel transitions from closed to open, never while it's already open
+// (so dragging it elsewhere and clicking another node doesn't snap it back).
+function positionFloatingPanel(panel: HTMLElement) {
   resetPanelPosition(panel);
   if (isMobileViewport()) return;
 
@@ -1447,11 +1488,14 @@ function positionFloatingPanel(
   const width = panel.offsetWidth || 360;
   const height = panel.offsetHeight || 320;
 
-  let x = anchor ? anchor.x + 16 : window.innerWidth - width - 24;
-  let y = anchor ? anchor.y + 16 : 80;
-
-  x = Math.min(Math.max(margin, x), window.innerWidth - width - margin);
-  y = Math.min(Math.max(topBound, y), window.innerHeight - height - margin);
+  const x = Math.min(
+    Math.max(margin, window.innerWidth - width - 24),
+    window.innerWidth - width - margin,
+  );
+  const y = Math.min(
+    Math.max(topBound, window.innerHeight - height - 24),
+    window.innerHeight - height - margin,
+  );
 
   panel.style.left = `${x}px`;
   panel.style.top = `${y}px`;
@@ -1476,7 +1520,8 @@ function createPanel(): HTMLElement {
     lookupHistory.length = 0;
   });
 
-  makeDraggable(panel, "lookup-header");
+  // Docked to the left edge, deliberately not draggable — only width- (and
+  // on mobile, height-) resizable via makeResizable's handle.
   makeResizable(panel, "right");
 
   return panel;
@@ -1506,11 +1551,7 @@ function createNodeDetailsPanel(): HTMLElement {
   return panel;
 }
 
-function showNodeDetails(
-  nodeId: string,
-  graph: Graph,
-  anchor?: { x: number; y: number },
-) {
+function showNodeDetails(nodeId: string, graph: Graph) {
   const panel = document.getElementById("node-details-panel") as HTMLElement;
   const title = document.getElementById("node-details-title")!;
   const body = document.getElementById("node-details-body")!;
@@ -1560,16 +1601,17 @@ function showNodeDetails(
   meta.innerHTML = `<tbody>${metaRows.join("")}</tbody>`;
   body.appendChild(meta);
 
-  const openAnchored = () => {
+  const openPanel = () => {
     if (isMobileViewport()) {
       closePanel(document.getElementById("lookup-panel") as HTMLElement);
     }
+    const wasOpen = panel.classList.contains("open");
     panel.classList.add("open");
-    positionFloatingPanel(panel, anchor);
+    if (!wasOpen) positionFloatingPanel(panel);
   };
 
   if (details.length === 0) {
-    openAnchored();
+    openPanel();
     return;
   }
 
@@ -1599,7 +1641,7 @@ function showNodeDetails(
     body.appendChild(card);
   }
 
-  openAnchored();
+  openPanel();
 }
 
 function renderResultSections(
@@ -1677,14 +1719,14 @@ function renderResultSections(
           }
           tr.appendChild(td);
         }
-        tr.addEventListener("click", (e) => {
+        tr.addEventListener("click", () => {
           const nodeIds = rowSignatureToNodeIds.get(signature);
           if (!nodeIds || nodeIds.size === 0 || !currentGraph) return;
           const nodeId = [...nodeIds][0];
           selectedNode = nodeId;
           hoveredNode = null;
           renderer?.refresh({ skipIndexation: true });
-          showNodeDetails(nodeId, currentGraph, { x: e.clientX, y: e.clientY });
+          showNodeDetails(nodeId, currentGraph);
           syncLookupRowHighlight();
         });
         tbody.appendChild(tr);
@@ -1776,7 +1818,6 @@ async function init() {
   injectPanelStyles();
   createPanel();
   createNodeDetailsPanel();
-  setExecutionTime(null);
 
   setStatus("Carregando dados…");
 
@@ -2086,7 +2127,7 @@ async function init() {
     syncLookupRowHighlight();
   });
 
-  renderer.on("clickNode", ({ node, event }) => {
+  renderer.on("clickNode", ({ node }) => {
     selectedNode = selectedNode === node ? null : node;
     hoveredNode = null;
     renderer!.refresh({ skipIndexation: true });
@@ -2099,12 +2140,7 @@ async function init() {
         : "";
       if (datasetId && datasetId !== "socios") focusLookupSection(datasetId);
     }
-    const original = event.original;
-    const anchor =
-      "clientX" in original
-        ? { x: original.clientX, y: original.clientY }
-        : undefined;
-    showNodeDetails(node, graph, anchor);
+    showNodeDetails(node, graph);
   });
 }
 

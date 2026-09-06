@@ -457,11 +457,17 @@ export function renderGraphPage(
       justify-content: space-between;
       flex-shrink: 0;
     }
-    footer span {
+    footer span, footer a {
       font-family: 'Space Mono', monospace;
       font-size: 0.58rem;
       color: var(--muted);
       letter-spacing: 0.05em;
+    }
+    footer a {
+      text-decoration: none;
+    }
+    footer a:hover {
+      color: #e0e0e0;
     }
     .footer-meta {
       margin-left: auto;
@@ -469,7 +475,7 @@ export function renderGraphPage(
       align-items: center;
       gap: 0;
     }
-    .footer-meta span + span::before { content: " | "; color: #2e2e50; }
+    .footer-meta > *:not(:first-child)::before { content: " | "; color: #2e2e50; }
     #loading-overlay {
       position: absolute;
       inset: 0;
@@ -529,7 +535,7 @@ export function renderGraphPage(
   <footer>
     <span id="status">Carregando…</span>
     <div class="footer-meta">
-      <span id="execution-time">Execução · --:--</span>
+      <a href="https://github.com/rafapolo/datative" target="_blank" rel="noopener noreferrer">GITHUB</a>
       <span>estático</span>
     </div>
   </footer>
