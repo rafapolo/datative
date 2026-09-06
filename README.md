@@ -22,9 +22,6 @@ Datative é um site estático de investigação que mostra as redes das entidade
   - `pack` (circle packing hierarquico, estilo D3 pack)
 - Sem servidor de dados em tempo de request — `src/index.ts` só lê arquivos estáticos.
 
-App local:
-
-- Landing/graph: `http://localhost:3003/`
 
 ## Scripts
 
@@ -39,10 +36,6 @@ App local:
 API (servidor de desenvolvimento):
 
 - `GET /entities/:id.json` — lê `static/entities/:id.json` diretamente; 404 se a entidade não foi pré-computada. No site publicado (GitHub Pages) esse mesmo caminho é um arquivo estático, sem servidor.
-
-## Deploy (GitHub Pages)
-
-`.github/workflows/pages.yml` roda a cada push em `main`: `bun run build:graph` + `bun run build:site`, depois publica `dist/` via Actions. **Não** roda `generate:static` — isso exige acesso SSH a `beelink`, que o runner do GitHub não tem. `static/entities/*.json` precisa estar commitado; o workflow só empacota o que já existe.
 
 Fluxo para atualizar os dados publicados:
 ```bash
