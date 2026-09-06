@@ -1,6 +1,6 @@
 # Risk-pattern analyses (rescued from `.specify/`)
 
-`.specify/` described a BigQuery-era, live-per-CNPJ-query fraud-detection feature
+`.specify/` described a live-per-CNPJ-query fraud-detection feature
 (single-file `index.ts` monolith, file-cache, `Promise.allSettled` runner) that
 predates the SSH/DuckDB migration and the later static-site rewrite — see
 `CLAUDE.md`. None of that plumbing exists anymore, so the spec/constitution/task
@@ -11,10 +11,10 @@ The files in this directory keep the one part still worth having: the actual
 which `basedosdados` tables/columns it needs, and the thresholds with their
 legal/methodological justification. If this feature is ever revived, it would
 need to be reimplemented as part of the offline static generator
-(`scripts/generate-static-entities.ts`) rather than as live per-request queries,
-and the SQL below (written for BigQuery) would need translating to the DuckDB
-dialect used by `scripts/lib/duckdb-ssh.ts` (e.g. `COUNTIF` → `count(*) filter
-(where ...)`, `DATE_DIFF`/`FORMAT_DATE` → DuckDB date functions).
+(`scripts/generate-static-entities.ts`) rather than as live per-request
+queries. SQL below is written in the DuckDB dialect used by
+`scripts/lib/duckdb-ssh.ts` (plain `dataset.table` references, no
+project-qualified backticks).
 
 | # | Pattern | Priority |
 |---|---|---|

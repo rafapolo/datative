@@ -26,14 +26,14 @@ its founding is a strong shell company indicator.
 
 ---
 
-## Query (BigQuery-flavored; needs DuckDB translation)
+## Query
 
 ```sql
 WITH empresa AS (
   SELECT cnpj_basico, data_inicio_atividade, porte
-  FROM `basedosdados.br_me_cnpj.empresas`
-  WHERE cnpj_basico = @cnpj_basico
-    AND ano = @ano AND mes = @mes   -- latest available partition
+  FROM br_me_cnpj.empresas
+  WHERE cnpj_basico = $cnpj_basico
+    AND ano = $ano AND mes = $mes   -- latest available partition
   LIMIT 1
 ),
 primeiro_contrato AS (
@@ -41,19 +41,19 @@ primeiro_contrato AS (
     MIN(data_assinatura_contrato)  AS first_contract_date,
     COUNT(*)                       AS contract_count,
     SUM(valor_final_compra)        AS total_value
-  FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra`
-  WHERE SUBSTR(cpf_cnpj_contratado, 1, 8) = @cnpj_basico
+  FROM br_cgu_licitacao_contrato.contrato_compra
+  WHERE SUBSTR(cpf_cnpj_contratado, 1, 8) = $cnpj_basico
 )
 SELECT
   e.data_inicio_atividade,
   e.porte,
   p.first_contract_date,
-  DATE_DIFF(p.first_contract_date, e.data_inicio_atividade, DAY) AS days_to_first_contract,
+  date_diff('day', e.data_inicio_atividade, p.first_contract_date) AS days_to_first_contract,
   p.contract_count,
   p.total_value
 FROM empresa e, primeiro_contrato p
-WHERE DATE_DIFF(p.first_contract_date, e.data_inicio_atividade, DAY) <= @max_days
-  AND p.total_value >= @min_contract_value
+WHERE date_diff('day', e.data_inicio_atividade, p.first_contract_date) <= $max_days
+  AND p.total_value >= $min_contract_value
 ```
 
 Thresholds: `max_days = 180` (6 months founding→first contract),

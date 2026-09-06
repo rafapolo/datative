@@ -13,23 +13,23 @@ tendering requirement that would kick in above the threshold.
 
 ---
 
-## Query (BigQuery-flavored; needs DuckDB translation)
+## Query
 
 ```sql
 SELECT
   id_orgao_superior,
   nome_orgao_superior,
-  FORMAT_DATE('%Y-%m', data_assinatura_contrato) AS mes,
+  strftime(data_assinatura_contrato, '%Y-%m') AS mes,
   COUNT(*)                      AS contrato_count,
   SUM(valor_inicial_compra)     AS combined_value,
   MAX(valor_inicial_compra)     AS max_single_value
-FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra`
-WHERE cpf_cnpj_contratado = @cnpj
-  AND ano = @ano
-  AND valor_inicial_compra < @threshold
+FROM br_cgu_licitacao_contrato.contrato_compra
+WHERE cpf_cnpj_contratado = $cnpj
+  AND ano = $ano
+  AND valor_inicial_compra < $threshold
 GROUP BY id_orgao_superior, nome_orgao_superior, mes
-HAVING COUNT(*) >= @min_count
-   AND SUM(valor_inicial_compra) > @threshold
+HAVING COUNT(*) >= $min_count
+   AND SUM(valor_inicial_compra) > $threshold
 ```
 
 Parameters: `cnpj`, `ano`, `threshold = 17_600` (BRL), `min_count = 3`

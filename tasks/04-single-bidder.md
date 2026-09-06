@@ -23,16 +23,16 @@ specifications, or deliberate exclusion of competitors.
 
 ---
 
-## Query (BigQuery-flavored; needs DuckDB translation)
+## Query
 
 ```sql
 WITH participantes AS (
   SELECT
     id_licitacao,
-    COUNT(*)                                          AS total_participantes,
-    COUNTIF(cpf_cnpj_participante = @cnpj)            AS cnpj_participated,
-    COUNTIF(cpf_cnpj_participante = @cnpj AND vencedor) AS cnpj_won
-  FROM `basedosdados.br_cgu_licitacao_contrato.licitacao_participante`
+    COUNT(*)                                                          AS total_participantes,
+    count(*) FILTER (WHERE cpf_cnpj_participante = $cnpj)             AS cnpj_participated,
+    count(*) FILTER (WHERE cpf_cnpj_participante = $cnpj AND vencedor) AS cnpj_won
+  FROM br_cgu_licitacao_contrato.licitacao_participante
   GROUP BY id_licitacao
 )
 SELECT
@@ -43,8 +43,8 @@ SELECT
   l.data_abertura,
   p.total_participantes
 FROM participantes p
-JOIN `basedosdados.br_cgu_licitacao_contrato.licitacao` l USING (id_licitacao)
-WHERE l.ano = @ano
+JOIN br_cgu_licitacao_contrato.licitacao l USING (id_licitacao)
+WHERE l.ano = $ano
   AND p.cnpj_participated = 1   -- this CNPJ was in the tender
   AND p.cnpj_won = 1            -- and won
   AND p.total_participantes = 1 -- and was the only participant

@@ -26,7 +26,7 @@ No joins needed — single table, cross-year aggregation.
 
 ---
 
-## Query (BigQuery-flavored; needs DuckDB translation)
+## Query
 
 ```sql
 SELECT
@@ -34,9 +34,9 @@ SELECT
   SUM(valor_final_compra)    AS annual_value,
   COUNT(*)                   AS contract_count,
   COUNT(DISTINCT id_orgao_superior) AS agency_count
-FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra`
-WHERE cpf_cnpj_contratado = @cnpj
-  AND ano BETWEEN @ano - 4 AND @ano   -- 5-year window
+FROM br_cgu_licitacao_contrato.contrato_compra
+WHERE cpf_cnpj_contratado = $cnpj
+  AND ano BETWEEN $ano - 4 AND $ano   -- 5-year window
 GROUP BY ano
 ORDER BY ano
 ```

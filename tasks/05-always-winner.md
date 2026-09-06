@@ -24,27 +24,27 @@ predictors of non-competitive behavior.
 
 ---
 
-## Query (BigQuery-flavored; needs DuckDB translation)
+## Query
 
 ```sql
 WITH participacoes AS (
   SELECT
     p.id_licitacao,
     p.vencedor
-  FROM `basedosdados.br_cgu_licitacao_contrato.licitacao_participante` p
-  JOIN `basedosdados.br_cgu_licitacao_contrato.licitacao` l USING (id_licitacao)
-  WHERE p.cpf_cnpj_participante = @cnpj
-    AND l.ano = @ano
+  FROM br_cgu_licitacao_contrato.licitacao_participante p
+  JOIN br_cgu_licitacao_contrato.licitacao l USING (id_licitacao)
+  WHERE p.cpf_cnpj_participante = $cnpj
+    AND l.ano = $ano
 )
 SELECT
-  COUNT(*)                    AS total_participacoes,
-  COUNTIF(vencedor = TRUE)    AS total_vitorias,
-  COUNTIF(vencedor = TRUE) / COUNT(*) AS win_rate,
-  SUM(l.valor_licitacao)      AS total_value_competed
+  COUNT(*)                                          AS total_participacoes,
+  count(*) FILTER (WHERE vencedor)                  AS total_vitorias,
+  count(*) FILTER (WHERE vencedor)::DOUBLE / COUNT(*) AS win_rate,
+  SUM(l.valor_licitacao)                             AS total_value_competed
 FROM participacoes p
-JOIN `basedosdados.br_cgu_licitacao_contrato.licitacao` l USING (id_licitacao)
-HAVING COUNT(*) >= @min_participations
-   AND COUNTIF(vencedor = TRUE) / COUNT(*) >= @win_rate_threshold
+JOIN br_cgu_licitacao_contrato.licitacao l USING (id_licitacao)
+HAVING COUNT(*) >= $min_participations
+   AND count(*) FILTER (WHERE vencedor)::DOUBLE / COUNT(*) >= $win_rate_threshold
 ```
 
 Thresholds: `win_rate_threshold = 0.60`, `min_participations = 5` (avoid

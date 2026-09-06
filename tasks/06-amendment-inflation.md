@@ -26,12 +26,12 @@ Guide.
 
 ---
 
-## Query (BigQuery-flavored; needs DuckDB translation)
+## Query
 
 ```sql
 WITH aditivos AS (
   SELECT id_contrato, COUNT(*) AS aditivo_count
-  FROM `basedosdados.br_cgu_licitacao_contrato.contrato_termo_aditivo`
+  FROM br_cgu_licitacao_contrato.contrato_termo_aditivo
   GROUP BY id_contrato
 )
 SELECT
@@ -43,12 +43,12 @@ SELECT
   c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) AS inflation_ratio,
   c.data_assinatura_contrato,
   COALESCE(a.aditivo_count, 0)                             AS aditivo_count
-FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra` c
+FROM br_cgu_licitacao_contrato.contrato_compra c
 LEFT JOIN aditivos a USING (id_contrato)
-WHERE c.cpf_cnpj_contratado = @cnpj
-  AND c.ano = @ano
+WHERE c.cpf_cnpj_contratado = $cnpj
+  AND c.ano = $ano
   AND c.valor_inicial_compra > 0
-  AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >= @inflation_threshold
+  AND c.valor_final_compra / NULLIF(c.valor_inicial_compra, 0) >= $inflation_threshold
 ORDER BY inflation_ratio DESC
 ```
 

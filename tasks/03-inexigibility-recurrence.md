@@ -11,7 +11,7 @@ managing unit suggests possible abuse of the sole-source exemption.
 
 ---
 
-## Query (BigQuery-flavored; needs DuckDB translation)
+## Query
 
 ```sql
 SELECT
@@ -21,12 +21,12 @@ SELECT
   SUM(valor_inicial_compra)     AS total_value,
   MIN(data_assinatura_contrato) AS first_date,
   MAX(data_assinatura_contrato) AS last_date
-FROM `basedosdados.br_cgu_licitacao_contrato.contrato_compra`
-WHERE cpf_cnpj_contratado = @cnpj
-  AND ano = @ano
+FROM br_cgu_licitacao_contrato.contrato_compra
+WHERE cpf_cnpj_contratado = $cnpj
+  AND ano = $ano
   AND UPPER(fundamento_legal) LIKE '%INEXIGIBILIDADE%'
 GROUP BY id_unidade_gestora, nome_unidade_gestora
-HAVING COUNT(*) >= @min_count
+HAVING COUNT(*) >= $min_count
 ```
 
 Parameters: `cnpj`, `ano`, `min_count = 3`
