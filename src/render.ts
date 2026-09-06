@@ -73,6 +73,7 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/svg+xml" href="${escHtml(links.favicon)}">
   <title>DATATIVE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -326,6 +327,7 @@ export function renderGraphPage(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/svg+xml" href="${escHtml(links.favicon)}">
   <title>DATA_ ${escHtml(label)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">

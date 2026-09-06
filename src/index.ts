@@ -11,6 +11,7 @@ function log(...args: unknown[]) {
 const PORT = parseInt(process.env.PORT ?? "3003", 10);
 const GRAPH_JS_PATH = resolve(import.meta.dir, "../public/graph.js");
 const FAVICON_PATH = resolve(import.meta.dir, "../public/favicon.svg");
+const ROBOTS_PATH = resolve(import.meta.dir, "../public/robots.txt");
 const STATIC_DIR = resolve(import.meta.dir, "../static");
 
 const entitiesIndex = loadEntitiesIndex();
@@ -39,6 +40,15 @@ Bun.serve({
       try {
         const svg = readFileSync(FAVICON_PATH);
         return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" } });
+      } catch {
+        return new Response("Not found", { status: 404 });
+      }
+    }
+
+    // robots.txt — belt-and-suspenders alongside the per-page noindex meta tag
+    if (url.pathname === "/robots.txt") {
+      try {
+        return new Response(readFileSync(ROBOTS_PATH), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
       } catch {
         return new Response("Not found", { status: 404 });
       }

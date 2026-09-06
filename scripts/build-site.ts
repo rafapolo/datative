@@ -23,6 +23,7 @@ const DIST_DIR = resolve(ROOT, "dist");
 const STATIC_DIR = resolve(ROOT, "static");
 const GRAPH_JS_PATH = resolve(ROOT, "public/graph.js");
 const FAVICON_PATH = resolve(ROOT, "public/favicon.svg");
+const ROBOTS_PATH = resolve(ROOT, "public/robots.txt");
 
 function log(...args: unknown[]) {
   console.log(`[${new Date().toISOString().slice(11, 23)}]`, ...args);
@@ -61,13 +62,14 @@ function main() {
 
   cpSync(GRAPH_JS_PATH, resolve(DIST_DIR, "graph.js"));
   cpSync(FAVICON_PATH, resolve(DIST_DIR, "favicon.svg"));
+  cpSync(ROBOTS_PATH, resolve(DIST_DIR, "robots.txt"));
   if (existsSync(resolve(STATIC_DIR, "entities"))) {
     cpSync(resolve(STATIC_DIR, "entities"), resolve(DIST_DIR, "entities"), { recursive: true });
   }
   // GitHub Pages otherwise runs dist/ through Jekyll, which ignores files/dirs
   // starting with "_" and can mangle other things; .nojekyll disables that.
   writeFileSync(resolve(DIST_DIR, ".nojekyll"), "");
-  log("copied graph.js, favicon.svg, entities/, .nojekyll");
+  log("copied graph.js, favicon.svg, robots.txt, entities/, .nojekyll");
   log("done", { outDir: DIST_DIR });
 }
 
