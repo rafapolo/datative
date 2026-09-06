@@ -483,6 +483,7 @@ function renderGraphPage(id: string): string {
       <label class="control-label" for="layout-select">Layout</label>
       <select id="layout-select" class="layout-select">
         <option value="radial">Radial</option>
+        <option value="radial-compact">Radial Compacto</option>
         <option value="collapsible-tree">Collapsible Tree</option>
         <option value="pack">Pack</option>
         <option value="forceatlas2">Force Atlas 2</option>

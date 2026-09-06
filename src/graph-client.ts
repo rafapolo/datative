@@ -83,11 +83,22 @@ let renderer: Sigma | null = null;
 let hoveredNode: string | null = null;
 let selectedNode: string | null = null;
 let layoutRootId = "";
-let currentLayout: "radial" | "forceatlas2" | "collapsible-tree" | "pack" =
-  "radial";
+let currentLayout:
+  | "radial"
+  | "radial-compact"
+  | "forceatlas2"
+  | "collapsible-tree"
+  | "pack" = "radial";
 let currentLookupLimit = 10;
 let currentGraph: Graph | null = null;
 const LOOKUP_LIMIT_OPTIONS = new Set([10, 20, 30, 40]);
+
+// Populated by radialCompactLayout: leaves beyond COMPACT_MAX_LEAVES per hub
+// are hidden (node + incident edges) rather than crammed into the same arc,
+// and one of them is repurposed to display a "+N mais" marker in its place.
+const COMPACT_MAX_LEAVES = 7;
+const compactHiddenNodeIds = new Set<string>();
+const compactOverflowLabels = new Map<string, string>();
 
 // Dataset colors injected server-side via window.__DATASET_COLORS
 const DATASET_COLORS: Record<string, string> =
@@ -552,6 +563,85 @@ function radialLayout(graph: Graph) {
   });
 }
 
+// Same hub placement as radialLayout, but caps visible leaves per hub at
+// COMPACT_MAX_LEAVES — sector weight is computed from the capped count so a
+// hub with 30 hits doesn't hog more angular room than one with 7, and the
+// leaves that do fit get generous spacing instead of being crammed into a
+// sector sized for the full (often 10-15+) hit count. Overflow leaves are
+// hidden (via compactHiddenNodeIds, read by nodeReducer/edgeReducer) and one
+// of them is repurposed in place as a "+N mais" marker (compactOverflowLabels).
+function radialCompactLayout(graph: Graph) {
+  compactHiddenNodeIds.clear();
+  compactOverflowLabels.clear();
+
+  const root = layoutRootId;
+  if (!root || !graph.hasNode(root)) return;
+
+  graph.setNodeAttribute(root, "x", 0);
+  graph.setNodeAttribute(root, "y", 0);
+
+  const layer1 = graph.neighbors(root).filter((n) => graph.hasNode(n));
+  if (layer1.length === 0) return;
+
+  const childrenOf = new Map<string, string[]>();
+  for (const g of layer1) {
+    childrenOf.set(g, graph.neighbors(g).filter((n) => n !== root));
+  }
+
+  const cappedCount = (g: string) =>
+    Math.min(childrenOf.get(g)?.length ?? 0, COMPACT_MAX_LEAVES);
+  const weights = layer1.map((g) => 1 + cappedCount(g));
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+  const R1 = Math.max(180, layer1.length * 50);
+  const maxLeaves = Math.max(...weights.map((w) => w - 1), 1);
+  const R2 = R1 + Math.max(160, maxLeaves * 38);
+
+  let cursor = -Math.PI / 2;
+  layer1.forEach((gId, i) => {
+    const sector = (2 * Math.PI * weights[i]) / totalWeight;
+    const gAngle = cursor + sector / 2;
+    cursor += sector;
+
+    graph.setNodeAttribute(gId, "x", Math.cos(gAngle) * R1);
+    graph.setNodeAttribute(gId, "y", Math.sin(gAngle) * R1);
+
+    const allChildren = childrenOf.get(gId) ?? [];
+    if (allChildren.length === 0) return;
+
+    const overflow = allChildren.length > COMPACT_MAX_LEAVES;
+    const visibleCount = overflow ? COMPACT_MAX_LEAVES - 1 : allChildren.length;
+    const visible = allChildren.slice(0, visibleCount);
+    const hidden = overflow ? allChildren.slice(visibleCount) : [];
+    const slots = overflow ? COMPACT_MAX_LEAVES : allChildren.length;
+
+    const spread = sector * 0.82;
+    const startAngle = gAngle - spread / 2;
+    const step = slots > 1 ? spread / (slots - 1) : 0;
+
+    visible.forEach((leafId, j) => {
+      const leafAngle = slots === 1 ? gAngle : startAngle + j * step;
+      graph.setNodeAttribute(leafId, "x", Math.cos(leafAngle) * R2);
+      graph.setNodeAttribute(leafId, "y", Math.sin(leafAngle) * R2);
+    });
+
+    if (overflow) {
+      const markerAngle = startAngle + (slots - 1) * step;
+      const markerX = Math.cos(markerAngle) * R2;
+      const markerY = Math.sin(markerAngle) * R2;
+      const [markerId, ...restHidden] = hidden;
+      graph.setNodeAttribute(markerId, "x", markerX);
+      graph.setNodeAttribute(markerId, "y", markerY);
+      compactOverflowLabels.set(markerId, `+${hidden.length} mais`);
+      for (const id of restHidden) {
+        compactHiddenNodeIds.add(id);
+        graph.setNodeAttribute(id, "x", markerX);
+        graph.setNodeAttribute(id, "y", markerY);
+      }
+    }
+  });
+}
+
 interface RootedTree {
   children: Map<string, string[]>;
   depth: Map<string, number>;
@@ -800,6 +890,10 @@ function packLayout(graph: Graph) {
 
 function runLayout(graph: Graph, _iterations: number, onDone?: () => void) {
   requestAnimationFrame(() => {
+    if (currentLayout !== "radial-compact") {
+      compactHiddenNodeIds.clear();
+      compactOverflowLabels.clear();
+    }
     if (currentLayout === "forceatlas2") {
       const settings = forceAtlas2.inferSettings(graph);
       forceAtlas2.assign(graph, { iterations: 150, settings });
@@ -807,6 +901,8 @@ function runLayout(graph: Graph, _iterations: number, onDone?: () => void) {
       packLayout(graph);
     } else if (currentLayout === "collapsible-tree") {
       collapsibleTreeLayout(graph);
+    } else if (currentLayout === "radial-compact") {
+      radialCompactLayout(graph);
     } else {
       radialLayout(graph);
     }
@@ -1664,7 +1760,18 @@ async function init() {
     labelColor: { color: "#c8d0e0" },
     nodeReducer: (node, data) => {
       const res = { ...data };
-      const alwaysShowLabels = currentLayout === "collapsible-tree";
+      if (currentLayout === "radial-compact" && compactHiddenNodeIds.has(node)) {
+        return { ...res, hidden: true };
+      }
+      const overflowLabel = currentLayout === "radial-compact"
+        ? compactOverflowLabels.get(node)
+        : undefined;
+      if (overflowLabel) {
+        res.label = overflowLabel;
+        res.fullLabel = overflowLabel;
+        res.color = "#5a5a6a";
+      }
+      const alwaysShowLabels = currentLayout === "collapsible-tree" || !!overflowLabel;
       if (alwaysShowLabels && res.fullLabel) {
         res.label = res.fullLabel as string;
       }
@@ -1702,6 +1809,13 @@ async function init() {
     edgeReducer: (edge, data) => {
       const res = { ...data };
       const g = renderer?.getGraph();
+      if (currentLayout === "radial-compact" && g) {
+        const src = g.source(edge);
+        const tgt = g.target(edge);
+        if (compactHiddenNodeIds.has(src) || compactHiddenNodeIds.has(tgt)) {
+          return { ...res, hidden: true };
+        }
+      }
       if (currentLayout === "collapsible-tree") {
         res.type = "line";
         res.size = 1;

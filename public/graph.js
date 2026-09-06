@@ -9586,6 +9586,9 @@ var currentLayout = "radial";
 var currentLookupLimit = 10;
 var currentGraph = null;
 var LOOKUP_LIMIT_OPTIONS = new Set([10, 20, 30, 40]);
+var COMPACT_MAX_LEAVES = 7;
+var compactHiddenNodeIds = new Set;
+var compactOverflowLabels = new Map;
 var DATASET_COLORS = window.__DATASET_COLORS ?? {};
 var DATASET_META = window.__DATASET_META ?? {};
 var autoAddedDatasets = new Set;
@@ -9882,6 +9885,66 @@ function radialLayout(graph) {
     });
   });
 }
+function radialCompactLayout(graph) {
+  compactHiddenNodeIds.clear();
+  compactOverflowLabels.clear();
+  const root = layoutRootId;
+  if (!root || !graph.hasNode(root))
+    return;
+  graph.setNodeAttribute(root, "x", 0);
+  graph.setNodeAttribute(root, "y", 0);
+  const layer1 = graph.neighbors(root).filter((n2) => graph.hasNode(n2));
+  if (layer1.length === 0)
+    return;
+  const childrenOf = new Map;
+  for (const g2 of layer1) {
+    childrenOf.set(g2, graph.neighbors(g2).filter((n2) => n2 !== root));
+  }
+  const cappedCount = (g2) => Math.min(childrenOf.get(g2)?.length ?? 0, COMPACT_MAX_LEAVES);
+  const weights = layer1.map((g2) => 1 + cappedCount(g2));
+  const totalWeight = weights.reduce((a3, b3) => a3 + b3, 0);
+  const R1 = Math.max(180, layer1.length * 50);
+  const maxLeaves = Math.max(...weights.map((w2) => w2 - 1), 1);
+  const R2 = R1 + Math.max(160, maxLeaves * 38);
+  let cursor = -Math.PI / 2;
+  layer1.forEach((gId, i3) => {
+    const sector = 2 * Math.PI * weights[i3] / totalWeight;
+    const gAngle = cursor + sector / 2;
+    cursor += sector;
+    graph.setNodeAttribute(gId, "x", Math.cos(gAngle) * R1);
+    graph.setNodeAttribute(gId, "y", Math.sin(gAngle) * R1);
+    const allChildren = childrenOf.get(gId) ?? [];
+    if (allChildren.length === 0)
+      return;
+    const overflow = allChildren.length > COMPACT_MAX_LEAVES;
+    const visibleCount = overflow ? COMPACT_MAX_LEAVES - 1 : allChildren.length;
+    const visible = allChildren.slice(0, visibleCount);
+    const hidden = overflow ? allChildren.slice(visibleCount) : [];
+    const slots = overflow ? COMPACT_MAX_LEAVES : allChildren.length;
+    const spread = sector * 0.82;
+    const startAngle = gAngle - spread / 2;
+    const step = slots > 1 ? spread / (slots - 1) : 0;
+    visible.forEach((leafId, j2) => {
+      const leafAngle = slots === 1 ? gAngle : startAngle + j2 * step;
+      graph.setNodeAttribute(leafId, "x", Math.cos(leafAngle) * R2);
+      graph.setNodeAttribute(leafId, "y", Math.sin(leafAngle) * R2);
+    });
+    if (overflow) {
+      const markerAngle = startAngle + (slots - 1) * step;
+      const markerX = Math.cos(markerAngle) * R2;
+      const markerY = Math.sin(markerAngle) * R2;
+      const [markerId, ...restHidden] = hidden;
+      graph.setNodeAttribute(markerId, "x", markerX);
+      graph.setNodeAttribute(markerId, "y", markerY);
+      compactOverflowLabels.set(markerId, `+${hidden.length} mais`);
+      for (const id of restHidden) {
+        compactHiddenNodeIds.add(id);
+        graph.setNodeAttribute(id, "x", markerX);
+        graph.setNodeAttribute(id, "y", markerY);
+      }
+    }
+  });
+}
 function buildRootedTree(graph, root) {
   const children = new Map;
   const depth = new Map([[root, 0]]);
@@ -10053,6 +10116,10 @@ function packLayout(graph) {
 }
 function runLayout(graph, _iterations, onDone) {
   requestAnimationFrame(() => {
+    if (currentLayout !== "radial-compact") {
+      compactHiddenNodeIds.clear();
+      compactOverflowLabels.clear();
+    }
     if (currentLayout === "forceatlas2") {
       const settings = import_graphology_layout_forceatlas2.default.inferSettings(graph);
       import_graphology_layout_forceatlas2.default.assign(graph, { iterations: 150, settings });
@@ -10060,6 +10127,8 @@ function runLayout(graph, _iterations, onDone) {
       packLayout(graph);
     } else if (currentLayout === "collapsible-tree") {
       collapsibleTreeLayout(graph);
+    } else if (currentLayout === "radial-compact") {
+      radialCompactLayout(graph);
     } else {
       radialLayout(graph);
     }
@@ -10815,7 +10884,16 @@ async function init() {
     labelColor: { color: "#c8d0e0" },
     nodeReducer: (node, data2) => {
       const res = { ...data2 };
-      const alwaysShowLabels = currentLayout === "collapsible-tree";
+      if (currentLayout === "radial-compact" && compactHiddenNodeIds.has(node)) {
+        return { ...res, hidden: true };
+      }
+      const overflowLabel = currentLayout === "radial-compact" ? compactOverflowLabels.get(node) : undefined;
+      if (overflowLabel) {
+        res.label = overflowLabel;
+        res.fullLabel = overflowLabel;
+        res.color = "#5a5a6a";
+      }
+      const alwaysShowLabels = currentLayout === "collapsible-tree" || !!overflowLabel;
       if (alwaysShowLabels && res.fullLabel) {
         res.label = res.fullLabel;
       }
@@ -10851,6 +10929,13 @@ async function init() {
     edgeReducer: (edge, data2) => {
       const res = { ...data2 };
       const g2 = renderer?.getGraph();
+      if (currentLayout === "radial-compact" && g2) {
+        const src = g2.source(edge);
+        const tgt = g2.target(edge);
+        if (compactHiddenNodeIds.has(src) || compactHiddenNodeIds.has(tgt)) {
+          return { ...res, hidden: true };
+        }
+      }
       if (currentLayout === "collapsible-tree") {
         res.type = "line";
         res.size = 1;
