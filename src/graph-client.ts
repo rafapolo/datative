@@ -1368,7 +1368,11 @@ function makeDraggable(panel: HTMLElement, handleId: string) {
   });
 }
 
-function makeResizable(panel: HTMLElement, edge: "left" | "right") {
+function makeResizable(
+  panel: HTMLElement,
+  edge: "left" | "right",
+  onResize?: () => void,
+) {
   const resizer = document.createElement("div");
   resizer.className = "panel-resizer";
   resizer.style.cssText = `
@@ -1403,6 +1407,7 @@ function makeResizable(panel: HTMLElement, edge: "left" | "right") {
     const newW = edge === "right" ? startW + dx : startW - dx;
     if (newW >= 240 && newW <= window.innerWidth * 0.9) {
       panel.style.width = newW + "px";
+      onResize?.();
     }
   });
 
@@ -1469,11 +1474,29 @@ function closePanel(panel: HTMLElement) {
   panel.classList.remove("open");
 }
 
-// Anchors the floating node-details card near wherever it was triggered
-// (a graph node click or a lookup-table row click) instead of always
-// docking to a fixed screen edge — clamped so it never runs off-viewport.
-// On mobile it's a no-op: the CSS bottom-sheet rules take over entirely.
-// Default spawn point for the floating node-details card: bottom-right
+// Unlike the floating node-details card, the docked lookup panel actually
+// reflows the graph instead of overlaying it — #graph-container is pushed
+// right by the panel's current width (open + desktop only) and Sigma is
+// told to resize, so the graph re-centers in whatever space is left rather
+// than sitting partly hidden behind the panel.
+function updateGraphLayout() {
+  const container = document.getElementById("graph-container");
+  const panel = document.getElementById("lookup-panel");
+  if (!container || !panel) return;
+  const offset =
+    !isMobileViewport() && panel.classList.contains("open")
+      ? panel.offsetWidth
+      : 0;
+  container.style.marginLeft = offset ? `${offset}px` : "";
+  container.style.width = offset ? `calc(100% - ${offset}px)` : "";
+  renderer?.resize();
+}
+// The lookup panel's default width is vw-based, and the mobile breakpoint
+// changes whether it reflows the graph at all — recompute on every window
+// resize, not just drag-resize.
+window.addEventListener("resize", updateGraphLayout);
+
+// Default spawn point for the floating node-details card: top-right
 // corner. It stays draggable from there — repositioning only happens when
 // the panel transitions from closed to open, never while it's already open
 // (so dragging it elsewhere and clicking another node doesn't snap it back).
@@ -1493,7 +1516,7 @@ function positionFloatingPanel(panel: HTMLElement) {
     window.innerWidth - width - margin,
   );
   const y = Math.min(
-    Math.max(topBound, window.innerHeight - height - 24),
+    Math.max(topBound, 80),
     window.innerHeight - height - margin,
   );
 
@@ -1518,11 +1541,13 @@ function createPanel(): HTMLElement {
   document.getElementById("lookup-close")!.addEventListener("click", () => {
     closePanel(panel);
     lookupHistory.length = 0;
+    updateGraphLayout();
   });
 
   // Docked to the left edge, deliberately not draggable — only width- (and
-  // on mobile, height-) resizable via makeResizable's handle.
-  makeResizable(panel, "right");
+  // on mobile, height-) resizable via makeResizable's handle. Resizing also
+  // reflows the graph (see updateGraphLayout).
+  makeResizable(panel, "right", updateGraphLayout);
 
   return panel;
 }
@@ -1791,6 +1816,7 @@ function openLookupPanel(
     closePanel(document.getElementById("node-details-panel") as HTMLElement);
   }
   panel.classList.add("open");
+  updateGraphLayout();
 
   const hits = results.filter((result) => result.count > 0).length;
   setStatus(`${hits} base(s) com referência`);

@@ -10572,7 +10572,7 @@ function makeDraggable(panel, handleId) {
     dragging = false;
   });
 }
-function makeResizable(panel, edge) {
+function makeResizable(panel, edge, onResize) {
   const resizer = document.createElement("div");
   resizer.className = "panel-resizer";
   resizer.style.cssText = `
@@ -10605,6 +10605,7 @@ function makeResizable(panel, edge) {
     const newW = edge === "right" ? startW + dx : startW - dx;
     if (newW >= 240 && newW <= window.innerWidth * 0.9) {
       panel.style.width = newW + "px";
+      onResize?.();
     }
   });
   document.addEventListener("mouseup", () => {
@@ -10661,6 +10662,17 @@ function closePanel(panel) {
   resetPanelPosition(panel);
   panel.classList.remove("open");
 }
+function updateGraphLayout() {
+  const container = document.getElementById("graph-container");
+  const panel = document.getElementById("lookup-panel");
+  if (!container || !panel)
+    return;
+  const offset = !isMobileViewport() && panel.classList.contains("open") ? panel.offsetWidth : 0;
+  container.style.marginLeft = offset ? `${offset}px` : "";
+  container.style.width = offset ? `calc(100% - ${offset}px)` : "";
+  renderer?.resize();
+}
+window.addEventListener("resize", updateGraphLayout);
 function positionFloatingPanel(panel) {
   resetPanelPosition(panel);
   if (isMobileViewport())
@@ -10670,7 +10682,7 @@ function positionFloatingPanel(panel) {
   const width = panel.offsetWidth || 360;
   const height = panel.offsetHeight || 320;
   const x = Math.min(Math.max(margin, window.innerWidth - width - 24), window.innerWidth - width - margin);
-  const y = Math.min(Math.max(topBound, window.innerHeight - height - 24), window.innerHeight - height - margin);
+  const y = Math.min(Math.max(topBound, 80), window.innerHeight - height - margin);
   panel.style.left = `${x}px`;
   panel.style.top = `${y}px`;
   panel.style.right = "auto";
@@ -10690,8 +10702,9 @@ function createPanel() {
   document.getElementById("lookup-close").addEventListener("click", () => {
     closePanel(panel);
     lookupHistory.length = 0;
+    updateGraphLayout();
   });
-  makeResizable(panel, "right");
+  makeResizable(panel, "right", updateGraphLayout);
   return panel;
 }
 function createNodeDetailsPanel() {
@@ -10905,6 +10918,7 @@ function openLookupPanel(cnpj, graph, results) {
     closePanel(document.getElementById("node-details-panel"));
   }
   panel.classList.add("open");
+  updateGraphLayout();
   const hits = results.filter((result) => result.count > 0).length;
   setStatus(`${hits} base(s) com referência`);
   renderResultSections(results, cnpj, graph);
