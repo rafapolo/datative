@@ -1,0 +1,667 @@
+[
+  {
+    "id": "00000000",
+    "type": "empresa",
+    "label": "BANCO DO BRASIL SA",
+    "datasetCount": 23,
+    "path": "entities/00000000.json"
+  },
+  {
+    "id": "60701190",
+    "type": "empresa",
+    "label": "ITAU UNIBANCO S.A.",
+    "datasetCount": 22,
+    "path": "entities/60701190.json"
+  },
+  {
+    "id": "90400888",
+    "type": "empresa",
+    "label": "BANCO SANTANDER (BRASIL) S.A.",
+    "datasetCount": 22,
+    "path": "entities/90400888.json"
+  },
+  {
+    "id": "60746948",
+    "type": "empresa",
+    "label": "BANCO BRADESCO S.A.",
+    "datasetCount": 21,
+    "path": "entities/60746948.json"
+  },
+  {
+    "id": "45433d836b6cb6fd",
+    "type": "pessoa",
+    "label": "Antonio Cleuton Fernandes Bento",
+    "datasetCount": 6,
+    "path": "entities/45433d836b6cb6fd.json"
+  },
+  {
+    "id": "6ee5fd6717655ec5",
+    "type": "pessoa",
+    "label": "Antonio Derlane Cavalcante Soares",
+    "datasetCount": 6,
+    "path": "entities/6ee5fd6717655ec5.json"
+  },
+  {
+    "id": "1130cefa5cead9a4",
+    "type": "pessoa",
+    "label": "Abdias Filho Coelho Cavalcante",
+    "datasetCount": 6,
+    "path": "entities/1130cefa5cead9a4.json"
+  },
+  {
+    "id": "04e70764c4f55f6d",
+    "type": "pessoa",
+    "label": "Antonio Romulo Cabral De Aragao",
+    "datasetCount": 6,
+    "path": "entities/04e70764c4f55f6d.json"
+  },
+  {
+    "id": "4948678992fcb0c9",
+    "type": "pessoa",
+    "label": "Francisco Emidio Nogueira De Lima",
+    "datasetCount": 6,
+    "path": "entities/4948678992fcb0c9.json"
+  },
+  {
+    "id": "8758138711364404",
+    "type": "pessoa",
+    "label": "Carlos Igor Matos Cunha",
+    "datasetCount": 6,
+    "path": "entities/8758138711364404.json"
+  },
+  {
+    "id": "d48196523b3cd18f",
+    "type": "pessoa",
+    "label": "FERNANDO MONTENEGRO CASTELO",
+    "datasetCount": 6,
+    "path": "entities/d48196523b3cd18f.json"
+  },
+  {
+    "id": "5353b240144f41f0",
+    "type": "pessoa",
+    "label": "Raimundo Macelio Mesquita Nogueira",
+    "datasetCount": 5,
+    "path": "entities/5353b240144f41f0.json"
+  },
+  {
+    "id": "7609023a7d98cc44",
+    "type": "pessoa",
+    "label": "Gesiel Gomes Da Cunha",
+    "datasetCount": 5,
+    "path": "entities/7609023a7d98cc44.json"
+  },
+  {
+    "id": "5a5ebe5f7afb712e",
+    "type": "pessoa",
+    "label": "Jose Valclebio Elias",
+    "datasetCount": 5,
+    "path": "entities/5a5ebe5f7afb712e.json"
+  },
+  {
+    "id": "089f940b1e21d10d",
+    "type": "pessoa",
+    "label": "Jucianio Saturnino Da Silva",
+    "datasetCount": 5,
+    "path": "entities/089f940b1e21d10d.json"
+  },
+  {
+    "id": "c4a10352a8c36923",
+    "type": "pessoa",
+    "label": "Jose Benilton Carneiro",
+    "datasetCount": 5,
+    "path": "entities/c4a10352a8c36923.json"
+  },
+  {
+    "id": "af1311f846b52230",
+    "type": "pessoa",
+    "label": "Paulo Pinheiro Barros Filho",
+    "datasetCount": 5,
+    "path": "entities/af1311f846b52230.json"
+  },
+  {
+    "id": "248a532185e238cb",
+    "type": "pessoa",
+    "label": "Francisco James Alves De Amorim",
+    "datasetCount": 5,
+    "path": "entities/248a532185e238cb.json"
+  },
+  {
+    "id": "c5d7a6ca43f6e883",
+    "type": "pessoa",
+    "label": "Joao Jose De Carvalho",
+    "datasetCount": 5,
+    "path": "entities/c5d7a6ca43f6e883.json"
+  },
+  {
+    "id": "97df4e8dab8fe7b7",
+    "type": "pessoa",
+    "label": "Francisco Ferreira Lima",
+    "datasetCount": 5,
+    "path": "entities/97df4e8dab8fe7b7.json"
+  },
+  {
+    "id": "544beaddd025c125",
+    "type": "pessoa",
+    "label": "Carlos Oliveira Machado",
+    "datasetCount": 5,
+    "path": "entities/544beaddd025c125.json"
+  },
+  {
+    "id": "875d4c4db17727c8",
+    "type": "pessoa",
+    "label": "Jose Amaury Barbosa Cosmo",
+    "datasetCount": 5,
+    "path": "entities/875d4c4db17727c8.json"
+  },
+  {
+    "id": "38a1c2033532b527",
+    "type": "pessoa",
+    "label": "Francisco Costa Junior",
+    "datasetCount": 5,
+    "path": "entities/38a1c2033532b527.json"
+  },
+  {
+    "id": "6dc5734dd79dac33",
+    "type": "pessoa",
+    "label": "Romulo Oliveira Rocha",
+    "datasetCount": 5,
+    "path": "entities/6dc5734dd79dac33.json"
+  },
+  {
+    "id": "a81a81d34065843e",
+    "type": "pessoa",
+    "label": "Aristeu De Sena Oliveira",
+    "datasetCount": 5,
+    "path": "entities/a81a81d34065843e.json"
+  },
+  {
+    "id": "c78decd1ac7b6aa6",
+    "type": "pessoa",
+    "label": "Francisco Davi Sousa Girao",
+    "datasetCount": 5,
+    "path": "entities/c78decd1ac7b6aa6.json"
+  },
+  {
+    "id": "2ed0f5206670bf4e",
+    "type": "pessoa",
+    "label": "Antonio Gledson Barbosa De Sousa",
+    "datasetCount": 5,
+    "path": "entities/2ed0f5206670bf4e.json"
+  },
+  {
+    "id": "64fafe722a2ed271",
+    "type": "pessoa",
+    "label": "Francisco Ribamar Costa Rodrigues",
+    "datasetCount": 5,
+    "path": "entities/64fafe722a2ed271.json"
+  },
+  {
+    "id": "b9e6b47e062a40de",
+    "type": "pessoa",
+    "label": "Jose Jovelino Da Silva",
+    "datasetCount": 5,
+    "path": "entities/b9e6b47e062a40de.json"
+  },
+  {
+    "id": "6b5b74440a81553c",
+    "type": "pessoa",
+    "label": "Fernando Felipe Dos Santos",
+    "datasetCount": 5,
+    "path": "entities/6b5b74440a81553c.json"
+  },
+  {
+    "id": "6b15e601c77cb808",
+    "type": "pessoa",
+    "label": "Carlos Queiroz Maia",
+    "datasetCount": 5,
+    "path": "entities/6b15e601c77cb808.json"
+  },
+  {
+    "id": "f6f0fd1af8e011c7",
+    "type": "pessoa",
+    "label": "Marcio Jose Teixeira",
+    "datasetCount": 5,
+    "path": "entities/f6f0fd1af8e011c7.json"
+  },
+  {
+    "id": "c58d1c9c01cee306",
+    "type": "pessoa",
+    "label": "Claudio Michel Carvalho Neves",
+    "datasetCount": 5,
+    "path": "entities/c58d1c9c01cee306.json"
+  },
+  {
+    "id": "655a608282883cd2",
+    "type": "pessoa",
+    "label": "Francisco Klever Rocha Neves",
+    "datasetCount": 5,
+    "path": "entities/655a608282883cd2.json"
+  },
+  {
+    "id": "49fdd2ca78e06488",
+    "type": "pessoa",
+    "label": "Antonio Wilame Mendes Farias",
+    "datasetCount": 5,
+    "path": "entities/49fdd2ca78e06488.json"
+  },
+  {
+    "id": "aaace398c101df8d",
+    "type": "pessoa",
+    "label": "Maglanio Dantas Pinheiro",
+    "datasetCount": 5,
+    "path": "entities/aaace398c101df8d.json"
+  },
+  {
+    "id": "a5ece55e8bbbbf8d",
+    "type": "pessoa",
+    "label": "Joao Soares De Freitas Junior",
+    "datasetCount": 5,
+    "path": "entities/a5ece55e8bbbbf8d.json"
+  },
+  {
+    "id": "8d47a357d8a13359",
+    "type": "pessoa",
+    "label": "Antonio Silva De Aguiar",
+    "datasetCount": 5,
+    "path": "entities/8d47a357d8a13359.json"
+  },
+  {
+    "id": "02cdcc607d4fee48",
+    "type": "pessoa",
+    "label": "Antonio Carlos Barbosa Gama",
+    "datasetCount": 5,
+    "path": "entities/02cdcc607d4fee48.json"
+  },
+  {
+    "id": "6be3a4dc6c77246d",
+    "type": "pessoa",
+    "label": "Eudileno De Sousa Soares",
+    "datasetCount": 5,
+    "path": "entities/6be3a4dc6c77246d.json"
+  },
+  {
+    "id": "829fe6dfe0c3a852",
+    "type": "pessoa",
+    "label": "Antonio Luciano Monteiro Da Silva",
+    "datasetCount": 5,
+    "path": "entities/829fe6dfe0c3a852.json"
+  },
+  {
+    "id": "9a99ad59e8898699",
+    "type": "pessoa",
+    "label": "Antonio Marcos Alves Da Silva",
+    "datasetCount": 5,
+    "path": "entities/9a99ad59e8898699.json"
+  },
+  {
+    "id": "eccefad418f55fad",
+    "type": "pessoa",
+    "label": "Antonio Wilson Barros Leal",
+    "datasetCount": 5,
+    "path": "entities/eccefad418f55fad.json"
+  },
+  {
+    "id": "37801803b79f7154",
+    "type": "pessoa",
+    "label": "Silvio Herminio Rodrigues Barros",
+    "datasetCount": 5,
+    "path": "entities/37801803b79f7154.json"
+  },
+  {
+    "id": "ceae3586a3f0cd41",
+    "type": "pessoa",
+    "label": "Menezio Alves Costa",
+    "datasetCount": 5,
+    "path": "entities/ceae3586a3f0cd41.json"
+  },
+  {
+    "id": "2e45025d6e13a521",
+    "type": "pessoa",
+    "label": "Elielnei Leite De Queiroz",
+    "datasetCount": 5,
+    "path": "entities/2e45025d6e13a521.json"
+  },
+  {
+    "id": "82036ef09cbfcbc2",
+    "type": "pessoa",
+    "label": "Manoel Egidio De Lima",
+    "datasetCount": 5,
+    "path": "entities/82036ef09cbfcbc2.json"
+  },
+  {
+    "id": "73965328d59cac22",
+    "type": "pessoa",
+    "label": "GIANCARLO ALVES BINA",
+    "datasetCount": 5,
+    "path": "entities/73965328d59cac22.json"
+  },
+  {
+    "id": "59ce1903228d1670",
+    "type": "pessoa",
+    "label": "JOSE MARIA DE SOUSA",
+    "datasetCount": 5,
+    "path": "entities/59ce1903228d1670.json"
+  },
+  {
+    "id": "3e3224d5fd55ea32",
+    "type": "pessoa",
+    "label": "MARIA EUNICE DE LIRA",
+    "datasetCount": 5,
+    "path": "entities/3e3224d5fd55ea32.json"
+  },
+  {
+    "id": "2f04d5028e1ea928",
+    "type": "pessoa",
+    "label": "EDSON MACEDO BATISTA",
+    "datasetCount": 5,
+    "path": "entities/2f04d5028e1ea928.json"
+  },
+  {
+    "id": "e853e8fd321fe657",
+    "type": "pessoa",
+    "label": "MIRIA NOGUEIRA DE LIMA",
+    "datasetCount": 5,
+    "path": "entities/e853e8fd321fe657.json"
+  },
+  {
+    "id": "1723c5414eb1634f",
+    "type": "pessoa",
+    "label": "EDUARDO SYDNEY BEZERRA DE GIRAO",
+    "datasetCount": 5,
+    "path": "entities/1723c5414eb1634f.json"
+  },
+  {
+    "id": "0b23a004b5867a39",
+    "type": "pessoa",
+    "label": "CONTRATADO : JACINTA MARIA SILVEIRA      -",
+    "datasetCount": 5,
+    "path": "entities/0b23a004b5867a39.json"
+  },
+  {
+    "id": "00360305",
+    "type": "empresa",
+    "label": "CAIXA ECONOMICA FEDERAL",
+    "datasetCount": 23,
+    "path": "entities/00360305.json"
+  },
+  {
+    "id": "01838723",
+    "type": "empresa",
+    "label": "BRF S.A.",
+    "datasetCount": 20,
+    "path": "entities/01838723.json"
+  },
+  {
+    "id": "60409075",
+    "type": "empresa",
+    "label": "NESTLE BRASIL LTDA.",
+    "datasetCount": 19,
+    "path": "entities/60409075.json"
+  },
+  {
+    "id": "33041260",
+    "type": "empresa",
+    "label": "GRUPO CASAS BAHIA S.A.",
+    "datasetCount": 18,
+    "path": "entities/33041260.json"
+  },
+  {
+    "id": "76535764",
+    "type": "empresa",
+    "label": "OI S.A. - EM RECUPERACAO JUDICIAL",
+    "datasetCount": 18,
+    "path": "entities/76535764.json"
+  },
+  {
+    "id": "02914460",
+    "type": "empresa",
+    "label": "SEARA ALIMENTOS LTDA",
+    "datasetCount": 18,
+    "path": "entities/02914460.json"
+  },
+  {
+    "id": "34274233",
+    "type": "empresa",
+    "label": "VIBRA ENERGIA S.A",
+    "datasetCount": 18,
+    "path": "entities/34274233.json"
+  },
+  {
+    "id": "77752293",
+    "type": "empresa",
+    "label": "LAR COOPERATIVA AGROINDUSTRIAL",
+    "datasetCount": 18,
+    "path": "entities/77752293.json"
+  },
+  {
+    "id": "92702067",
+    "type": "empresa",
+    "label": "BANCO DO ESTADO DO RIO GRANDE DO SUL SA",
+    "datasetCount": 18,
+    "path": "entities/92702067.json"
+  },
+  {
+    "id": "79114450",
+    "type": "empresa",
+    "label": "COCAMAR COOPERATIVA AGROINDUSTRIAL",
+    "datasetCount": 18,
+    "path": "entities/79114450.json"
+  },
+  {
+    "id": "83305235",
+    "type": "empresa",
+    "label": "COOPERATIVA AGROINDUSTRIAL ALFA",
+    "datasetCount": 17,
+    "path": "entities/83305235.json"
+  },
+  {
+    "id": "76093731",
+    "type": "empresa",
+    "label": "COPACOL-COOPERATIVA AGROINDUSTRIAL CONSOLATA",
+    "datasetCount": 17,
+    "path": "entities/76093731.json"
+  },
+  {
+    "id": "89237911",
+    "type": "empresa",
+    "label": "GLOBAL DISTRIBUICAO DE BENS DE CONSUMO LTDA.",
+    "datasetCount": 17,
+    "path": "entities/89237911.json"
+  },
+  {
+    "id": "35820448",
+    "type": "empresa",
+    "label": "WHITE MARTINS GASES INDUSTRIAIS LTDA",
+    "datasetCount": 17,
+    "path": "entities/35820448.json"
+  },
+  {
+    "id": "71208516",
+    "type": "empresa",
+    "label": "ALGAR TELECOM S/A",
+    "datasetCount": 17,
+    "path": "entities/71208516.json"
+  },
+  {
+    "id": "44734671",
+    "type": "empresa",
+    "label": "CRISTALIA PRODUTOS QUIMICOS FARMACEUTICOS LTDA",
+    "datasetCount": 17,
+    "path": "entities/44734671.json"
+  },
+  {
+    "id": "40432544",
+    "type": "empresa",
+    "label": "CLARO S.A.",
+    "datasetCount": 17,
+    "path": "entities/40432544.json"
+  },
+  {
+    "id": "75904383",
+    "type": "empresa",
+    "label": "COAMO AGROINDUSTRIAL COOPERATIVA",
+    "datasetCount": 17,
+    "path": "entities/75904383.json"
+  },
+  {
+    "id": "45236791",
+    "type": "empresa",
+    "label": "COOPERCITRUS COOPERATIVA DE PRODUTORES RURAIS",
+    "datasetCount": 17,
+    "path": "entities/45236791.json"
+  },
+  {
+    "id": "61585865",
+    "type": "empresa",
+    "label": "RAIA DROGASIL S/A",
+    "datasetCount": 17,
+    "path": "entities/61585865.json"
+  },
+  {
+    "id": "16670085",
+    "type": "empresa",
+    "label": "LOCALIZA RENT A CAR SA",
+    "datasetCount": 16,
+    "path": "entities/16670085.json"
+  },
+  {
+    "id": "47960950",
+    "type": "empresa",
+    "label": "MAGAZINE LUIZA S/A",
+    "datasetCount": 16,
+    "path": "entities/47960950.json"
+  },
+  {
+    "id": "92665611",
+    "type": "empresa",
+    "label": "DIMED S/A - DISTRIBUIDORA DE MEDICAMENTOS",
+    "datasetCount": 16,
+    "path": "entities/92665611.json"
+  },
+  {
+    "id": "90657289",
+    "type": "empresa",
+    "label": "COOPERATIVA AGRICOLA MISTA GENERAL OSORIO LTDA",
+    "datasetCount": 16,
+    "path": "entities/90657289.json"
+  },
+  {
+    "id": "02558157",
+    "type": "empresa",
+    "label": "TELEFONICA BRASIL S.A.",
+    "datasetCount": 16,
+    "path": "entities/02558157.json"
+  },
+  {
+    "id": "19791896",
+    "type": "empresa",
+    "label": "SUPERGASBRAS ENERGIA LTDA",
+    "datasetCount": 16,
+    "path": "entities/19791896.json"
+  },
+  {
+    "id": "82901000",
+    "type": "empresa",
+    "label": "INTELBRAS S.A. INDUSTRIA DE TELECOMUNICACAO ELETRONICA BRASILEIRA",
+    "datasetCount": 16,
+    "path": "entities/82901000.json"
+  },
+  {
+    "id": "58160789",
+    "type": "empresa",
+    "label": "BANCO SAFRA S A",
+    "datasetCount": 16,
+    "path": "entities/58160789.json"
+  },
+  {
+    "id": "61198164",
+    "type": "empresa",
+    "label": "PORTO SEGURO COMPANHIA DE SEGUROS GERAIS",
+    "datasetCount": 16,
+    "path": "entities/61198164.json"
+  },
+  {
+    "id": "85070068",
+    "type": "empresa",
+    "label": "GONCALVES & TORTOLA S/A",
+    "datasetCount": 16,
+    "path": "entities/85070068.json"
+  },
+  {
+    "id": "77863223",
+    "type": "empresa",
+    "label": "C.VALE - COOPERATIVA AGROINDUSTRIAL",
+    "datasetCount": 16,
+    "path": "entities/77863223.json"
+  },
+  {
+    "id": "91495549",
+    "type": "empresa",
+    "label": "COTRIJAL COOPERATIVA AGROPECUARIA E INDUSTRIAL",
+    "datasetCount": 15,
+    "path": "entities/91495549.json"
+  },
+  {
+    "id": "98338072",
+    "type": "empresa",
+    "label": "COOPERATIVA MISTA SAO LUIZ LTDA",
+    "datasetCount": 15,
+    "path": "entities/98338072.json"
+  },
+  {
+    "id": "83573212",
+    "type": "empresa",
+    "label": "COOPERATIVA DE PRODUCAO E CONSUMO CONCORDIA",
+    "datasetCount": 15,
+    "path": "entities/83573212.json"
+  },
+  {
+    "id": "62232889",
+    "type": "empresa",
+    "label": "BANCO DAYCOVAL S.A.",
+    "datasetCount": 15,
+    "path": "entities/62232889.json"
+  },
+  {
+    "id": "92781335",
+    "type": "empresa",
+    "label": "TAURUS ARMAS S.A.",
+    "datasetCount": 15,
+    "path": "entities/92781335.json"
+  },
+  {
+    "id": "59104422",
+    "type": "empresa",
+    "label": "VOLKSWAGEN DO BRASIL INDUSTRIA DE VEICULOS AUTOMOTORES LTDA",
+    "datasetCount": 15,
+    "path": "entities/59104422.json"
+  },
+  {
+    "id": "83310441",
+    "type": "empresa",
+    "label": "COOPERATIVA CENTRAL AURORA ALIMENTOS",
+    "datasetCount": 15,
+    "path": "entities/83310441.json"
+  },
+  {
+    "id": "81243735",
+    "type": "empresa",
+    "label": "POSITIVO TECNOLOGIA S.A.",
+    "datasetCount": 15,
+    "path": "entities/81243735.json"
+  },
+  {
+    "id": "02916265",
+    "type": "empresa",
+    "label": "JBS S/A",
+    "datasetCount": 15,
+    "path": "entities/02916265.json"
+  },
+  {
+    "id": "88611835",
+    "type": "empresa",
+    "label": "MARCOPOLO SA",
+    "datasetCount": 15,
+    "path": "entities/88611835.json"
+  }
+]
