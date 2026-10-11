@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hashCpf, isCpfLength, isPersonalDocColumn, maskCpf, sanitizeCpfValue, sanitizeRow } from "../scripts/lib/cpf-privacy";
+import { hashCpf, isCpfLength, isPersonalDocColumn, maskCpf, sanitizeAnyValue, sanitizeCpfValue, sanitizeRow } from "../scripts/lib/cpf-privacy";
 
 describe("isCpfLength", () => {
   test("11 digits is a CPF", () => {
@@ -112,5 +112,28 @@ describe("sanitizeRow", () => {
   test("a mixed cnpj join column only masks the value when it's actually CPF-shaped", () => {
     const row = { cpf_cnpj_doador: "12345678000195" };
     expect(sanitizeRow(row, ["cpf_cnpj_doador"])).toEqual({ cpf_cnpj_doador: "12345678000195" });
+  });
+});
+
+describe("sanitizeAnyValue", () => {
+  test("masks a fully punctuated CPF in any column", () => {
+    expect(sanitizeAnyValue("722.071.677-04")).toBe(maskCpf("72207167704"));
+  });
+
+  test("leaves a bare 11-digit value alone — only document columns mask those", () => {
+    expect(sanitizeAnyValue("50000000320")).toBe("50000000320");
+  });
+
+  test("leaves names, CNPJs and non-strings alone", () => {
+    expect(sanitizeAnyValue("ITAU CORRETORA")).toBe("ITAU CORRETORA");
+    expect(sanitizeAnyValue("60.701.190/0001-04")).toBe("60.701.190/0001-04");
+    expect(sanitizeAnyValue(42)).toBe(42);
+  });
+
+  test("sanitizeRow applies it to non-document columns", () => {
+    expect(sanitizeRow({ Escriturador: "722.071.677-04", id: "50000000320" }, [])).toEqual({
+      Escriturador: maskCpf("72207167704"),
+      id: "50000000320",
+    });
   });
 });

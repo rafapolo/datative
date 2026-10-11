@@ -48,10 +48,21 @@ export function isPersonalDocColumn(columnName: string, cnpjColumnNames: readonl
   return PERSONAL_DOC_COLUMN.test(columnName) || cnpjColumnNames.includes(columnName);
 }
 
+// The fully punctuated form ("123.456.789-00") is unambiguous — no id, amount
+// or code is written that way — so it's masked in ANY column, not just
+// document columns. Found live: CVM's fca_escriturador has rows whose
+// `Escriturador` (a name field) holds the person's punctuated CPF.
+const PUNCTUATED_CPF = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+
+export function sanitizeAnyValue(value: unknown): unknown {
+  if (typeof value !== "string" || !PUNCTUATED_CPF.test(value.trim())) return value;
+  return maskCpf(value.replace(/\D/g, ""));
+}
+
 export function sanitizeRow<T extends Record<string, unknown>>(row: T, cnpjColumnNames: readonly string[]): T {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(row)) {
-    out[k] = isPersonalDocColumn(k, cnpjColumnNames) ? sanitizeCpfValue(v) : v;
+    out[k] = isPersonalDocColumn(k, cnpjColumnNames) ? sanitizeCpfValue(v) : sanitizeAnyValue(v);
   }
   return out as T;
 }
