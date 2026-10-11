@@ -316,7 +316,15 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
     const { idField, labelField } = inferNodeFields(ds);
     const clauses = ds.cnpjColumns.map((col) => {
       const digits = docDigitsExpr(col);
-      if (col.type === "basico") return withColumnWhere(col, `(${digits} = '${cnpjBasico}')`);
+      // basico columns are clean 8-digit VARCHAR everywhere they're wired
+      // (checked 2026-10-11) — compare the raw column so DuckDB can prune
+      // parquet row groups by min/max; wrapping it in regexp_replace forces a
+      // full scan (br_me_cnpj.estabelecimentos: 94 s vs 25 s, and timeouts
+      // under load). A normalize basico column still goes through digits.
+      if (col.type === "basico") {
+        const lhs = col.normalize ? digits : `"${col.name}"`;
+        return withColumnWhere(col, `(${lhs} = '${cnpjBasico}')`);
+      }
       const padded = col.normalize ? `lpad(${digits}, 14, '0')` : digits;
       const notBlank = col.normalize ? `ltrim(${digits}, '0') <> '' AND ` : "";
       if (col.type === "full") return withColumnWhere(col, `(${notBlank}${padded} LIKE '${cnpjBasico}%')`);
