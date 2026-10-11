@@ -287,6 +287,7 @@ function focusLookupSection(datasetId: string) {
   )) {
     if (openHeader !== header) openHeader.classList.remove("expanded");
   }
+  if (bodyDiv) ensureLookupTable(bodyDiv);
   bodyDiv?.classList.add("expanded");
   header?.classList.add("expanded");
   panel.classList.add("open");
@@ -1189,6 +1190,40 @@ function injectPanelStyles() {
       text-decoration: underline dotted;
     }
     .cnpj-link:hover { color: #fff; }
+    .lookup-more {
+      display: block;
+      width: 100%;
+      min-height: 40px;
+      padding: 0.55rem;
+      font: 700 0.62rem 'Space Mono', monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+      background: #0d1430;
+      border: none;
+      border-top: 1px solid #1f2a44;
+      cursor: pointer;
+    }
+    .lookup-more:hover { color: #fff; background: #121a3a; }
+    .lookup-more[hidden] { display: none; }
+    #lookup-fab {
+      position: fixed;
+      left: 14px;
+      bottom: 52px;
+      z-index: 20;
+      min-height: 44px;
+      padding: 0 1.1rem;
+      font: 700 0.66rem 'Space Mono', monospace;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #0a0a18;
+      background: #e8b84b;
+      border: none;
+      border-radius: 22px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      cursor: pointer;
+    }
+    #lookup-fab[hidden] { display: none; }
     #lookup-back {
       background: none;
       border: none;
@@ -1460,6 +1495,8 @@ function updateGraphLayout() {
     !isMobileViewport() && panel.classList.contains("open")
       ? panel.offsetWidth
       : 0;
+  const fab = document.getElementById("lookup-fab");
+  if (fab) fab.hidden = panel.classList.contains("open");
   container.style.marginLeft = offset ? `${offset}px` : "";
   container.style.width = offset ? `calc(100% - ${offset}px)` : "";
   // resize() alone clears the WebGL canvases (changing their width/height
@@ -1485,6 +1522,20 @@ function createPanel(): HTMLElement {
     <div id="lookup-body"></div>
   `;
   document.body.appendChild(panel);
+
+  // Reopens the panel once closed — otherwise the only way back was clicking
+  // a dataset hub in the graph. Hidden while the panel is open (see
+  // updateGraphLayout).
+  const fab = document.createElement("button");
+  fab.id = "lookup-fab";
+  fab.type = "button";
+  fab.textContent = "Bases";
+  fab.addEventListener("click", () => {
+    if (isMobileViewport()) closePanel(document.getElementById("node-details-panel") as HTMLElement);
+    panel.classList.add("open");
+    updateGraphLayout();
+  });
+  document.body.appendChild(fab);
 
   document.getElementById("lookup-close")!.addEventListener("click", () => {
     closePanel(panel);
@@ -1616,6 +1667,105 @@ function showNodeDetails(nodeId: string, graph: Graph) {
   openPanel();
 }
 
+const lazyTables = new WeakMap<HTMLElement, () => void>();
+
+function ensureLookupTable(bodyDiv: HTMLElement) {
+  const build = lazyTables.get(bodyDiv);
+  if (!build) return;
+  lazyTables.delete(bodyDiv);
+  build();
+}
+
+// Rows are appended in pages of this size behind a "mostrar mais" button, so
+// opening a 500-row dataset on a phone doesn't stall on one huge layout.
+const LOOKUP_PAGE_SIZE = 100;
+
+const PUBLISHED_IDS = new Set<string>(
+  (window as unknown as { __PUBLISHED_IDS__?: string[] }).__PUBLISHED_IDS__ ?? [],
+);
+const ENTITY_HREF_TEMPLATE =
+  (window as unknown as { __ENTITY_HREF__?: string }).__ENTITY_HREF__ ?? "?cnpj=__ID__";
+
+function buildLookupTable(result: LookupResult, bodyDiv: HTMLElement) {
+  const cols = Object.keys(result.rows[0]);
+  const cnpjCols = new Set(result.cnpjColumnNames ?? []);
+  const table = document.createElement("table");
+  table.className = "lookup-table";
+  const headRow = document.createElement("tr");
+  for (const c of cols) {
+    const th = document.createElement("th");
+    th.textContent = c;
+    headRow.appendChild(th);
+  }
+  const thead = document.createElement("thead");
+  thead.appendChild(headRow);
+  const tbody = document.createElement("tbody");
+  table.append(thead, tbody);
+  bodyDiv.appendChild(table);
+
+  // One delegated listener per table instead of one per row.
+  tbody.addEventListener("click", (e) => {
+    const tr = (e.target as HTMLElement).closest<HTMLTableRowElement>("tr[data-row-signature]");
+    if (!tr) return;
+    const nodeIds = rowSignatureToNodeIds.get(tr.dataset.rowSignature!);
+    if (!nodeIds || nodeIds.size === 0 || !currentGraph) return;
+    const nodeId = [...nodeIds][0];
+    selectedNode = nodeId;
+    hoveredNode = null;
+    renderer?.refresh({ skipIndexation: true });
+    showNodeDetails(nodeId, currentGraph);
+    syncLookupRowHighlight();
+  });
+
+  let rendered = 0;
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "lookup-more";
+  const renderPage = () => {
+    const frag = document.createDocumentFragment();
+    const end = Math.min(rendered + LOOKUP_PAGE_SIZE, result.rows.length);
+    for (let i = rendered; i < end; i++) {
+      const row = result.rows[i];
+      const tr = document.createElement("tr");
+      const signature = rowSignature(result.id, row);
+      tr.dataset.rowSignature = signature;
+      tr.dataset.datasetId = result.id;
+      // Rows beyond the generator's per-dataset graph cap (inGraph:false)
+      // never got a Sigma node, so clicking them can't highlight anything
+      // in the graph — mark them visually so that's clear before the click.
+      if ((rowSignatureToNodeIds.get(signature)?.size ?? 0) === 0) tr.classList.add("row-no-node");
+      for (const col of cols) {
+        const val = row[col];
+        const text = val == null ? "—" : String(val);
+        const td = document.createElement("td");
+        td.title = text;
+        const basico = cnpjCols.has(col) && isCnpj(text) ? extractBasico(text) : "";
+        if (basico && basico !== currentLookupCnpj && PUBLISHED_IDS.has(basico)) {
+          const a = document.createElement("a");
+          a.className = "cnpj-link";
+          a.textContent = text;
+          a.href = ENTITY_HREF_TEMPLATE.replace("__ID__", encodeURIComponent(basico));
+          a.addEventListener("click", (e) => e.stopPropagation());
+          td.appendChild(a);
+        } else {
+          td.textContent = text;
+        }
+        tr.appendChild(td);
+      }
+      frag.appendChild(tr);
+    }
+    tbody.appendChild(frag);
+    rendered = end;
+    const left = result.rows.length - rendered;
+    more.textContent = `mostrar mais ${Math.min(left, LOOKUP_PAGE_SIZE)} de ${left}`;
+    more.hidden = left <= 0;
+    syncLookupRowHighlight();
+  };
+  more.addEventListener("click", renderPage);
+  bodyDiv.appendChild(more);
+  renderPage();
+}
+
 function renderResultSections(
   results: LookupResult[],
   cnpj: string,
@@ -1655,61 +1805,12 @@ function renderResultSections(
     const bodyDiv = document.createElement("div");
     bodyDiv.className = "lookup-section-body";
 
+    // Tables are built on first expand, not up front: a big entity (Banco do
+    // Brasil) has ~60 datasets × up to 500 rows, which eagerly meant ~7k <tr>
+    // and ~80k DOM nodes before anything was opened — the main cost of the
+    // page, worst on mobile.
     if (hasHits && result.rows.length > 0) {
-      const cols = Object.keys(result.rows[0]);
-      const cnpjCols = new Set(result.cnpjColumnNames ?? []);
-      const tHead = cols.map((c) => `<th>${c}</th>`).join("");
-
-      const table = document.createElement("table");
-      table.className = "lookup-table";
-      table.innerHTML = `<thead><tr>${tHead}</tr></thead><tbody></tbody>`;
-      const tbody = table.querySelector("tbody")!;
-
-      for (const row of result.rows) {
-        const tr = document.createElement("tr");
-        const signature = rowSignature(result.id, row);
-        tr.dataset.rowSignature = signature;
-        tr.dataset.datasetId = result.id;
-        // Rows beyond the generator's per-dataset graph cap (inGraph:false)
-        // never got a Sigma node, so clicking them can't highlight anything
-        // in the graph — mark them visually so that's clear before the click.
-        const hasNode = (rowSignatureToNodeIds.get(signature)?.size ?? 0) > 0;
-        if (!hasNode) tr.classList.add("row-no-node");
-        for (const col of cols) {
-          const val = row[col];
-          const text = val == null ? "—" : String(val);
-          const td = document.createElement("td");
-          td.title = text;
-
-          if (cnpjCols.has(col) && isCnpj(text)) {
-            const span = document.createElement("span");
-            span.className = "cnpj-link";
-            span.textContent = text;
-            span.addEventListener("click", (e) => {
-              e.stopPropagation();
-              const basico = extractBasico(text);
-              window.open(`/?cnpj=${encodeURIComponent(basico)}`, "_blank", "noopener,noreferrer");
-            });
-            td.appendChild(span);
-          } else {
-            td.textContent = text;
-          }
-          tr.appendChild(td);
-        }
-        tr.addEventListener("click", () => {
-          const nodeIds = rowSignatureToNodeIds.get(signature);
-          if (!nodeIds || nodeIds.size === 0 || !currentGraph) return;
-          const nodeId = [...nodeIds][0];
-          selectedNode = nodeId;
-          hoveredNode = null;
-          renderer?.refresh({ skipIndexation: true });
-          showNodeDetails(nodeId, currentGraph);
-          syncLookupRowHighlight();
-        });
-        tbody.appendChild(tr);
-      }
-
-      bodyDiv.appendChild(table);
+      lazyTables.set(bodyDiv, () => buildLookupTable(result, bodyDiv));
     }
 
     // Toggle body on header click — accordion: keep only one section expanded.
@@ -1729,6 +1830,7 @@ function renderResultSections(
       )) {
         if (openHeader !== header) openHeader.classList.remove("expanded");
       }
+      ensureLookupTable(bodyDiv);
       bodyDiv.classList.toggle("expanded");
       header.classList.toggle("expanded");
     });
@@ -1736,6 +1838,7 @@ function renderResultSections(
     // Auto-expand first dataset that already has hits.
     if (!firstExpanded && hasHits) {
       firstExpanded = true;
+      ensureLookupTable(bodyDiv);
       bodyDiv.classList.add("expanded");
       header.classList.add("expanded");
     }
@@ -1762,15 +1865,24 @@ function openLookupPanel(
   currentLookupCnpj = cnpj;
   currentLookupLabel = cnpj; // updated below if razao_social available
 
-  title.textContent = `CNPJ: ${cnpj}`;
+  // The entity's own name, not "CNPJ: <id>" — for a pessoa the id is a CPF
+  // hash, meaningless to a reader.
+  const rootLabel = graph.hasNode(cnpj) ? valueText(graph.getNodeAttribute(cnpj, "fullLabel") ?? graph.getNodeAttribute(cnpj, "label")) : "";
+  title.textContent = rootLabel && rootLabel !== "—" ? rootLabel : `CNPJ: ${cnpj}`;
+  title.title = cnpj;
   backBtn.style.display = lookupHistory.length > 0 ? "inline-block" : "none";
+  const hits = results.filter((result) => result.count > 0).length;
+  const fab = document.getElementById("lookup-fab");
+  if (fab) fab.textContent = `Bases · ${hits}`;
+  // On a phone both panels are bottom sheets covering most of the screen —
+  // start with the graph alone and let the "Bases" button open the list.
   if (isMobileViewport()) {
     closePanel(document.getElementById("node-details-panel") as HTMLElement);
+  } else {
+    panel.classList.add("open");
   }
-  panel.classList.add("open");
   updateGraphLayout();
 
-  const hits = results.filter((result) => result.count > 0).length;
   setStatus(`${hits} base(s) com referência`);
   renderResultSections(results, cnpj, graph);
 }
@@ -2052,7 +2164,7 @@ async function init() {
   );
   if (overlay) overlay.style.display = "none";
   openLookupPanel(rootId, graph, lookupResults);
-  showNodeDetails(rootId, graph);
+  if (!isMobileViewport()) showNodeDetails(rootId, graph);
 
   // Node dragging
   let draggedNode: string | null = null;

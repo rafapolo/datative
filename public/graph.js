@@ -9687,6 +9687,8 @@ function focusLookupSection(datasetId) {
     if (openHeader !== header)
       openHeader.classList.remove("expanded");
   }
+  if (bodyDiv)
+    ensureLookupTable(bodyDiv);
   bodyDiv?.classList.add("expanded");
   header?.classList.add("expanded");
   panel.classList.add("open");
@@ -10399,6 +10401,40 @@ function injectPanelStyles() {
       text-decoration: underline dotted;
     }
     .cnpj-link:hover { color: #fff; }
+    .lookup-more {
+      display: block;
+      width: 100%;
+      min-height: 40px;
+      padding: 0.55rem;
+      font: 700 0.62rem 'Space Mono', monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+      background: #0d1430;
+      border: none;
+      border-top: 1px solid #1f2a44;
+      cursor: pointer;
+    }
+    .lookup-more:hover { color: #fff; background: #121a3a; }
+    .lookup-more[hidden] { display: none; }
+    #lookup-fab {
+      position: fixed;
+      left: 14px;
+      bottom: 52px;
+      z-index: 20;
+      min-height: 44px;
+      padding: 0 1.1rem;
+      font: 700 0.66rem 'Space Mono', monospace;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #0a0a18;
+      background: #e8b84b;
+      border: none;
+      border-radius: 22px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      cursor: pointer;
+    }
+    #lookup-fab[hidden] { display: none; }
     #lookup-back {
       background: none;
       border: none;
@@ -10647,6 +10683,9 @@ function updateGraphLayout() {
   if (!container || !panel)
     return;
   const offset = !isMobileViewport() && panel.classList.contains("open") ? panel.offsetWidth : 0;
+  const fab = document.getElementById("lookup-fab");
+  if (fab)
+    fab.hidden = panel.classList.contains("open");
   container.style.marginLeft = offset ? `${offset}px` : "";
   container.style.width = offset ? `calc(100% - ${offset}px)` : "";
   renderer?.resize();
@@ -10665,6 +10704,17 @@ function createPanel() {
     <div id="lookup-body"></div>
   `;
   document.body.appendChild(panel);
+  const fab = document.createElement("button");
+  fab.id = "lookup-fab";
+  fab.type = "button";
+  fab.textContent = "Bases";
+  fab.addEventListener("click", () => {
+    if (isMobileViewport())
+      closePanel(document.getElementById("node-details-panel"));
+    panel.classList.add("open");
+    updateGraphLayout();
+  });
+  document.body.appendChild(fab);
   document.getElementById("lookup-close").addEventListener("click", () => {
     closePanel(panel);
     lookupHistory.length = 0;
@@ -10766,6 +10816,93 @@ function showNodeDetails(nodeId, graph) {
   }
   openPanel();
 }
+var lazyTables = new WeakMap;
+function ensureLookupTable(bodyDiv) {
+  const build = lazyTables.get(bodyDiv);
+  if (!build)
+    return;
+  lazyTables.delete(bodyDiv);
+  build();
+}
+var LOOKUP_PAGE_SIZE = 100;
+var PUBLISHED_IDS = new Set(window.__PUBLISHED_IDS__ ?? []);
+var ENTITY_HREF_TEMPLATE = window.__ENTITY_HREF__ ?? "?cnpj=__ID__";
+function buildLookupTable(result, bodyDiv) {
+  const cols = Object.keys(result.rows[0]);
+  const cnpjCols = new Set(result.cnpjColumnNames ?? []);
+  const table = document.createElement("table");
+  table.className = "lookup-table";
+  const headRow = document.createElement("tr");
+  for (const c of cols) {
+    const th = document.createElement("th");
+    th.textContent = c;
+    headRow.appendChild(th);
+  }
+  const thead = document.createElement("thead");
+  thead.appendChild(headRow);
+  const tbody = document.createElement("tbody");
+  table.append(thead, tbody);
+  bodyDiv.appendChild(table);
+  tbody.addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-row-signature]");
+    if (!tr)
+      return;
+    const nodeIds = rowSignatureToNodeIds.get(tr.dataset.rowSignature);
+    if (!nodeIds || nodeIds.size === 0 || !currentGraph)
+      return;
+    const nodeId = [...nodeIds][0];
+    selectedNode = nodeId;
+    hoveredNode = null;
+    renderer?.refresh({ skipIndexation: true });
+    showNodeDetails(nodeId, currentGraph);
+    syncLookupRowHighlight();
+  });
+  let rendered = 0;
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "lookup-more";
+  const renderPage = () => {
+    const frag = document.createDocumentFragment();
+    const end = Math.min(rendered + LOOKUP_PAGE_SIZE, result.rows.length);
+    for (let i = rendered;i < end; i++) {
+      const row = result.rows[i];
+      const tr = document.createElement("tr");
+      const signature = rowSignature(result.id, row);
+      tr.dataset.rowSignature = signature;
+      tr.dataset.datasetId = result.id;
+      if ((rowSignatureToNodeIds.get(signature)?.size ?? 0) === 0)
+        tr.classList.add("row-no-node");
+      for (const col of cols) {
+        const val = row[col];
+        const text = val == null ? "—" : String(val);
+        const td = document.createElement("td");
+        td.title = text;
+        const basico = cnpjCols.has(col) && isCnpj(text) ? extractBasico(text) : "";
+        if (basico && basico !== currentLookupCnpj && PUBLISHED_IDS.has(basico)) {
+          const a = document.createElement("a");
+          a.className = "cnpj-link";
+          a.textContent = text;
+          a.href = ENTITY_HREF_TEMPLATE.replace("__ID__", encodeURIComponent(basico));
+          a.addEventListener("click", (e) => e.stopPropagation());
+          td.appendChild(a);
+        } else {
+          td.textContent = text;
+        }
+        tr.appendChild(td);
+      }
+      frag.appendChild(tr);
+    }
+    tbody.appendChild(frag);
+    rendered = end;
+    const left = result.rows.length - rendered;
+    more.textContent = `mostrar mais ${Math.min(left, LOOKUP_PAGE_SIZE)} de ${left}`;
+    more.hidden = left <= 0;
+    syncLookupRowHighlight();
+  };
+  more.addEventListener("click", renderPage);
+  bodyDiv.appendChild(more);
+  renderPage();
+}
 function renderResultSections(results, cnpj, graph) {
   const body = document.getElementById("lookup-body");
   body.innerHTML = "";
@@ -10793,55 +10930,7 @@ function renderResultSections(results, cnpj, graph) {
     const bodyDiv = document.createElement("div");
     bodyDiv.className = "lookup-section-body";
     if (hasHits && result.rows.length > 0) {
-      const cols = Object.keys(result.rows[0]);
-      const cnpjCols = new Set(result.cnpjColumnNames ?? []);
-      const tHead = cols.map((c) => `<th>${c}</th>`).join("");
-      const table = document.createElement("table");
-      table.className = "lookup-table";
-      table.innerHTML = `<thead><tr>${tHead}</tr></thead><tbody></tbody>`;
-      const tbody = table.querySelector("tbody");
-      for (const row of result.rows) {
-        const tr = document.createElement("tr");
-        const signature = rowSignature(result.id, row);
-        tr.dataset.rowSignature = signature;
-        tr.dataset.datasetId = result.id;
-        const hasNode = (rowSignatureToNodeIds.get(signature)?.size ?? 0) > 0;
-        if (!hasNode)
-          tr.classList.add("row-no-node");
-        for (const col of cols) {
-          const val = row[col];
-          const text = val == null ? "—" : String(val);
-          const td = document.createElement("td");
-          td.title = text;
-          if (cnpjCols.has(col) && isCnpj(text)) {
-            const span = document.createElement("span");
-            span.className = "cnpj-link";
-            span.textContent = text;
-            span.addEventListener("click", (e) => {
-              e.stopPropagation();
-              const basico = extractBasico(text);
-              window.open(`/?cnpj=${encodeURIComponent(basico)}`, "_blank", "noopener,noreferrer");
-            });
-            td.appendChild(span);
-          } else {
-            td.textContent = text;
-          }
-          tr.appendChild(td);
-        }
-        tr.addEventListener("click", () => {
-          const nodeIds = rowSignatureToNodeIds.get(signature);
-          if (!nodeIds || nodeIds.size === 0 || !currentGraph)
-            return;
-          const nodeId = [...nodeIds][0];
-          selectedNode = nodeId;
-          hoveredNode = null;
-          renderer?.refresh({ skipIndexation: true });
-          showNodeDetails(nodeId, currentGraph);
-          syncLookupRowHighlight();
-        });
-        tbody.appendChild(tr);
-      }
-      bodyDiv.appendChild(table);
+      lazyTables.set(bodyDiv, () => buildLookupTable(result, bodyDiv));
     }
     header.addEventListener("click", () => {
       debugLog("lookup section click", {
@@ -10857,11 +10946,13 @@ function renderResultSections(results, cnpj, graph) {
         if (openHeader !== header)
           openHeader.classList.remove("expanded");
       }
+      ensureLookupTable(bodyDiv);
       bodyDiv.classList.toggle("expanded");
       header.classList.toggle("expanded");
     });
     if (!firstExpanded && hasHits) {
       firstExpanded = true;
+      ensureLookupTable(bodyDiv);
       bodyDiv.classList.add("expanded");
       header.classList.add("expanded");
     }
@@ -10877,14 +10968,20 @@ function openLookupPanel(cnpj, graph, results) {
   const backBtn = document.getElementById("lookup-back");
   currentLookupCnpj = cnpj;
   currentLookupLabel = cnpj;
-  title.textContent = `CNPJ: ${cnpj}`;
+  const rootLabel = graph.hasNode(cnpj) ? valueText(graph.getNodeAttribute(cnpj, "fullLabel") ?? graph.getNodeAttribute(cnpj, "label")) : "";
+  title.textContent = rootLabel && rootLabel !== "—" ? rootLabel : `CNPJ: ${cnpj}`;
+  title.title = cnpj;
   backBtn.style.display = lookupHistory.length > 0 ? "inline-block" : "none";
+  const hits = results.filter((result) => result.count > 0).length;
+  const fab = document.getElementById("lookup-fab");
+  if (fab)
+    fab.textContent = `Bases · ${hits}`;
   if (isMobileViewport()) {
     closePanel(document.getElementById("node-details-panel"));
+  } else {
+    panel.classList.add("open");
   }
-  panel.classList.add("open");
   updateGraphLayout();
-  const hits = results.filter((result) => result.count > 0).length;
   setStatus(`${hits} base(s) com referência`);
   renderResultSections(results, cnpj, graph);
 }
@@ -11116,7 +11213,8 @@ async function init() {
   if (overlay)
     overlay.style.display = "none";
   openLookupPanel(rootId, graph, lookupResults);
-  showNodeDetails(rootId, graph);
+  if (!isMobileViewport())
+    showNodeDetails(rootId, graph);
   let draggedNode = null;
   let isDragging = false;
   let dragOffset = { dx: 0, dy: 0 };

@@ -41,26 +41,29 @@ export interface LinkScheme {
 }
 
 function renderEntityRow(e: EntityIndexEntry, links: LinkScheme): string {
+  // data-search feeds the landing's client-side filter (lowercased, accents
+  // stripped in the inline script's normalizer on both sides).
   return (
-    `<a href="${escHtml(links.entityHref(e.id))}" class="ci-row">` +
+    `<a href="${escHtml(links.entityHref(e.id))}" class="ci-row ci-${e.type}" data-search="${escHtml(`${e.id} ${e.label}`)}">` +
     `<span class="ci-cnpj">${escHtml(e.id)}</span>` +
     `<span class="ci-name">${escHtml(e.label)}</span>` +
-    `<span class="ci-porte">${e.datasetCount} datasets</span>` +
+    `<span class="ci-porte" title="${e.datasetCount} bases com registro">${e.datasetCount}<span class="ci-porte-unit"> bases</span></span>` +
     `</a>`
   );
 }
 
-function renderEntityPanel(title: string, entities: EntityIndexEntry[], links: LinkScheme): string {
+function renderEntityPanel(title: string, kind: "empresa" | "pessoa", entities: EntityIndexEntry[], links: LinkScheme): string {
   const rows = entities.length
     ? entities.map((e) => renderEntityRow(e, links)).join("")
     : `<div style="padding:1rem 1.2rem;color:var(--muted);font-size:0.8rem">Nenhuma entidade pré-computada ainda — rode <code>bun run generate:static</code>.</div>`;
-  return `<aside class="ci-panel">
+  return `<aside class="ci-panel ci-panel-${kind}">
       <div class="ci-panel-header">
         <span class="ci-panel-label">${escHtml(title)}</span>
-        <span class="ci-panel-count">${entities.length}</span>
+        <span class="ci-panel-count" data-total="${entities.length}">${entities.length}</span>
       </div>
       <div class="ci-scroll">
         ${rows}
+        <div class="ci-empty" hidden>Nada encontrado.</div>
       </div>
     </aside>`;
 }
@@ -288,6 +291,29 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
       color: var(--muted);
       flex-shrink: 0;
     }
+    .ci-row[hidden] { display: none; }
+    .ci-empty {
+      padding: 1rem 1.2rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .ci-search {
+      width: 100%;
+      max-width: 460px;
+      margin-top: 0.6rem;
+      padding: 0.7rem 0.9rem;
+      font: 400 0.9rem 'DM Sans', sans-serif;
+      color: var(--text);
+      background: #0b0b1c;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .ci-search::placeholder { color: var(--muted); }
+    .ci-search:focus { border-color: var(--gold); }
+    .ci-tabs { display: none; }
     /* Below this, the desktop 3-column row (logo | Empresas | Pessoas) has no
        room to breathe — stack them instead. The page still never scrolls as
        a whole (html/body keep overflow:hidden); each stacked section gets
@@ -314,6 +340,35 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
         border-left: none;
         border-top: 1px solid var(--border);
       }
+      /* One list at a time, full remaining height, switched by tabs — two
+         stacked lists left ~7 rows each, each in its own nested scroll. */
+      .layout[data-tab="empresa"] .ci-panel-pessoa,
+      .layout[data-tab="pessoa"] .ci-panel-empresa { display: none; }
+      .ci-panel-header { display: none; }
+      .ci-tabs {
+        display: flex;
+        gap: 0.4rem;
+        margin-top: 0.6rem;
+      }
+      .ci-tab {
+        flex: 1;
+        min-height: 44px;
+        font: 700 0.62rem 'Space Mono', monospace;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--muted);
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .ci-tab span { margin-left: 0.4em; opacity: 0.7; }
+      .ci-tab.active { color: var(--gold); border-color: var(--gold); }
+      .ci-search { max-width: none; font-size: 16px; /* <16px makes iOS zoom on focus */ }
+      .ci-row { padding: 0.75rem 1.2rem; align-items: center; }
+      .ci-name { font-size: 0.85rem; }
+      .ci-pessoa .ci-cnpj { display: none; } /* a CPF hash means nothing to a reader */
+      .ci-porte-unit { display: none; }
       footer { padding: 0.6rem 1rem; }
     }
   </style>
@@ -331,10 +386,51 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
       <div class="gold-rule"></div>
       <p class="tagline">Cruzamento de CNPJs com bases públicas federais — Receita Federal, CGU, TSE, SIAFI e mais.</p>
       <p class="tagline">Entidades pré-computadas, sem consulta ao vivo — clique numa entidade abaixo para ver a rede.</p>
+      <input id="entity-search" class="ci-search" type="search" placeholder="Buscar empresa, pessoa ou CNPJ" autocomplete="off" spellcheck="false" aria-label="Buscar entidade">
+      <div class="ci-tabs" role="tablist">
+        <button type="button" class="ci-tab active" data-tab="empresa" role="tab" aria-selected="true">Empresas <span>${empresas.length}</span></button>
+        <button type="button" class="ci-tab" data-tab="pessoa" role="tab" aria-selected="false">Pessoas <span>${pessoas.length}</span></button>
+      </div>
     </main>
-    ${renderEntityPanel("Empresas", empresas, links)}
-    ${renderEntityPanel("Pessoas", pessoas, links)}
+    ${renderEntityPanel("Empresas", "empresa", empresas, links)}
+    ${renderEntityPanel("Pessoas", "pessoa", pessoas, links)}
   </div>
+  <script>
+    (function () {
+      var norm = function (t) { return t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); };
+      var rows = Array.prototype.slice.call(document.querySelectorAll(".ci-row"));
+      rows.forEach(function (r) { r.dataset.search = norm(r.dataset.search || ""); });
+      var input = document.getElementById("entity-search");
+      input.addEventListener("input", function () {
+        var q = norm(input.value.trim()).replace(/[.\/-]/g, "");
+        document.querySelectorAll(".ci-panel").forEach(function (panel) {
+          var shown = 0;
+          panel.querySelectorAll(".ci-row").forEach(function (r) {
+            var hit = !q || r.dataset.search.replace(/[.\/-]/g, "").indexOf(q) !== -1;
+            r.hidden = !hit;
+            if (hit) shown++;
+          });
+          var count = panel.querySelector(".ci-panel-count");
+          count.textContent = q ? shown + "/" + count.dataset.total : count.dataset.total;
+          panel.querySelector(".ci-empty").hidden = shown > 0;
+          var tab = document.querySelector('.ci-tab[data-tab="' + (panel.classList.contains("ci-panel-pessoa") ? "pessoa" : "empresa") + '"] span');
+          if (tab) tab.textContent = q ? String(shown) : count.dataset.total;
+        });
+      });
+      var layout = document.querySelector(".layout");
+      layout.dataset.tab = "empresa";
+      document.querySelectorAll(".ci-tab").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          layout.dataset.tab = btn.dataset.tab;
+          document.querySelectorAll(".ci-tab").forEach(function (b) {
+            var on = b === btn;
+            b.classList.toggle("active", on);
+            b.setAttribute("aria-selected", on ? "true" : "false");
+          });
+        });
+      });
+    })();
+  </script>
   <footer>
     <span class="footer-copy">DATATIVE · CNPJ GRAPH</span>
     <span class="footer-status"><span class="status-dot"></span> ESTÁTICO</span>
@@ -602,6 +698,11 @@ export function renderGraphPage(
   </footer>
   <script>
     window.__ENTITY_ID__ = ${JSON.stringify(id)};
+    // Lets the client link a CNPJ in a lookup table to that company's own page
+    // — only when one was published, and with the same dev/static URL scheme
+    // the landing uses (an absolute "/?cnpj=" 404s under GitHub Pages).
+    window.__ENTITY_HREF__ = ${JSON.stringify(links.entityHref("__ID__"))};
+    window.__PUBLISHED_IDS__ = ${JSON.stringify([...entitiesById.keys()])};
     window.__DATASET_COLORS = ${JSON.stringify(
       Object.fromEntries([
         ...CNPJ_DATASETS.map((d) => [d.id, d.color]),
