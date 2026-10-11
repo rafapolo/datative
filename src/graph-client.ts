@@ -1019,6 +1019,12 @@ function injectPanelStyles() {
       overflow: hidden;
       background: #12122b;
       transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+      max-height: 450px;
+      display: flex;
+      flex-direction: column;
+    }
+    .lookup-section-header {
+      flex-shrink: 0;
     }
     .lookup-section:hover {
       border-color: #3a3a68;
@@ -1096,6 +1102,8 @@ function injectPanelStyles() {
     }
     .lookup-section-body.expanded {
       display: block;
+      overflow: auto;
+      min-height: 0;
     }
     .lookup-table {
       width: 100%;
