@@ -30,8 +30,7 @@
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { execRemoteSQL } from "./lib/duckdb-ssh";
-import { buildSelectSQL } from "./lib/parquet-store";
-import { extractCnpjRoot, socioNodeId, isMaskedDocument } from "./lib/cnpj-index";
+import { socioNodeId, isMaskedDocument } from "./lib/cnpj-index";
 import { hashCpf, isPersonalDocColumn, sanitizeAnyValue, sanitizeCpfValue, sanitizeRow } from "./lib/cpf-privacy";
 import { CNPJ_DATASETS, type CnpjColumn, type CnpjDatasetEntry } from "../src/cnpj-datasets";
 
@@ -104,11 +103,6 @@ function docDigitsExpr(col: CnpjColumn): string {
   const raw = `CAST("${col.name}" AS VARCHAR)`;
   const unfloated = col.normalize ? `regexp_replace(${raw}, '\\.0+$', '')` : raw;
   return `regexp_replace(${unfloated}, '[^0-9]', '', 'g')`;
-}
-
-// A column's own row filter (CnpjColumn.where), ANDed onto its match clause.
-function withColumnWhere(col: CnpjColumn, clause: string): string {
-  return col.where ? `(${col.where} AND ${clause})` : clause;
 }
 
 // Digits-only extraction, then bucket into an 8-digit company root or an
@@ -285,157 +279,218 @@ function safeNodeIdAndLabel(
   return { nodeId, nodeLabel };
 }
 
-async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string; network: EntityNetwork }> {
-  const nodes: GraphNode[] = [];
-  const links: GraphLink[] = [];
-  const addNode = (n: GraphNode) => { if (!nodes.find((x) => x.id === n.id)) nodes.push(n); };
+// --- Batched build: one scan per table for ALL target entities ---
+//
+// Building entity by entity meant targets × datasets queries (156 × 117 ≈ 18k),
+// each one a full scan of its table to find a single company — hours of
+// beelink time, and timeouts on the big tables under that load. Instead every
+// table is scanned once with the whole target set in an IN list, the entity
+// key computed by the same entityKeyExpr the ranking pass uses, and capped at
+// PANEL_LIMIT rows per entity with a window function. Rows are then dealt out
+// to each entity's network in JS. The output JSON shape is unchanged.
 
-  const empresaRows = await execRemoteSQL(buildSelectSQL("br_me_cnpj", "empresas", {
-    columns: ["cnpj_basico", "razao_social"],
-    filters: { cnpj_basico: cnpjBasico },
-    limit: 1,
-  }));
-  const label = String(empresaRows[0]?.razao_social ?? cnpjBasico);
-  addNode({ id: cnpjBasico, label, type: "empresa" });
-
-  const socioRows = await execRemoteSQL(buildSelectSQL("br_me_cnpj", "socios", {
-    columns: ["nome", "documento"],
-    rawWhere: `"cnpj_basico" = '${cnpjBasico}'`,
-    limit: PER_DATASET_LIMIT,
-  }));
-  for (const s of socioRows) {
-    const nome = String(s.nome ?? "");
-    const documento = s.documento != null ? String(s.documento) : null;
-    const socioId = socioNodeId(documento, cnpjBasico, nome);
-    addNode({ id: socioId, label: nome || socioId, type: "socio" });
-    links.push({ source: cnpjBasico, target: socioId });
-  }
-
-  await pMap(CNPJ_DATASETS, CONCURRENCY, async (ds) => {
-    const parts = ds.table.split(".");
-    const { idField, labelField } = inferNodeFields(ds);
-    const clauses = ds.cnpjColumns.map((col) => {
-      const digits = docDigitsExpr(col);
-      // basico columns are clean 8-digit VARCHAR everywhere they're wired
-      // (checked 2026-10-11) — compare the raw column so DuckDB can prune
-      // parquet row groups by min/max; wrapping it in regexp_replace forces a
-      // full scan (br_me_cnpj.estabelecimentos: 94 s vs 25 s, and timeouts
-      // under load). A normalize basico column still goes through digits.
-      if (col.type === "basico") {
-        const lhs = col.normalize ? digits : `"${col.name}"`;
-        return withColumnWhere(col, `(${lhs} = '${cnpjBasico}')`);
-      }
-      const padded = col.normalize ? `lpad(${digits}, 14, '0')` : digits;
-      const notBlank = col.normalize ? `ltrim(${digits}, '0') <> '' AND ` : "";
-      if (col.type === "full") return withColumnWhere(col, `(${notBlank}${padded} LIKE '${cnpjBasico}%')`);
-      return withColumnWhere(col, `(${notBlank}length(${digits}) = 14 AND ${padded} LIKE '${cnpjBasico}%')`);
-    });
-    const columns = [...new Set([...ds.displayFields, idField, labelField, ...ds.cnpjColumns.map((c) => c.name)])];
-    let rows: Record<string, unknown>[] = [];
-    try {
-      rows = await withTimeout(
-        execRemoteSQL(buildSelectSQL(parts[1], parts[2], {
-          columns,
-          rawWhere: `(${clauses.join(" OR ")})`,
-          limit: PANEL_LIMIT,
-        })),
-        QUERY_TIMEOUT_MS,
-        `${ds.id} lookup for ${cnpjBasico}`,
-      );
-    } catch (err) {
-      log("  cross-dataset lookup failed", ds.id, String(err).slice(0, 150));
-      return;
-    }
-    rows.forEach((row, i) => {
-      const { nodeId, nodeLabel } = safeNodeIdAndLabel(ds, row, idField, labelField, i);
-      const inGraph = i < PER_DATASET_LIMIT;
-      const safeRow = sanitizeRow(row, ds.cnpjColumns.map((c) => c.name));
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row: safeRow, ...(inGraph ? {} : { inGraph: false }) });
-      if (inGraph) links.push({ source: cnpjBasico, target: nodeId });
-    });
-  });
-
-  return { label, network: { nodes, links } };
+interface BuildTarget {
+  type: EntityType;
+  rawId: string; // cnpj_basico, or the raw CPF (used only to query beelink)
+  publicId: string; // cnpj_basico, or hashCpf(cpf)
 }
 
-async function buildPessoaNetwork(documento: string, publicId: string): Promise<{ label: string; network: EntityNetwork }> {
-  const nodes: GraphNode[] = [];
-  const links: GraphLink[] = [];
-  const addNode = (n: GraphNode) => { if (!nodes.find((x) => x.id === n.id)) nodes.push(n); };
+// A full-table scan for every entity at once can legitimately take minutes on
+// the biggest tables — far past the per-query QUERY_TIMEOUT_MS of the ranking.
+const BATCH_TIMEOUT_MS = parseInt(args["batch-timeout-ms"] ?? "1800000", 10);
 
-  const socioRows = await execRemoteSQL(buildSelectSQL("br_me_cnpj", "socios", {
-    columns: ["nome", "cnpj_basico"],
-    rawWhere: `"documento" = '${documento}'`,
-    limit: PER_DATASET_LIMIT,
-  }));
-  let label = String(socioRows[0]?.nome ?? sanitizeCpfValue(documento));
-  const rootNode: GraphNode = { id: publicId, label, type: "socio" };
-  addNode(rootNode);
+const sqlList = (ids: Iterable<string>) => [...ids].map((id) => `'${id}'`).join(",");
 
-  const companyIds = [...new Set(socioRows.map((r) => String(r.cnpj_basico)))];
-  if (companyIds.length) {
-    const empresaRows = await execRemoteSQL(buildSelectSQL("br_me_cnpj", "empresas", {
-      columns: ["cnpj_basico", "razao_social"],
-      rawWhere: `"cnpj_basico" IN (${companyIds.map((id) => `'${id}'`).join(",")})`,
-      limit: companyIds.length,
-    }));
-    const labelByCnpj = new Map(empresaRows.map((r) => [String(r.cnpj_basico), String(r.razao_social ?? r.cnpj_basico)]));
-    for (const cnpjBasico of companyIds) {
-      addNode({ id: cnpjBasico, label: labelByCnpj.get(cnpjBasico) ?? cnpjBasico, type: "empresa" });
-      links.push({ source: publicId, target: cnpjBasico });
+// Clean basico columns (checked 2026-10-11: 8-digit VARCHAR everywhere they're
+// wired) are compared raw so DuckDB can prune parquet row groups by min/max.
+function batchKeyExpr(col: CnpjColumn): string {
+  if (col.type === "basico" && !col.normalize) {
+    return col.where ? `CASE WHEN ${col.where} THEN "${col.name}" ELSE NULL END` : `"${col.name}"`;
+  }
+  return entityKeyExpr(col).keyExpr;
+}
+
+// Keys never collide across entity types: empresa keys are 8-digit roots,
+// pessoa keys 11-digit CPFs, and only mixed columns can yield the latter.
+function datasetBatchSQL(ds: CnpjDatasetEntry, columns: string[], keys: string[], windowed = true): string {
+  const [, dataset, table] = ds.table.split(".");
+  const select = columns.map((c) => `"${c}"`).join(", ");
+  // UNION (not ALL): a row matched through two of its columns for the same
+  // entity (e.g. CNPJ_FUNDO and CNPJ_ADMIN both its own) is still one row,
+  // as it was with the old per-entity `col1 OR col2` filter.
+  const parts = ds.cnpjColumns.map((col) => {
+    const key = batchKeyExpr(col);
+    return `SELECT ${select}, ${key} AS __key FROM "${dataset}"."${table}" WHERE ${key} IN (${sqlList(keys)})`;
+  });
+  const union = parts.join("\nUNION\n");
+  if (!windowed) return `${union};`;
+  return `SELECT * EXCLUDE (__rn) FROM (
+    SELECT *, row_number() OVER (PARTITION BY __key) AS __rn FROM (${union})
+  ) WHERE __rn <= ${PANEL_LIMIT};`;
+}
+
+// Batched scans are heavy, so fewer run at once than the ranking's CONCURRENCY.
+const BATCH_CONCURRENCY = parseInt(args["batch-concurrency"] ?? "3", 10);
+
+// Under memory pressure (beelink is shared — another DuckDB there held 9 GB
+// on 2026-10-11) remote duckdb fails intermittently on queries that succeed
+// when retried alone: "Out of buffer", "ZSTD Decompression failure" on a
+// parquet file that reads fine, "free(): invalid size".
+const TRANSIENT = /Out of buffer|Decompression failure|free\(\)|invalid size|Out of Memory|exited 255/i;
+
+async function timedBatch(label: string, sql: string): Promise<Record<string, unknown>[]> {
+  for (let attempt = 1; ; attempt++) {
+    const t0 = Date.now();
+    try {
+      const rows = await withTimeout(execRemoteSQL(sql), BATCH_TIMEOUT_MS, label);
+      log("  batch", label, { rows: rows.length, ms: Date.now() - t0, ...(attempt > 1 ? { attempt } : {}) });
+      return rows;
+    } catch (err) {
+      if (attempt >= 4 || !TRANSIENT.test(String(err))) throw err;
+      log("  transient failure, retrying", label, { attempt, err: String(err).slice(0, 120) });
+      await new Promise((r) => setTimeout(r, 15000 * attempt));
     }
   }
+}
 
-  // Cross-dataset hits keyed on the full 11-digit CPF (mixed columns only —
-  // "basico"/"full" columns are CNPJ-root matches and don't apply to a person).
-  const withMixedCols = CNPJ_DATASETS.filter((ds) => ds.cnpjColumns.some((c) => c.type === "mixed"));
-  await pMap(withMixedCols, CONCURRENCY, async (ds) => {
-    const mixedCols = ds.cnpjColumns.filter((c) => c.type === "mixed");
-    const parts = ds.table.split(".");
+function groupBy(rows: Record<string, unknown>[], field: string): Map<string, Record<string, unknown>[]> {
+  const out = new Map<string, Record<string, unknown>[]>();
+  for (const r of rows) {
+    const k = String(r[field]);
+    let list = out.get(k);
+    if (!list) out.set(k, (list = []));
+    list.push(r);
+  }
+  return out;
+}
+
+async function buildNetworks(targets: BuildTarget[]): Promise<Map<string, { label: string; network: EntityNetwork }>> {
+  const roots = targets.filter((t) => t.type === "empresa").map((t) => t.rawId);
+  const cpfs = targets.filter((t) => t.type === "pessoa").map((t) => t.rawId);
+
+  // Base Receita tables: sócios of every empresa, companies of every pessoa
+  // (by CPF — usually masked in socios, so often empty), then razão social
+  // for every company id either side needs.
+  const [sociosByEmpresa, sociosByPessoa] = await Promise.all([
+    roots.length
+      ? timedBatch("socios por empresa", `SELECT cnpj_basico, nome, documento FROM (
+          SELECT cnpj_basico, nome, documento, row_number() OVER (PARTITION BY cnpj_basico) AS rn
+          FROM "br_me_cnpj"."socios" WHERE "cnpj_basico" IN (${sqlList(roots)})
+        ) WHERE rn <= ${PER_DATASET_LIMIT};`)
+      : Promise.resolve([]),
+    cpfs.length
+      ? timedBatch("socios por cpf", `SELECT documento, nome, cnpj_basico FROM (
+          SELECT documento, nome, cnpj_basico, row_number() OVER (PARTITION BY documento) AS rn
+          FROM "br_me_cnpj"."socios" WHERE "documento" IN (${sqlList(cpfs)})
+        ) WHERE rn <= ${PER_DATASET_LIMIT};`)
+      : Promise.resolve([]),
+  ]);
+  const companyIds = new Set([...roots, ...sociosByPessoa.map((r) => String(r.cnpj_basico))]);
+  const empresaRows = companyIds.size
+    ? await timedBatch("razao social", `SELECT cnpj_basico, razao_social
+        FROM "br_me_cnpj"."empresas" WHERE "cnpj_basico" IN (${sqlList(companyIds)});`)
+    : [];
+  // Deduped here, not with GROUP BY/any_value: aggregating over empresas
+  // dies on beelink with DuckDB "Out of buffer" (2026-10-11); the plain
+  // filtered select doesn't. empresas is full history, so a few dozen
+  // rows per company — first non-empty razão social wins.
+  const razaoSocial = new Map<string, string>();
+  for (const r of empresaRows) {
+    const id = String(r.cnpj_basico);
+    if (!razaoSocial.has(id) && r.razao_social) razaoSocial.set(id, String(r.razao_social));
+  }
+  const sociosOf = groupBy(sociosByEmpresa, "cnpj_basico");
+  const empresasOf = groupBy(sociosByPessoa, "documento");
+
+  // Cross-dataset hits: one batched query per dataset.
+  const hits = new Map<string, Map<string, Record<string, unknown>[]>>(); // datasetId → key → rows
+  await pMap(CNPJ_DATASETS, BATCH_CONCURRENCY, async (ds) => {
+    const hasMixed = ds.cnpjColumns.some((c) => c.type === "mixed");
+    const keys = hasMixed ? [...roots, ...cpfs] : roots;
+    if (!keys.length) return;
     const { idField, labelField } = inferNodeFields(ds);
-    const clauses = mixedCols.map((col) => withColumnWhere(col, `(${docDigitsExpr(col)} = '${documento}')`));
-    const columns = [...new Set([...ds.displayFields, idField, labelField, ...mixedCols.map((c) => c.name)])];
-    let rows: Record<string, unknown>[] = [];
+    const columns = [...new Set([...ds.displayFields, idField, labelField, ...ds.cnpjColumns.map((c) => c.name)])];
     try {
-      rows = await withTimeout(
-        execRemoteSQL(buildSelectSQL(parts[1], parts[2], {
-          columns,
-          rawWhere: `(${clauses.join(" OR ")})`,
-          limit: PANEL_LIMIT,
-        })),
-        QUERY_TIMEOUT_MS,
-        `${ds.id} lookup for ${documento}`,
-      );
+      const rows = await timedBatch(ds.id, datasetBatchSQL(ds, columns, keys));
+      hits.set(ds.id, groupBy(rows, "__key"));
     } catch (err) {
-      log("  cross-dataset lookup failed", ds.id, String(err).slice(0, 150));
-      return;
-    }
-    rows.forEach((row, i) => {
-      const { nodeId, nodeLabel } = safeNodeIdAndLabel(ds, row, idField, labelField, i);
-      const inGraph = i < PER_DATASET_LIMIT;
-      const safeRow = sanitizeRow(row, mixedCols.map((c) => c.name));
-      addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row: safeRow, ...(inGraph ? {} : { inGraph: false }) });
-      if (inGraph) links.push({ source: publicId, target: nodeId });
-    });
-  });
-
-  // br_me_cnpj.socios masks most CPFs for privacy, so the lookup above often
-  // finds nothing even when this CPF was ranked via an unmasked mixed column
-  // elsewhere (CGU/TSE/etc). Fall back to the first cross-dataset hit's own
-  // name field rather than showing the raw CPF digits as the entity's label.
-  if (label === sanitizeCpfValue(documento)) {
-    const preferred = ["nome_favorecido", "nome_contratado", "nome_fornecedor", "nome_doador", "nome", "razao_social", "nome_razao_social", "nome_fantasia"];
-    outer: for (const n of nodes) {
-      if (!n.row) continue;
-      for (const key of preferred) {
-        const value = n.row[key];
-        if (value) { label = String(value); break outer; }
+      // Same "Out of buffer" risk as the empresas aggregate: retry without the
+      // window function and cap per entity here instead.
+      log("  batch failed, retrying without window", ds.id, String(err).slice(0, 200));
+      try {
+        const rows = await timedBatch(`${ds.id} (sem janela)`, datasetBatchSQL(ds, columns, keys, false));
+        const grouped = groupBy(rows, "__key");
+        for (const [k, list] of grouped) grouped.set(k, list.slice(0, PANEL_LIMIT));
+        hits.set(ds.id, grouped);
+      } catch (err2) {
+        log("  cross-dataset batch FAILED", ds.id, String(err2).slice(0, 200));
       }
     }
-    rootNode.label = label;
-  }
+  });
 
-  return { label, network: { nodes, links } };
+  const out = new Map<string, { label: string; network: EntityNetwork }>();
+  for (const t of targets) {
+    const nodes: GraphNode[] = [];
+    const links: GraphLink[] = [];
+    const seen = new Set<string>();
+    const addNode = (n: GraphNode) => { if (!seen.has(n.id)) { seen.add(n.id); nodes.push(n); } };
+
+    let label: string;
+    let rootNode: GraphNode;
+    if (t.type === "empresa") {
+      label = razaoSocial.get(t.rawId) ?? t.rawId;
+      rootNode = { id: t.publicId, label, type: "empresa" };
+      addNode(rootNode);
+      for (const s of sociosOf.get(t.rawId) ?? []) {
+        const nome = String(s.nome ?? "");
+        const documento = s.documento != null ? String(s.documento) : null;
+        const socioId = socioNodeId(documento, t.rawId, nome);
+        addNode({ id: socioId, label: nome || socioId, type: "socio" });
+        links.push({ source: t.publicId, target: socioId });
+      }
+    } else {
+      const socioRows = empresasOf.get(t.rawId) ?? [];
+      label = String(socioRows[0]?.nome ?? sanitizeCpfValue(t.rawId));
+      rootNode = { id: t.publicId, label, type: "socio" };
+      addNode(rootNode);
+      for (const cnpjBasico of new Set(socioRows.map((r) => String(r.cnpj_basico)))) {
+        addNode({ id: cnpjBasico, label: razaoSocial.get(cnpjBasico) ?? cnpjBasico, type: "empresa" });
+        links.push({ source: t.publicId, target: cnpjBasico });
+      }
+    }
+
+    for (const ds of CNPJ_DATASETS) {
+      const rows = hits.get(ds.id)?.get(t.rawId);
+      if (!rows) continue;
+      const { idField, labelField } = inferNodeFields(ds);
+      const docColumns = ds.cnpjColumns.map((c) => c.name);
+      rows.forEach((raw, i) => {
+        const { __key: _key, ...row } = raw;
+        const { nodeId, nodeLabel } = safeNodeIdAndLabel(ds, row, idField, labelField, i);
+        const inGraph = i < PER_DATASET_LIMIT;
+        addNode({ id: nodeId, label: nodeLabel, type: ds.nodeType ?? "registro", datasetId: ds.id, datasetLabel: ds.label, row: sanitizeRow(row, docColumns), ...(inGraph ? {} : { inGraph: false }) });
+        if (inGraph) links.push({ source: t.publicId, target: nodeId });
+      });
+    }
+
+    // br_me_cnpj.socios masks most CPFs for privacy, so a pessoa often has no
+    // socios hit even when it was ranked via an unmasked mixed column
+    // elsewhere (CGU/TSE/etc). Fall back to the first cross-dataset hit's own
+    // name field rather than showing the raw CPF digits as the entity's label.
+    if (t.type === "pessoa" && label === sanitizeCpfValue(t.rawId)) {
+      const preferred = ["nome_favorecido", "nome_contratado", "nome_fornecedor", "nome_doador", "nome", "razao_social", "nome_razao_social", "nome_fantasia", "NOME", "nome_sancionado", "nome_infrator"];
+      outer: for (const n of nodes) {
+        if (!n.row) continue;
+        for (const key of preferred) {
+          const value = n.row[key];
+          if (value) { label = String(value); break outer; }
+        }
+      }
+      rootNode.label = label;
+    }
+    out.set(t.publicId, { label, network: { nodes, links } });
+  }
+  return out;
 }
 
 // --- Main ---
@@ -454,14 +509,14 @@ interface IndexEntry {
 // targeted this way: their public id is a CPF hash, and the raw CPF needed to
 // query beelink only comes out of the ranking pass.
 async function buildOnly(ids: string[]) {
-  for (const id of ids) {
-    const t0 = Date.now();
-    const { label, network } = await buildEmpresaNetwork(id);
+  const t0 = Date.now();
+  const built = await buildNetworks(ids.map((id) => ({ type: "empresa" as const, rawId: id, publicId: id })));
+  for (const [id, { label, network }] of built) {
     writeFileSync(resolve(ENTITIES_DIR, `${id}.json`), JSON.stringify(network));
-    const perDataset = new Map<string, number>();
-    for (const n of network.nodes) if (n.datasetId) perDataset.set(n.datasetId, (perDataset.get(n.datasetId) ?? 0) + 1);
-    log("built", id, label, { nodes: network.nodes.length, datasets: perDataset.size, ms: Date.now() - t0 });
+    const datasets = new Set(network.nodes.map((n) => n.datasetId).filter(Boolean));
+    log("built", id, label, { nodes: network.nodes.length, datasets: datasets.size });
   }
+  log("done", { entities: built.size, ms: Date.now() - t0 });
 }
 
 async function main() {
@@ -497,33 +552,32 @@ async function main() {
   log("previously published", { total: previous.length, carriedOutsideTop: carried.length, notInRanking: unreached.length });
   const index: IndexEntry[] = [];
 
-  for (let i = 0; i < top.length; i++) {
-    const entity = top[i];
-    // Pessoa entities are keyed publicly by a hash of the CPF, never the raw
-    // digits — the raw id is only used internally below to query beelink.
-    const publicId = entity.type === "pessoa" ? hashCpf(entity.id) : entity.id;
-    const outPath = resolve(ENTITIES_DIR, `${publicId}.json`);
-    if (!FORCE && existsSync(outPath)) {
-      log(`[${i + 1}/${top.length}] skip (exists)`, entity.type, publicId);
+  // Pessoa entities are keyed publicly by a hash of the CPF, never the raw
+  // digits — the raw id is only used internally to query beelink.
+  const pathOf = (publicId: string) => resolve(ENTITIES_DIR, `${publicId}.json`);
+  const toBuild: BuildTarget[] = [];
+  for (const entity of top) {
+    const publicId = publicIdOf(entity);
+    if (!FORCE && existsSync(pathOf(publicId))) {
       try {
-        const network = JSON.parse(readFileSync(outPath, "utf8")) as EntityNetwork;
+        const network = JSON.parse(readFileSync(pathOf(publicId), "utf8")) as EntityNetwork;
         const rootLabel = network.nodes.find((n) => n.id === publicId)?.label ?? publicId;
         index.push({ id: publicId, type: entity.type, label: rootLabel, datasetCount: entity.datasetCount, path: `entities/${publicId}.json` });
       } catch (err) {
-        log(`[${i + 1}/${top.length}] WARN could not index existing file`, publicId, String(err).slice(0, 150));
+        log("WARN could not index existing file", publicId, String(err).slice(0, 150));
       }
       continue;
     }
-    log(`[${i + 1}/${top.length}] building`, entity.type, publicId, { datasetCount: entity.datasetCount });
-    try {
-      const { label, network } = entity.type === "empresa"
-        ? await buildEmpresaNetwork(entity.id)
-        : await buildPessoaNetwork(entity.id, publicId);
-      writeFileSync(outPath, JSON.stringify(network));
-      index.push({ id: publicId, type: entity.type, label, datasetCount: entity.datasetCount, path: `entities/${publicId}.json` });
-    } catch (err) {
-      log(`[${i + 1}/${top.length}] FAILED`, publicId, String(err).slice(0, 200));
-    }
+    toBuild.push({ type: entity.type, rawId: entity.id, publicId });
+  }
+  log("building", { entities: toBuild.length, skippedExisting: top.length - toBuild.length });
+  const datasetCountOf = new Map(top.map((r) => [publicIdOf(r), r.datasetCount]));
+  const built = await buildNetworks(toBuild);
+  for (const t of toBuild) {
+    const result = built.get(t.publicId);
+    if (!result) continue;
+    writeFileSync(pathOf(t.publicId), JSON.stringify(result.network));
+    index.push({ id: t.publicId, type: t.type, label: result.label, datasetCount: datasetCountOf.get(t.publicId) ?? 0, path: `entities/${t.publicId}.json` });
   }
 
   // A previously published entity the ranking no longer reaches (e.g. its only
