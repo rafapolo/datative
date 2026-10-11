@@ -148680,6 +148680,6999 @@
           "nullable": true
         }
       ]
+    },
+    "br_cgu_sancoes.ceis": {
+      "path": "beelink:/home/polo/rodado/br_cgu_sancoes/ceis/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "data_extracao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "cadastro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_sancao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_pessoa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_sancionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_sancionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_informado_orgao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "razao_social_receita",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fantasia_receita",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "categoria_sancao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_inicio_sancao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_final_sancao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_publicacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "publicacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "detalhamento_meio_publicacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_transito_julgado",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "abrangencia_sancao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "orgao_sancionador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf_orgao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "esfera_orgao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fundamentacao_legal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_origem_informacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "origem_informacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "observacoes",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cgu_sancoes.cnep": {
+      "path": "beelink:/home/polo/rodado/br_cgu_sancoes/cnep/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "data_extracao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "cadastro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_sancao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_pessoa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_sancionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_sancionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_informado_orgao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "razao_social_receita",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fantasia_receita",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "categoria_sancao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valor_multa",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "data_inicio_sancao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_final_sancao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_publicacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "publicacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "detalhamento_meio_publicacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_transito_julgado",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "abrangencia_sancao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "orgao_sancionador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf_orgao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "esfera_orgao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fundamentacao_legal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_origem_informacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "origem_informacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "observacoes",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cgu_sancoes.cepim": {
+      "path": "beelink:/home/polo/rodado/br_cgu_sancoes/cepim/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "cnpj_entidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_extracao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "motivo_impedimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_entidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_convenio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "orgao_concedente",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cgu_sancoes.acordos_leniencia": {
+      "path": "beelink:/home/polo/rodado/br_cgu_sancoes/acordos_leniencia/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "data_extracao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "id_acordo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_sancionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "razao_social_receita",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fantasia_receita",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_inicio_acordo",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_fim_acordo",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "situacao_acordo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_informacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "numero_processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "termos_acordo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "orgao_sancionador",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tcu_inidoneos.inabilitados_funcao_publica": {
+      "path": "beelink:/home/polo/rodado/br_tcu_inidoneos/inabilitados_funcao_publica/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "NOME",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "PROCESSO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DELIBERACAO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA TRANSITO JULGADO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA FINAL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA ACORDAO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "UF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "MUNICIPIO",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tcu_inidoneos.resp_contas_julgadas_irreg_implicacao_eleitoral": {
+      "path": "beelink:/home/polo/rodado/br_tcu_inidoneos/resp_contas_julgadas_irreg_implicacao_eleitoral/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "NOME",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "PROCESSO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DELIBERACAO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA TRANSITO JULGADO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA FINAL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "UF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "MUNICIPIO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CARGO/FUNCAO",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_mte_listasuja.empregadores": {
+      "path": "beelink:/home/polo/rodado/br_mte_listasuja/empregadores/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "ano_acao_fiscal",
+          "type": "SMALLINT",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "empregador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_basico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "trabalhadores_envolvidos",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "cnae",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnae_subclasse",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_decisao_procedencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "periodos_inclusao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_primeira_inclusao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_inclusao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "reincluido",
+          "type": "BOOLEAN",
+          "nullable": true
+        },
+        {
+          "name": "nota",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_atualizacao_cadastro",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_coleta",
+          "type": "DATE",
+          "nullable": true
+        }
+      ]
+    },
+    "br_mte_listasuja.ceac": {
+      "path": "beelink:/home/polo/rodado/br_mte_listasuja/ceac/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "versao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "ano_acao_fiscal",
+          "type": "SMALLINT",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "empregador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_basico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "periodos_cadastro_empregadores",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "periodos_ceac",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_primeira_inclusao_ceac",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_inclusao_ceac",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "termo_ajustamento_conduta",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_coleta",
+          "type": "DATE",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ibama_autos.auto_infracao": {
+      "path": "beelink:/home/polo/rodado/br_ibama_autos/auto_infracao/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "seq_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_status_formulario",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_sit_auto_aie",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sit_cancelado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ser_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cd_original_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_auto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_multa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "val_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fundamentacao_multa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "patrimonio_apuracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "gravidade_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cd_nivel_gravidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "motivacao_conduta",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "efeito_meio_ambiente",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "efeito_saude_publica",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "passivel_recuperacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unid_arrecadacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_hora_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "forma_entrega",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_ciencia_autuacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dt_fato_infracional",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dt_inicio_ato_inequivoco",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dt_fim_ato_inequivoco",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_unid_conciliacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cod_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nu_processo_formatado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cod_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cd_receita_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_receita",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tp_pessoa_infrator",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_pessoa_infrator",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_infrator",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_infrator",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "qt_area",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "infracao_area",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_outros_tipo_area",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "classificacao_area",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_fator_ajuste",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_longitude_auto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_latitude_auto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_wkt",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_local_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_referencia_acao_fiscalizatoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_conservacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_sicafi_biomas_atingidos_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_biomas_atingidos",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_notificacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_acao_fiscalizatoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cd_acao_fiscalizatoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unid_controle",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_acao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "denuncia_sisliv",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_ordem_fiscalizacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ordem_fiscalizacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unid_ordenadora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_solicitacao_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "solicitacao_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "operacao_sol_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dt_lancamento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tp_ult_alteracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dt_ult_alteracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "justificativa_alteracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "wkt_ge_area_autuada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dt_ult_alter_geom",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tp_origem_ge_area_autuada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_erro_ge_area_autuada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_wkt_ge_area_autuada_com_erro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "st_auto_migrado_aie",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_enquadramento_administrativo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_enquadramento_nao_administrativo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ds_enquadramento_complementar",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cd_termos_apreensao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cd_termos_embargos",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tp_origem_registro_auto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ultima_atualizacao_relatorio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ibama_embargos_novo.termo_embargo": {
+      "path": "beelink:/home/polo/rodado/br_ibama_embargos_novo/termo_embargo/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "seq_tad",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_status_formulario",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_status_formulario_aie",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sit_cancelado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_tad",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ser_tad",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cod_substituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_embargo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_impressao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "forma_entrega",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_pessoa_embargo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_embargado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_embargado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_tad",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cod_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_localizacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_longitude_tad",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_latitude_tad",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "deter_prodes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_poligono",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "embarga_poligono",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "qtd_area_embargada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_imovel",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_area",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "geom_area_embargada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_ult_alter_geom",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unid_apresentacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unid_controle",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sit_desembargo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_desembargo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_desembargo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_desembargo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_auto_infracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_notificacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_acao_fiscalizatoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cd_acao_fiscalizatoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_ordem_fiscalizacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ordem_fiscalizacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unid_ordenadora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_solicitacao_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "solicitacao_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "operacao_sol_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_ult_alteracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_alteracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "justificativa_alteracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ultima_atualizacao_relatorio",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ibama_embargos_novo.decisao": {
+      "path": "beelink:/home/polo/rodado/br_ibama_embargos_novo/decisao/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "seq_tad",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "seq_decisao_judicial",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_decisao_embargo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_decisao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "des_observacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "num_pessoa_interessado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "interessado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_interessado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_acao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "dat_inclusao_acao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sit_cancelado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ultima_atualizacao_relatorio",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ibama_ctf.app": {
+      "path": "beelink:/home/polo/rodado/br_ibama_ctf/app/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "razao_social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_da_categoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_da_categoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_de_inicio_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_de_termino_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "potenc_de_pol_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "estado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "latitude",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "longitude",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao_cadastral",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ultima_atualizacao_relatorio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ibama_ctf.aida": {
+      "path": "beelink:/home/polo/rodado/br_ibama_ctf/aida/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "razao_social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_da_categoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_da_categoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_de_inicio_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_de_termino_da_atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "estado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "latitude",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "longitude",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao_cadastral",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ultima_atualizacao_relatorio",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_mgi_compras_publicas.fornecedor": {
+      "path": "beelink:/home/polo/rodado/br_mgi_compras_publicas/fornecedor/",
+      "file_count": 2,
+      "columns": [
+        {
+          "name": "data_extracao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_razao_social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_cnae",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_cnae",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_natureza_juridica",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "natureza_juridica",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_porte_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "porte_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "indicador_habilitado_licitar",
+          "type": "BOOLEAN",
+          "nullable": true
+        },
+        {
+          "name": "indicador_fornecedor_ativo",
+          "type": "BOOLEAN",
+          "nullable": true
+        }
+      ]
+    },
+    "br_mgi_compras_publicas.licitacao_item": {
+      "path": "beelink:/home/polo/rodado/br_mgi_compras_publicas/licitacao_item/",
+      "file_count": 10,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "id_compra",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_compra_item",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_licitacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_item_licitacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_uasg",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_uasg",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_aviso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_modalidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modalidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_item_material",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_material",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_item_servico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_servico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_item",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidade",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "valor_estimado",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "criterio_julgamento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "beneficio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_fornecedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fornecedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_vencedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_vencedor_pessoa_fisica",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "indicador_decreto_7174",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "indicador_sustentavel",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_alteracao",
+          "type": "TIMESTAMP",
+          "nullable": true
+        }
+      ]
+    },
+    "br_mgi_compras_publicas.compra_sem_licitacao_item": {
+      "path": "beelink:/home/polo/rodado/br_mgi_compras_publicas/compra_sem_licitacao_item/",
+      "file_count": 10,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "id_compra",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_compra_item",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_item_material",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_uasg",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_orgao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_aviso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_modalidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidade_total_item",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "objeto_licitacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fundamento_legal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "justificativa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_responsavel_declaracao_dispensa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cargo_responsavel_declaracao_dispensa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_responsavel_ratificacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cargo_responsavel_ratificacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modalidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_inciso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_item",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_conjunto_materiais",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_conjunto_materiais",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_servico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_servico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_detalhada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "marca_material",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fabricante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_medida",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidade_material",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "valor_estimado",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "valor_estimado_item",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "tipo_fornecedor_vencedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fornecedor_vencedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_vencedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_vencedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_responsavel_declaracao_dispensa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_responsavel_ratificacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_responsavel_publicacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_publicacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_alteracao",
+          "type": "TIMESTAMP",
+          "nullable": true
+        }
+      ]
+    },
+    "br_mgi_compras_publicas.pregao_item_oferta": {
+      "path": "beelink:/home/polo/rodado/br_mgi_compras_publicas/pregao_item_oferta/",
+      "file_count": 38,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "id_compra",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_item",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_cpf_fornecedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fornecedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_item",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_fornecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidade",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "valor_unitario",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "valor_global",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "marca",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fabricante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modelo_versao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_detalhada_ofertada",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_senado_ceaps.despesas": {
+      "path": "beelink:/home/polo/rodado/br_senado_ceaps/despesas/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "mes",
+          "type": "TINYINT",
+          "nullable": true
+        },
+        {
+          "name": "cod_senador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_senador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_despesa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_fornecedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fornecedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "detalhamento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valor_reembolsado",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "tipo_documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_documento",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_senado_dados_abertos_administrativos.contratacao": {
+      "path": "beelink:/home/polo/rodado/br_senado_dados_abertos_administrativos/contratacao/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "data_extracao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "tipo_contratacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_contratacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_formatado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_sub_especie",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sub_especie",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "objeto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_licitacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modalidade_licitacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_unidade_gestora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_gestora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fundamentacao_legal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "processo_principal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "indicador_mao_de_obra",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_assinatura",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_publicacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_inicio_vigencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_fim_vigencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_ultima_atualizacao",
+          "type": "DATE",
+          "nullable": true
+        }
+      ]
+    },
+    "br_senado_dados_abertos_administrativos.empresa": {
+      "path": "beelink:/home/polo/rodado/br_senado_dados_abertos_administrativos/empresa/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "data_extracao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "id_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tse_eleicoes.pesquisa_eleitoral": {
+      "path": "beelink:/home/polo/rodado/br_tse_eleicoes/pesquisa_eleitoral/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_municipio_tse",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_eleicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_eleicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_pesquisa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fantasia_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pesquisa_propria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cargos",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_registro",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "hora_registro",
+          "type": "TIME WITH TIME ZONE",
+          "nullable": true
+        },
+        {
+          "name": "data_inicio",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_fim",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "data_divulgacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "quantidade_entrevistados",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "valor_pesquisa",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "registro_conre_estatistico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_estatistico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_metodologia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_plano_amostral",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_sistema_controle",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_area_abrangencia",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tse_eleicoes.pesquisa_eleitoral_contratante": {
+      "path": "beelink:/home/polo/rodado/br_tse_eleicoes/pesquisa_eleitoral_contratante/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_pesquisa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_contratante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_contratante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_contratante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "contratante_pagante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valor_pago",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "origem_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_tse_eleicoes.pesquisa_eleitoral_pagante": {
+      "path": "beelink:/home/polo/rodado/br_tse_eleicoes/pesquisa_eleitoral_pagante/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_pesquisa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_contratante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_pagante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_pagante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "origem_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_cia_aberta.cadastro": {
+      "path": "beelink:/home/polo/rodado/br_cvm_cia_aberta/cadastro/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "CNPJ_CIA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DENOM_SOCIAL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DENOM_COMERC",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_REG",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "DT_CONST",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "DT_CANCEL",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "MOTIVO_CANCEL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "SIT",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_INI_SIT",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "CD_CVM",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "SETOR_ATIV",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TP_MERC",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CATEG_REG",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_INI_CATEG",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "SIT_EMISSOR",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_INI_SIT_EMISSOR",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "CONTROLE_ACIONARIO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TP_ENDER",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "LOGRADOURO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "COMPL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "BAIRRO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "MUN",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "UF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "PAIS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CEP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDD_TEL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TEL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDD_FAX",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "FAX",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "EMAIL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TP_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_INI_RESP",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "LOGRADOURO_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "COMPL_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "BAIRRO_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "MUN_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "UF_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "PAIS_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CEP_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDD_TEL_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TEL_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDD_FAX_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "FAX_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "EMAIL_RESP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_AUDITOR",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "AUDITOR",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_cia_aberta.fre_posicao_acionaria": {
+      "path": "beelink:/home/polo/rodado/br_cvm_cia_aberta/fre_posicao_acionaria/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "CNPJ_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Referencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Versao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Acionista",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Acionista",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Pessoa_Acionista",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF_CNPJ_Acionista",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Acionista_Relacionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Acionista_Relacionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Pessoa_Acionista_Relacionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF_CNPJ_Acionista_Relacionado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Quantidade_Acao_Ordinaria_Circulacao",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "Percentual_Acao_Ordinaria_Circulacao",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "Quantidade_Acao_Preferencial_Circulacao",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "Percentual_Acao_Preferencial_Circulacao",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "Quantidade_Total_Acoes_Circulacao",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "Percentual_Total_Acoes_Circulacao",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "Nacionalidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Sigla_UF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Residente_Exterior",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Representante_Legal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Pessoa_Representante_Legal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF_CNPJ_Representante_legal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Composicao_Capital_Social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Ultima_Alteracao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Acionista_Controlador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Participante_Acordo_Acionistas",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_cia_aberta.fre_participacao_sociedade": {
+      "path": "beelink:/home/polo/rodado/br_cvm_cia_aberta/fre_participacao_sociedade/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "CNPJ_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Referencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Versao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Sociedade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Razao_Social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Sociedade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Descricao_Atividades",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Pais_Sede",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "UF_Sede",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Municipio_Sede",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Participacao_Emissor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Possui_Registro_CVM",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Codigo_CVM",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Razao_Aquisicao_Manutencao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Valor_Mercado",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Data_Valor_Contabil",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Valor_Mercado",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "Valor_Contabil",
+          "type": "DOUBLE",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_cia_aberta.fre_auditor": {
+      "path": "beelink:/home/polo/rodado/br_cvm_cia_aberta/fre_auditor/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "CNPJ_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Referencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Versao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF_Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Codigo_CVM_Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Origem_Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Inicio_Contratacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Data_Fim_Contratacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Data_Inicio_Prestacao_Servico",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Servico_Contratado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Remuneracao_Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Justificativa_Substituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Razao_Apresentada",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_cia_aberta.fca_escriturador": {
+      "path": "beelink:/home/polo/rodado/br_cvm_cia_aberta/fca_escriturador/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "CNPJ_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Referencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Versao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Empresarial",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Escriturador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Escriturador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Endereco",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Logradouro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Complemento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Bairro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Cidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Sigla_UF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Pais",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CEP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDI_Telefone",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDD_Telefone",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Telefone",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDI_Fax",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDD_Fax",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Fax",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Email",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Inicio_Atuacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Data_Fim_Atuacao",
+          "type": "DATE",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_cia_aberta.fre_administrador_membro_conselho_fiscal": {
+      "path": "beelink:/home/polo/rodado/br_cvm_cia_aberta/fre_administrador_membro_conselho_fiscal/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "CNPJ_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Referencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Versao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Orgao_Administracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Profissao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Cargo_Eletivo_Ocupado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Complemento_Cargo_Eletivo_Ocupado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Eleicao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Data_Posse",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Data_Inicio_Primeiro_Mandato",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Prazo_Mandato",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Eleito_Controlador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Outro_Cargo_Funcao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Experiencia_Profissional",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Nascimento",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Numero_Mandatos_Consecutivos",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Percentual_Participacao_Reunioes",
+          "type": "DOUBLE",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_cia_aberta.fre_relacao_familiar": {
+      "path": "beelink:/home/polo/rodado/br_cvm_cia_aberta/fre_relacao_familiar/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "CNPJ_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Referencia",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "Versao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Documento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Companhia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Administrador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF_Administrador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Emissor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Emissor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Cargo_Administrador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Pessoa_Relacionada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF_Pessoa_Relacionada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Nome_Emissor_Pessoa_Relacionada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Emissor_Pessoa_Relacionada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Cargo_Pessoa_Relacionada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Parentesco",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Observacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_fundos.registro_fundo": {
+      "path": "beelink:/home/polo/rodado/br_cvm_fundos/registro_fundo/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ID_Registro_Fundo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Fundo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Codigo_CVM",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Registro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Constituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Fundo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Denominacao_Social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Cancelamento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Inicio_Situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Adaptacao_RCVM175",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Inicio_Exercicio_Social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Fim_Exercicio_Social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Patrimonio_Liquido",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Patrimonio_Liquido",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Diretor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Administrador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Administrador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Pessoa_Gestor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF_CNPJ_Gestor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Gestor",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cvm_fundos.registro_classe": {
+      "path": "beelink:/home/polo/rodado/br_cvm_fundos/registro_classe/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ID_Registro_Fundo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_Registro_Classe",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Classe",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Codigo_CVM",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Registro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Constituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Inicio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tipo_Classe",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Denominacao_Social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Inicio_Situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Classificacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Indicador_Desempenho",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Classe_Cotas",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Classificacao_Anbima",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Tributacao_Longo_Prazo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Entidade_Investimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Permitido_Aplicacao_CemPorCento_Exterior",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Classe_ESG",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Forma_Condominio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Exclusivo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Publico_Alvo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Patrimonio_Liquido",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Data_Patrimonio_Liquido",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Auditor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Custodiante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Custodiante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_Controlador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "Controlador",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_bndes_operacoes_contratadas.operacoes_indiretas_automaticas": {
+      "path": "beelink:/home/polo/rodado/br_bndes_operacoes_contratadas/operacoes_indiretas_automaticas/",
+      "file_count": 5,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "data_contratacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_cliente",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_cliente",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "porte_cliente",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "natureza_cliente",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valor_operacao",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "valor_desembolsado",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "fonte_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "custo_financeiro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "taxa_juros",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "prazo_carencia",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "prazo_amortizacao",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "modalidade_apoio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "forma_apoio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "produto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "instrumento_financeiro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "inovacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "area_operacional",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "setor_cnae",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "subsetor_cnae_agrupado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_subsetor_cnae",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_subsetor_cnae",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "setor_bndes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "subsetor_bndes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "instituicao_financeira_credenciada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_agente_financeiro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao_operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_bndes_operacoes_contratadas.operacoes_exportacao_bens": {
+      "path": "beelink:/home/polo/rodado/br_bndes_operacoes_contratadas/operacoes_exportacao_bens/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "data_contratacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_pais_destino",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_exportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_exportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "porte_exportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "categoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modalidade_operacional",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_mutuario",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "produto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modalidade_apoio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "forma_apoio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "area_operacional",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fonte_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "custo_financeiro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_moeda",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "setor_bndes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "subsetor_bndes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_garantia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao_operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_bndes_operacoes_contratadas.operacoes_exportacao_servicos": {
+      "path": "beelink:/home/polo/rodado/br_bndes_operacoes_contratadas/operacoes_exportacao_servicos/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "data_contratacao",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_pais_destino",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_exportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_exportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "porte_exportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "categoria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modalidade_operacional",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_mutuario",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "produto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modalidade_apoio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "forma_apoio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "area_operacional",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fonte_recurso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "custo_financeiro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_moeda",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "setor_bndes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "subsetor_bndes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_garantia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao_operacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valor_operacao",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "valor_desembolsado",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "taxa_juros",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "prazo_meses",
+          "type": "BIGINT",
+          "nullable": true
+        }
+      ]
+    },
+    "br_bcb_ifdata.cadastro": {
+      "path": "beelink:/home/polo/rodado/br_bcb_ifdata/cadastro/",
+      "file_count": 106,
+      "columns": [
+        {
+          "name": "ano_mes",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "ano",
+          "type": "SMALLINT",
+          "nullable": true
+        },
+        {
+          "name": "mes",
+          "type": "TINYINT",
+          "nullable": true
+        },
+        {
+          "name": "cod_inst",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_instituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_inicio_atividade",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "tcb",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "td",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tc",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "segmento_tb",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "atividade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sr",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cod_conglomerado_financeiro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cod_conglomerado_prudencial",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_instituicao_lider",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_bcb_sicor.instituicao_financeira": {
+      "path": "beelink:/home/polo/rodado/br_bcb_sicor/instituicao_financeira/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "cnpj_basico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "segmento",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ans_operadoras.operadoras_ativas": {
+      "path": "beelink:/home/polo/rodado/br_ans_operadoras/operadoras_ativas/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "REGISTRO_OPERADORA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "RAZAO_SOCIAL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NOME_FANTASIA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "MODALIDADE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "LOGRADOURO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NUMERO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "COMPLEMENTO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "BAIRRO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CIDADE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "UF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CEP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDD",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TELEFONE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "FAX",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ENDERECO_ELETRONICO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "REPRESENTANTE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CARGO_REPRESENTANTE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "REGIAO_DE_COMERCIALIZACAO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA_REGISTRO_ANS",
+          "type": "DATE",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ans_operadoras.operadoras_canceladas": {
+      "path": "beelink:/home/polo/rodado/br_ans_operadoras/operadoras_canceladas/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "REGISTRO_OPERADORA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "RAZAO_SOCIAL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NOME_FANTASIA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "MODALIDADE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "LOGRADOURO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NUMERO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "COMPLEMENTO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "BAIRRO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CIDADE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "UF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CEP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DDD",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TELEFONE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "FAX",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ENDERECO_ELETRONICO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "REPRESENTANTE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CARGO_REPRESENTANTE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "REGIAO_DE_COMERCIALIZACAO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA_REGISTRO_ANS",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "DATA_DESCREDENCIAMENTO",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "MOTIVO_DO_DESCREDENCIAMENTO",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ans_operadoras.penalidades": {
+      "path": "beelink:/home/polo/rodado/br_ans_operadoras/penalidades/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "NR_DEMANDA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NR_PROCESSO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TIPO_PROCESSO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "OBJETO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "REGISTRO_OPERADORA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "RAZAO_SOCIAL",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "SITUACAO_OPERADORA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "STATUS_DEMANDA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_DECISAO_1A",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "DT_PUBLICACAO_1A",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "DT_PUBLICACAO_1A_FINAL",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "VL_MULTA_FIXA_1A",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "VL_MULTA_DIARIA_1A",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "VL_TOTAL_APLICADO_1A",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "DT_CIENCIA_RECONSIDERA_TOTAL",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "DT_DECISAO_2A",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "DT_PUBLICACAO_2A",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "TIPO_DECISAO_2A",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "VL_MULTA_FIXA_2A",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "VL_MULTA_DIARIA_2A",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "VL_TOTAL_APLICADO_2A",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "VL_MULTA_FINAL_APLICADA",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "VL_TOTAL_DESCONTOS",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "DT_ARQUIVAMENTO",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "MOTIVO_ARQUIVAMENTO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "TIPO_PENALIDADE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_SUSPENSAO_ADM",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "DT_SUSPENSAO_JUD",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "NR_GRU",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_VENC_GRU",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "VL_GRU",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "DE_SITUACAO_GRU",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_PAGTO_A_VISTA_ANS",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "VL_PAGO_A_VISTA_ANS",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "DT_VENC_1A_PARC_ANS",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "VL_PARCELAS_ANS_PAGAS",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "STATUS_PARCELAMENTO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DT_INSCRICAO",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "INSCRITO_DA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ORIGEM_PAGAMENTO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NR_COMPETENCIA_CARGA",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_anp_combustiveis.precos": {
+      "path": "beelink:/home/polo/rodado/br_anp_combustiveis/precos/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "razao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fantasia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "endereco",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "complemento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "bairro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cep",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "estado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "bandeira",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "produto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_medida",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "preco_revenda",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "data_coleta",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_anvisa_cmed.precos": {
+      "path": "beelink:/home/polo/rodado/br_anvisa_cmed/precos/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "lista",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "substancia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "laboratorio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_ggrem",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "registro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ean_1",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ean_2",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ean_3",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "produto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "apresentacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "classe_terapeutica",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_de_produto_status_do_produto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "regime_de_preco",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_sem_impostos",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_0pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_12_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_12_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_17_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_17_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_17_5_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_17_5_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_18_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_18_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_19_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_19_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_19_5_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_19_5_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_20_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_20_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_20_5_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_20_5_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_21_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_21_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_22_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_22_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_22_5_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_22_5_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_23_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pf_23_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_sem_impostos",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_0_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_12_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_12_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_17_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_17_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_17_5_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_17_5_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_18_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_18_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_19_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_19_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_19_5_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_19_5_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_20_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_20_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_20_5_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_20_5_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_21_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_21_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_22_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_22_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_22_5_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_22_5_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_23_pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "pmc_23_pct_alc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "restricao_hospitalar",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cap",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "confaz_87",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "icms_0pct",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "analise_recursal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "lista_de_concessao_de_credito_tributario_pis_cofins",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "comercializacao_2025",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tarja",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "destinacao_comercial",
+          "type": "INTEGER",
+          "nullable": true
+        }
+      ]
+    },
+    "br_aneel_dadosabertos.empreendimento_geracao_distribuida": {
+      "path": "beelink:/home/polo/rodado/br_aneel_dadosabertos/empreendimento_geracao_distribuida/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "DatGeracaoConjuntoDados",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "AnmPeriodoReferencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NumCNPJDistribuidora",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "SigAgente",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NomAgente",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CodClasseConsumo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscClasseConsumo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CodSubGrupoTarifario",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "DscSubGrupoTarifario",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CodUFibge",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "SigUF",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CodRegiao",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "NomRegiao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CodMunicipioIbge",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "NomMunicipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CodCEP",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "SigTipoConsumidor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NumCPFCNPJ",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CodEmpreendimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DthAtualizaCadastralEmpreend",
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "SigModalidadeEmpreendimento",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "DscModalidadeHabilitado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "QtdUCRecebeCredito",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "SigTipoGeracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscFonteGeracao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscPorte",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "MdaPotenciaInstaladaKW",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "NomSubEstacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NumCoordESub",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "NumCoordNSub",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "NomTitularEmpreendimento",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_aneel_dadosabertos.tarifas_homologadas": {
+      "path": "beelink:/home/polo/rodado/br_aneel_dadosabertos/tarifas_homologadas/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "DatGeracaoConjuntoDados",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscREH",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "SigAgente",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NumCNPJDistribuidora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DatInicioVigencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DatFimVigencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscBaseTarifaria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscSubGrupo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscModalidadeTarifaria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscClasse",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscSubClasse",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscDetalhe",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NomPostoTarifario",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DscUnidadeTerciaria",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "SigAgenteAcessante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "VlrTUSD",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "VlrTE",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_antt_dadosabertos.rntrc": {
+      "path": "beelink:/home/polo/rodado/br_antt_dadosabertos/rntrc/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "nome_transportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_rntrc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_primeiro_cadastro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao_rntrc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpfcnpjtransportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "categoria_transportador",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cep",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "equiparado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_situacao_rntrc",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "referencia",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ana_outorgas.captacoes": {
+      "path": "beelink:/home/polo/rodado/br_ana_outorgas/captacoes/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "emp_nm_responsavel",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "emp_nu_cpfcnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "int_qt_vazaomedia",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "ing_nm_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ing_sg_ufmunicipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "esfera",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_ana_outorgas.lancamentos": {
+      "path": "beelink:/home/polo/rodado/br_ana_outorgas/lancamentos/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "emp_nm_empreendimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "emp_nm_responsavel",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "emp_nu_cpfcnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "int_qt_vazaomedia",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "int_qt_vazaomaxima",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "int_qt_volumeanual",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "int_nm_corpohidrico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ing_nm_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ing_sg_ufmunicipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ing_nm_regiao_hidro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ing_cd_ottobacia_trecho",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "int_nu_latitude",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "int_nu_longitude",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "tfn_ds",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tsf_ds",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tch_ds",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "out_dt_outorgainicial",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "out_dt_outorgafinal",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "org_nm",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "esfera",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_anm.cfem_cfem_arrecadacao": {
+      "path": "beelink:/home/polo/rodado/br_anm/cfem_cfem_arrecadacao/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "mes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "anodoprocesso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_pf_pj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "substancia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigomunicipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidadecomercializada",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidadedemedida",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valorrecolhido",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "datacriacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_anm.cfem_cfem_autuacao": {
+      "path": "beelink:/home/polo/rodado/br_anm/cfem_cfem_autuacao/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "processocobranca",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "anopublicacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "mespublicacao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_pf_pj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nometitular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numeroauto",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "processominerario",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "substancia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valor",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_anm.scm_portaria_de_lavra": {
+      "path": "beelink:/home/polo/rodado/br_anm/scm_portaria_de_lavra/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "superintendencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_de_requerimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fase_atual",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_do_titular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "titular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio_s",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "substancia_s",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_s_de_uso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_anm.scm_alvara_de_pesquisa": {
+      "path": "beelink:/home/polo/rodado/br_anm/scm_alvara_de_pesquisa/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "superintendencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_de_requerimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fase_atual",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_do_titular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "titular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio_s",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "substancia_s",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_s_de_uso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_anm.scm_requerimento_de_pesquisa": {
+      "path": "beelink:/home/polo/rodado/br_anm/scm_requerimento_de_pesquisa/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "superintendencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_de_requerimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fase_atual",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_do_titular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "titular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio_s",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "substancia_s",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_s_de_uso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_anm.scm_licenciamento": {
+      "path": "beelink:/home/polo/rodado/br_anm/scm_licenciamento/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "superintendencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "processo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_de_requerimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fase_atual",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_cnpj_do_titular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "titular",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "municipio_s",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "substancia_s",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_s_de_uso",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_saude_bps.dados": {
+      "path": "beelink:/home/polo/rodado/br_saude_bps/dados/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano_da_compra",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "nome_da_instituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_da_instituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_do_munica­pio_da_instituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf_da_instituicao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_da_compra",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_da_insercao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_br",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "descricao_catmat",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_de_fornecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "generico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "anvisa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "modalidade_da_compra",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_da_compra",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "capacidade",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "unidade_de_medida",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_fornecimento_capacidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_do_fornecedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fornecedor",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_do_fabricante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "fabricante",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidade_itens_comprados",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "preco_unitario",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "preco_total",
+          "type": "DOUBLE",
+          "nullable": true
+        }
+      ]
+    },
+    "br_saude_farmaciapopular.estabelecimentos": {
+      "path": "beelink:/home/polo/rodado/br_saude_farmaciapopular/estabelecimentos/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "codigo_cnes",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "numero_cnpj_entidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_razao_social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fantasia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "natureza_organizacao_entidade",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "tipo_gestao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_nivel_hierarquia",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "descricao_esfera_administrativa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_tipo_unidade",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "codigo_cep_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "endereco_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "bairro_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_telefone_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "latitude_estabelecimento_decimo_grau",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "longitude_estabelecimento_decimo_grau",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "endereco_email_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_cnpj",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_identificador_turno_atendimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "descricao_turno_atendimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento_faz_atendimento_ambulatorial_sus",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_estabelecimento_saude",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_uf",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "codigo_municipio",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "descricao_natureza_juridica_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_motivo_desabilitacao_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento_possui_centro_cirurgico",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento_possui_centro_obstetrico",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento_possui_centro_neonatal",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento_possui_atendimento_hospitalar",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento_possui_servico_apoio",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento_possui_atendimento_ambulatorial",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "codigo_atividade_ensino_unidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_natureza_organizacao_unidade",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "codigo_nivel_hierarquia_unidade",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "codigo_esfera_administrativa_unidade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_atualizacao",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cgu_pessoal_executivo_federal.terceirizados": {
+      "path": "beelink:/home/polo/rodado/br_cgu_pessoal_executivo_federal/terceirizados/",
+      "file_count": 2,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "mes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_terceirizado",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_orgao_superior_unidade_gestora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_unidade_gestora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_gestora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_unidade_gestora",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "contrato_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "razao_social_empresa",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "categoria_profissional",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nivel_escolaridade",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidade_horas_trabalhadas_semanais",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "unidade_trabalho",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valor_mensal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "custo_mensal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_orgao_trabalho",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_orgao_trabalho",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_siafi_trabalho",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_siape_trabalho",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_cgu_gas_do_povo.gas_do_povo": {
+      "path": "beelink:/home/polo/rodado/br_cgu_gas_do_povo/gas_do_povo/",
+      "file_count": 8,
+      "columns": [
+        {
+          "name": "ano_mes",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "mes_referencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_municipio_siafi",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cpf_beneficiario",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_favorecido",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "estabelecimento",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidade_pessoas_familia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "periodo_validade_vale_meses",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_inicio_vigencia_vale",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_fim_vigencia_vale",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_retirada_vale",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "valor_beneficio",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_minc_salic.entidades": {
+      "path": "beelink:/home/polo/rodado/br_minc_salic/entidades/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "cep",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cidade_id",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "cidade_nome",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpjcpf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "empresa",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "estado_id",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "impressions_count",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "incentivos_count",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "incentivos_sum",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "last_incentivo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "logradouro",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "patrocinador",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "projetos_count",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "projetos_liberados",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "projetos_sum",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "proponente",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "responsavel",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tel_cel",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tel_com",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tel_fax",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tel_res",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "updated_at",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "urlized",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_transferegov_siconv.siconv_acomp_obras_contratos_medicoes": {
+      "path": "beelink:/home/polo/rodado/br_transferegov_siconv/siconv_acomp_obras_contratos_medicoes/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ID_PROPOSTA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_CONTRATO_MEDICAO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_MEDICAO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA_INICIO_OBRA_CONTRATO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_FORNECEDOR_CONTRATO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NUMERO_MEDICAO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NR_ULTIMA_MEDICAO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "SITUACAO_MEDICAO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA_INICIO_MEDICAO_OBJETO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DATA_FIM_MEDICAO_OBJETO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "QTD_DIAS_SEM_MEDICAO_ACOMPANHAMENTO_OBRA",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_transferegov_siconv.siconv_apoiadores_emendas_programas": {
+      "path": "beelink:/home/polo/rodado/br_transferegov_siconv/siconv_apoiadores_emendas_programas/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ID_CNPJ_PROGRAMA_EMENDA_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NUMERO_EMENDA_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NOME_PARLAMENTAR_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "INDICACAO_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "PARLAMENTAR_SOLICITANTE_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CPF_PF_SOLICITANTE_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NOME_PF_SOLICITANTE_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_PJ_SOLICITANTE_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NOME_PJ_SOLICITANTE_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_PROPONENTE_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NOME_PROPONENTE_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "VALOR_REPASSE_PROPOSTA_APOIADORES_EMENDAS",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ID_PROGRAMA",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_transferegov_siconv.siconv_consorcios": {
+      "path": "beelink:/home/polo/rodado/br_transferegov_siconv/siconv_consorcios/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ID_PROPOSTA",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_CONSORCIO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NOME_CONSORCIO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CODIGO_CNAE_PRIMARIO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DESC_CNAE_PRIMARIO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CODIGO_CNAE_SECUNDARIO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "DESC_CNAE_SECUNDARIO",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "CNPJ_PARTICIPANTE",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "NOME_PARTICIPANTE",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_rf_dirpf.fundos_habilitados": {
+      "path": "beelink:/home/polo/rodado/br_rf_dirpf/fundos_habilitados/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "numero",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "id_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "tipo_fundo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_fundo",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "codigo_banco",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "codigo_agencia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "numero_conta",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "vai_pgd",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "e_classe",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_empresarial",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "anexo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "ano_dirpf",
+          "type": "VARCHAR",
+          "nullable": true
+        }
+      ]
+    },
+    "br_me_rais_identificada.estabelecimentos": {
+      "path": "beelink:/home/polo/rodado/br_me_rais_identificada/estabelecimentos/",
+      "file_count": 1,
+      "columns": [
+        {
+          "name": "ano",
+          "type": "BIGINT",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_basico",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "razao_social",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "natureza_juridica",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "porte",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "capital_social",
+          "type": "DOUBLE",
+          "nullable": true
+        },
+        {
+          "name": "id_municipio",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "sigla_uf",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "cnae_fiscal_principal",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "quantidade_vinculos_ativos",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "cnpj_completo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "nome_fantasia",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao_cadastral_codigo",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "situacao_cadastral_descricao",
+          "type": "VARCHAR",
+          "nullable": true
+        },
+        {
+          "name": "data_situacao_cadastral",
+          "type": "DATE",
+          "nullable": true
+        }
+      ]
     }
   }
 }

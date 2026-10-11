@@ -25,13 +25,14 @@
  *
  * Usage:
  *   bun run scripts/generate-static-entities.ts [--top=50] [--per-dataset-limit=15] [--concurrency=6] [--force]
+ *   bun run scripts/generate-static-entities.ts --ids=00000000,60701190   # rebuild only these empresas
  */
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { execRemoteSQL } from "./lib/duckdb-ssh";
 import { buildSelectSQL } from "./lib/parquet-store";
 import { extractCnpjRoot, socioNodeId, isMaskedDocument } from "./lib/cnpj-index";
-import { hashCpf, isPersonalDocColumn, sanitizeCpfValue, sanitizeRow } from "./lib/cpf-privacy";
+import { hashCpf, isPersonalDocColumn, sanitizeAnyValue, sanitizeCpfValue, sanitizeRow } from "./lib/cpf-privacy";
 import { CNPJ_DATASETS, type CnpjColumn, type CnpjDatasetEntry } from "../src/cnpj-datasets";
 
 function log(...args: unknown[]) {
@@ -81,7 +82,7 @@ interface EntitySource {
 // tens of millions of values, far too large to ship over SSH as JSON just to
 // count breadth. socios is still queried per-entity (a targeted single-cnpj
 // lookup, cheap) when building each top entity's actual network below.
-const BASE_RECEITA_TABLES = new Set(["br_me_cnpj.empresas", "br_me_cnpj.socios", "br_me_cnpj.estabelecimentos"]);
+const BASE_RECEITA_TABLES = new Set(["br_me_cnpj.empresas", "br_me_cnpj.socios", "br_me_cnpj.estabelecimentos", "br_me_cnpj.simples"]);
 
 function collectSources(): EntitySource[] {
   const sources: EntitySource[] = [];
@@ -96,30 +97,44 @@ function collectSources(): EntitySource[] {
   return sources;
 }
 
+// Digits-only form of a document column. A normalize column may also arrive
+// float-shaped ("4834065000193.0" — INEP, or any DOUBLE cast to VARCHAR), so
+// the trailing ".0" goes first or it would become a 15th digit.
+function docDigitsExpr(col: CnpjColumn): string {
+  const raw = `CAST("${col.name}" AS VARCHAR)`;
+  const unfloated = col.normalize ? `regexp_replace(${raw}, '\\.0+$', '')` : raw;
+  return `regexp_replace(${unfloated}, '[^0-9]', '', 'g')`;
+}
+
+// A column's own row filter (CnpjColumn.where), ANDed onto its match clause.
+function withColumnWhere(col: CnpjColumn, clause: string): string {
+  return col.where ? `(${col.where} AND ${clause})` : clause;
+}
+
 // Digits-only extraction, then bucket into an 8-digit company root or an
 // 11-digit CPF depending on column type/length. Masked CPFs ("***123456**")
 // strip down to 6 digits and are naturally dropped by the length check.
 function entityKeyExpr(col: CnpjColumn): { keyExpr: string; typeExpr: string } {
-  const raw = `"${col.name}"`;
-  const digits = `regexp_replace(CAST(${raw} AS VARCHAR), '[^0-9]', '', 'g')`;
+  const digits = docDigitsExpr(col);
+  const guarded = (expr: string) => (col.where ? `CASE WHEN ${col.where} THEN ${expr} ELSE NULL END` : expr);
   if (col.type === "basico") {
-    return { keyExpr: `NULLIF(${digits}, '')`, typeExpr: `'empresa'` };
+    return { keyExpr: guarded(`NULLIF(${digits}, '')`), typeExpr: `'empresa'` };
   }
   if (col.type === "full") {
     const padded = col.normalize ? `lpad(${digits}, 14, '0')` : digits;
-    const guard = col.normalize ? `${digits} <> ''` : `length(${digits}) = 14`;
+    const guard = col.normalize ? `ltrim(${digits}, '0') <> ''` : `length(${digits}) = 14`;
     return {
-      keyExpr: `CASE WHEN ${guard} THEN substr(${padded}, 1, 8) ELSE NULL END`,
+      keyExpr: guarded(`CASE WHEN ${guard} THEN substr(${padded}, 1, 8) ELSE NULL END`),
       typeExpr: `'empresa'`,
     };
   }
   return {
-    keyExpr: `CASE WHEN length(${digits}) = 14 THEN substr(${digits}, 1, 8)
+    keyExpr: guarded(`CASE WHEN length(${digits}) = 14 THEN substr(${digits}, 1, 8)
                     WHEN length(${digits}) = 11 THEN ${digits}
-                    ELSE NULL END`,
-    typeExpr: `CASE WHEN length(${digits}) = 14 THEN 'empresa'
+                    ELSE NULL END`),
+    typeExpr: guarded(`CASE WHEN length(${digits}) = 14 THEN 'empresa'
                      WHEN length(${digits}) = 11 THEN 'pessoa'
-                     ELSE NULL END`,
+                     ELSE NULL END`),
   };
 }
 
@@ -262,10 +277,10 @@ function safeNodeIdAndLabel(
 ): { nodeId: string; nodeLabel: string } {
   const docColumns = ds.cnpjColumns.map((c) => c.name);
   const rawId = row[idField] ?? fallbackIndex;
-  const idValue = isPersonalDocColumn(idField, docColumns) ? sanitizeCpfValue(rawId) : rawId;
+  const idValue = isPersonalDocColumn(idField, docColumns) ? sanitizeCpfValue(rawId) : sanitizeAnyValue(rawId);
   const nodeId = `${ds.id}:${idValue}`;
   const rawLabel = row[labelField];
-  const labelValue = isPersonalDocColumn(labelField, docColumns) ? sanitizeCpfValue(rawLabel) : rawLabel;
+  const labelValue = isPersonalDocColumn(labelField, docColumns) ? sanitizeCpfValue(rawLabel) : sanitizeAnyValue(rawLabel);
   const nodeLabel = String(labelValue ?? nodeId);
   return { nodeId, nodeLabel };
 }
@@ -300,13 +315,12 @@ async function buildEmpresaNetwork(cnpjBasico: string): Promise<{ label: string;
     const parts = ds.table.split(".");
     const { idField, labelField } = inferNodeFields(ds);
     const clauses = ds.cnpjColumns.map((col) => {
-      const raw = `"${col.name}"`;
-      const digits = `regexp_replace(CAST(${raw} AS VARCHAR), '[^0-9]', '', 'g')`;
-      if (col.type === "basico") return `(${digits} = '${cnpjBasico}')`;
+      const digits = docDigitsExpr(col);
+      if (col.type === "basico") return withColumnWhere(col, `(${digits} = '${cnpjBasico}')`);
       const padded = col.normalize ? `lpad(${digits}, 14, '0')` : digits;
-      const notBlank = col.normalize ? `${digits} <> '' AND ` : "";
-      if (col.type === "full") return `(${notBlank}${padded} LIKE '${cnpjBasico}%')`;
-      return `(${notBlank}length(${digits}) = 14 AND ${padded} LIKE '${cnpjBasico}%')`;
+      const notBlank = col.normalize ? `ltrim(${digits}, '0') <> '' AND ` : "";
+      if (col.type === "full") return withColumnWhere(col, `(${notBlank}${padded} LIKE '${cnpjBasico}%')`);
+      return withColumnWhere(col, `(${notBlank}length(${digits}) = 14 AND ${padded} LIKE '${cnpjBasico}%')`);
     });
     const columns = [...new Set([...ds.displayFields, idField, labelField, ...ds.cnpjColumns.map((c) => c.name)])];
     let rows: Record<string, unknown>[] = [];
@@ -371,11 +385,7 @@ async function buildPessoaNetwork(documento: string, publicId: string): Promise<
     const mixedCols = ds.cnpjColumns.filter((c) => c.type === "mixed");
     const parts = ds.table.split(".");
     const { idField, labelField } = inferNodeFields(ds);
-    const clauses = mixedCols.map((col) => {
-      const raw = `"${col.name}"`;
-      const digits = `regexp_replace(CAST(${raw} AS VARCHAR), '[^0-9]', '', 'g')`;
-      return `(${digits} = '${documento}')`;
-    });
+    const clauses = mixedCols.map((col) => withColumnWhere(col, `(${docDigitsExpr(col)} = '${documento}')`));
     const columns = [...new Set([...ds.displayFields, idField, labelField, ...mixedCols.map((c) => c.name)])];
     let rows: Record<string, unknown>[] = [];
     try {
@@ -430,7 +440,27 @@ interface IndexEntry {
   path: string;
 }
 
+// --ids=<cnpj_basico>,... rebuilds just those empresa entities' files, skipping
+// the ranking pass and leaving entities-index.json alone — for timing or
+// spot-checking a dataset change before a full run. Pessoa entities can't be
+// targeted this way: their public id is a CPF hash, and the raw CPF needed to
+// query beelink only comes out of the ranking pass.
+async function buildOnly(ids: string[]) {
+  for (const id of ids) {
+    const t0 = Date.now();
+    const { label, network } = await buildEmpresaNetwork(id);
+    writeFileSync(resolve(ENTITIES_DIR, `${id}.json`), JSON.stringify(network));
+    const perDataset = new Map<string, number>();
+    for (const n of network.nodes) if (n.datasetId) perDataset.set(n.datasetId, (perDataset.get(n.datasetId) ?? 0) + 1);
+    log("built", id, label, { nodes: network.nodes.length, datasets: perDataset.size, ms: Date.now() - t0 });
+  }
+}
+
 async function main() {
+  if (args.ids) {
+    await buildOnly(args.ids.split(",").map((x) => x.trim()).filter(Boolean));
+    return;
+  }
   const ranked = await rankEntities();
   log("ranked entities", { total: ranked.length });
 
@@ -441,7 +471,22 @@ async function main() {
   const topEmpresas = eligible.filter((r) => r.type === "empresa").slice(0, TOP_N);
   const topPessoas = eligible.filter((r) => r.type === "pessoa").slice(0, TOP_N);
   log("split by type", { empresas: topEmpresas.length, pessoas: topPessoas.length });
-  const top = [...topEmpresas, ...topPessoas];
+  const publicIdOf = (r: EntityRank) => (r.type === "pessoa" ? hashCpf(r.id) : r.id);
+
+  // Entities already published stay published: wiring new datasets shifts the
+  // breadth ranking, and an entity that falls out of the new top-N would
+  // otherwise vanish from the site instead of being rebuilt with the new
+  // relations. Pessoa ids in the index are CPF hashes, so they're matched back
+  // to their raw CPF through the ranking (hash of each ranked CPF).
+  const indexPath = resolve(OUT_DIR, "entities-index.json");
+  const previous: IndexEntry[] = existsSync(indexPath) ? JSON.parse(readFileSync(indexPath, "utf8")) : [];
+  const topIds = new Set([...topEmpresas, ...topPessoas].map(publicIdOf));
+  const previousIds = new Set(previous.map((e) => e.id));
+  const carried = eligible.filter((r) => previousIds.has(publicIdOf(r)) && !topIds.has(publicIdOf(r)));
+  const top = [...topEmpresas, ...topPessoas, ...carried];
+  const reachedIds = new Set(top.map(publicIdOf));
+  const unreached = previous.filter((e) => !reachedIds.has(e.id));
+  log("previously published", { total: previous.length, carriedOutsideTop: carried.length, notInRanking: unreached.length });
   const index: IndexEntry[] = [];
 
   for (let i = 0; i < top.length; i++) {
@@ -473,7 +518,13 @@ async function main() {
     }
   }
 
-  writeFileSync(resolve(OUT_DIR, "entities-index.json"), JSON.stringify(index, null, 2));
+  // A previously published entity the ranking no longer reaches (e.g. its only
+  // source table failed this run) keeps its old file and index row untouched.
+  for (const e of unreached) {
+    if (existsSync(resolve(OUT_DIR, e.path))) index.push(e);
+  }
+
+  writeFileSync(indexPath, JSON.stringify(index, null, 2));
   log("done", { written: index.length, outDir: OUT_DIR });
 }
 
