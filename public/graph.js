@@ -17,7 +17,7 @@ var __toESM = (mod, isNodeMode, target) => {
       return cached;
   }
   target = mod != null ? __create(__getProtoOf(mod)) : {};
-  const to = isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
+  const to = isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
   if (mod && typeof mod === "object" || typeof mod === "function") {
     for (let key of __getOwnPropNames(mod))
       if (!__hasOwnProp.call(to, key))
@@ -48,10 +48,10 @@ var require_getters = __commonJS(function(exports) {
   }
   function createNodeValueGetter(nameOrFunction, defaultValue) {
     var getter = {};
-    var coerceToDefault = function(v2) {
-      if (typeof v2 === "undefined")
+    var coerceToDefault = function(v) {
+      if (typeof v === "undefined")
         return defaultValue;
-      return v2;
+      return v;
     };
     if (typeof defaultValue === "function")
       coerceToDefault = defaultValue;
@@ -88,10 +88,10 @@ var require_getters = __commonJS(function(exports) {
   }
   function createEdgeValueGetter(nameOrFunction, defaultValue) {
     var getter = {};
-    var coerceToDefault = function(v2) {
-      if (typeof v2 === "undefined")
+    var coerceToDefault = function(v) {
+      if (typeof v === "undefined")
         return defaultValue;
-      return v2;
+      return v;
     };
     if (typeof defaultValue === "function")
       coerceToDefault = defaultValue;
@@ -119,14 +119,14 @@ var require_getters = __commonJS(function(exports) {
         var extremities = graph.extremities(edge);
         return coerceToDefault(nameOrFunction(edge, graph.getEdgeAttributes(edge), extremities[0], extremities[1], graph.getNodeAttributes(extremities[0]), graph.getNodeAttributes(extremities[1]), graph.isUndirected(edge)));
       };
-      getter.fromEntry = function(e3, a3, s2, t2, sa, ta, u2) {
-        return coerceToDefault(nameOrFunction(e3, a3, s2, t2, sa, ta, u2));
+      getter.fromEntry = function(e, a, s, t, sa, ta, u) {
+        return coerceToDefault(nameOrFunction(e, a, s, t, sa, ta, u));
       };
-      getter.fromPartialEntry = function(e3, a3, s2, t2) {
-        return coerceToDefault(nameOrFunction(e3, a3, s2, t2));
+      getter.fromPartialEntry = function(e, a, s, t) {
+        return coerceToDefault(nameOrFunction(e, a, s, t));
       };
-      getter.fromMinimalEntry = function(e3, a3) {
-        return coerceToDefault(nameOrFunction(e3, a3));
+      getter.fromMinimalEntry = function(e, a) {
+        return coerceToDefault(nameOrFunction(e, a));
       };
     } else {
       getter.fromAttributes = returnDefault;
@@ -173,32 +173,32 @@ var require_iterate = __commonJS(function(exports, module) {
   var PPR = 9;
   var MAX_FORCE = 10;
   module.exports = function iterate(options, NodeMatrix, EdgeMatrix) {
-    var l2, r2, n2, n1, n22, rn, e3, w2, g2, s2;
+    var l, r, n, n1, n2, rn, e, w, g, s;
     var order = NodeMatrix.length, size = EdgeMatrix.length;
     var adjustSizes = options.adjustSizes;
     var thetaSquared = options.barnesHutTheta * options.barnesHutTheta;
     var outboundAttCompensation, coefficient, xDist, yDist, ewc, distance, factor;
     var RegionMatrix = [];
-    for (n2 = 0;n2 < order; n2 += PPN) {
-      NodeMatrix[n2 + NODE_OLD_DX] = NodeMatrix[n2 + NODE_DX];
-      NodeMatrix[n2 + NODE_OLD_DY] = NodeMatrix[n2 + NODE_DY];
-      NodeMatrix[n2 + NODE_DX] = 0;
-      NodeMatrix[n2 + NODE_DY] = 0;
+    for (n = 0;n < order; n += PPN) {
+      NodeMatrix[n + NODE_OLD_DX] = NodeMatrix[n + NODE_DX];
+      NodeMatrix[n + NODE_OLD_DY] = NodeMatrix[n + NODE_DY];
+      NodeMatrix[n + NODE_DX] = 0;
+      NodeMatrix[n + NODE_DY] = 0;
     }
     if (options.outboundAttractionDistribution) {
       outboundAttCompensation = 0;
-      for (n2 = 0;n2 < order; n2 += PPN) {
-        outboundAttCompensation += NodeMatrix[n2 + NODE_MASS];
+      for (n = 0;n < order; n += PPN) {
+        outboundAttCompensation += NodeMatrix[n + NODE_MASS];
       }
       outboundAttCompensation /= order / PPN;
     }
     if (options.barnesHutOptimize) {
-      var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, q2, q22, subdivisionAttempts;
-      for (n2 = 0;n2 < order; n2 += PPN) {
-        minX = Math.min(minX, NodeMatrix[n2 + NODE_X]);
-        maxX = Math.max(maxX, NodeMatrix[n2 + NODE_X]);
-        minY = Math.min(minY, NodeMatrix[n2 + NODE_Y]);
-        maxY = Math.max(maxY, NodeMatrix[n2 + NODE_Y]);
+      var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, q, q2, subdivisionAttempts;
+      for (n = 0;n < order; n += PPN) {
+        minX = Math.min(minX, NodeMatrix[n + NODE_X]);
+        maxX = Math.max(maxX, NodeMatrix[n + NODE_X]);
+        minY = Math.min(minY, NodeMatrix[n + NODE_Y]);
+        maxY = Math.max(maxY, NodeMatrix[n + NODE_Y]);
       }
       var dx = maxX - minX, dy = maxY - minY;
       if (dx > dy) {
@@ -217,119 +217,119 @@ var require_iterate = __commonJS(function(exports, module) {
       RegionMatrix[0 + REGION_MASS] = 0;
       RegionMatrix[0 + REGION_MASS_CENTER_X] = 0;
       RegionMatrix[0 + REGION_MASS_CENTER_Y] = 0;
-      l2 = 1;
-      for (n2 = 0;n2 < order; n2 += PPN) {
-        r2 = 0;
+      l = 1;
+      for (n = 0;n < order; n += PPN) {
+        r = 0;
         subdivisionAttempts = SUBDIVISION_ATTEMPTS;
         while (true) {
-          if (RegionMatrix[r2 + REGION_FIRST_CHILD] >= 0) {
-            if (NodeMatrix[n2 + NODE_X] < RegionMatrix[r2 + REGION_CENTER_X]) {
-              if (NodeMatrix[n2 + NODE_Y] < RegionMatrix[r2 + REGION_CENTER_Y]) {
-                q2 = RegionMatrix[r2 + REGION_FIRST_CHILD];
+          if (RegionMatrix[r + REGION_FIRST_CHILD] >= 0) {
+            if (NodeMatrix[n + NODE_X] < RegionMatrix[r + REGION_CENTER_X]) {
+              if (NodeMatrix[n + NODE_Y] < RegionMatrix[r + REGION_CENTER_Y]) {
+                q = RegionMatrix[r + REGION_FIRST_CHILD];
               } else {
-                q2 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR;
+                q = RegionMatrix[r + REGION_FIRST_CHILD] + PPR;
               }
             } else {
-              if (NodeMatrix[n2 + NODE_Y] < RegionMatrix[r2 + REGION_CENTER_Y]) {
-                q2 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR * 2;
+              if (NodeMatrix[n + NODE_Y] < RegionMatrix[r + REGION_CENTER_Y]) {
+                q = RegionMatrix[r + REGION_FIRST_CHILD] + PPR * 2;
               } else {
-                q2 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR * 3;
+                q = RegionMatrix[r + REGION_FIRST_CHILD] + PPR * 3;
               }
             }
-            RegionMatrix[r2 + REGION_MASS_CENTER_X] = (RegionMatrix[r2 + REGION_MASS_CENTER_X] * RegionMatrix[r2 + REGION_MASS] + NodeMatrix[n2 + NODE_X] * NodeMatrix[n2 + NODE_MASS]) / (RegionMatrix[r2 + REGION_MASS] + NodeMatrix[n2 + NODE_MASS]);
-            RegionMatrix[r2 + REGION_MASS_CENTER_Y] = (RegionMatrix[r2 + REGION_MASS_CENTER_Y] * RegionMatrix[r2 + REGION_MASS] + NodeMatrix[n2 + NODE_Y] * NodeMatrix[n2 + NODE_MASS]) / (RegionMatrix[r2 + REGION_MASS] + NodeMatrix[n2 + NODE_MASS]);
-            RegionMatrix[r2 + REGION_MASS] += NodeMatrix[n2 + NODE_MASS];
-            r2 = q2;
+            RegionMatrix[r + REGION_MASS_CENTER_X] = (RegionMatrix[r + REGION_MASS_CENTER_X] * RegionMatrix[r + REGION_MASS] + NodeMatrix[n + NODE_X] * NodeMatrix[n + NODE_MASS]) / (RegionMatrix[r + REGION_MASS] + NodeMatrix[n + NODE_MASS]);
+            RegionMatrix[r + REGION_MASS_CENTER_Y] = (RegionMatrix[r + REGION_MASS_CENTER_Y] * RegionMatrix[r + REGION_MASS] + NodeMatrix[n + NODE_Y] * NodeMatrix[n + NODE_MASS]) / (RegionMatrix[r + REGION_MASS] + NodeMatrix[n + NODE_MASS]);
+            RegionMatrix[r + REGION_MASS] += NodeMatrix[n + NODE_MASS];
+            r = q;
             continue;
           } else {
-            if (RegionMatrix[r2 + REGION_NODE] < 0) {
-              RegionMatrix[r2 + REGION_NODE] = n2;
+            if (RegionMatrix[r + REGION_NODE] < 0) {
+              RegionMatrix[r + REGION_NODE] = n;
               break;
             } else {
-              RegionMatrix[r2 + REGION_FIRST_CHILD] = l2 * PPR;
-              w2 = RegionMatrix[r2 + REGION_SIZE] / 2;
-              g2 = RegionMatrix[r2 + REGION_FIRST_CHILD];
-              RegionMatrix[g2 + REGION_NODE] = -1;
-              RegionMatrix[g2 + REGION_CENTER_X] = RegionMatrix[r2 + REGION_CENTER_X] - w2;
-              RegionMatrix[g2 + REGION_CENTER_Y] = RegionMatrix[r2 + REGION_CENTER_Y] - w2;
-              RegionMatrix[g2 + REGION_SIZE] = w2;
-              RegionMatrix[g2 + REGION_NEXT_SIBLING] = g2 + PPR;
-              RegionMatrix[g2 + REGION_FIRST_CHILD] = -1;
-              RegionMatrix[g2 + REGION_MASS] = 0;
-              RegionMatrix[g2 + REGION_MASS_CENTER_X] = 0;
-              RegionMatrix[g2 + REGION_MASS_CENTER_Y] = 0;
-              g2 += PPR;
-              RegionMatrix[g2 + REGION_NODE] = -1;
-              RegionMatrix[g2 + REGION_CENTER_X] = RegionMatrix[r2 + REGION_CENTER_X] - w2;
-              RegionMatrix[g2 + REGION_CENTER_Y] = RegionMatrix[r2 + REGION_CENTER_Y] + w2;
-              RegionMatrix[g2 + REGION_SIZE] = w2;
-              RegionMatrix[g2 + REGION_NEXT_SIBLING] = g2 + PPR;
-              RegionMatrix[g2 + REGION_FIRST_CHILD] = -1;
-              RegionMatrix[g2 + REGION_MASS] = 0;
-              RegionMatrix[g2 + REGION_MASS_CENTER_X] = 0;
-              RegionMatrix[g2 + REGION_MASS_CENTER_Y] = 0;
-              g2 += PPR;
-              RegionMatrix[g2 + REGION_NODE] = -1;
-              RegionMatrix[g2 + REGION_CENTER_X] = RegionMatrix[r2 + REGION_CENTER_X] + w2;
-              RegionMatrix[g2 + REGION_CENTER_Y] = RegionMatrix[r2 + REGION_CENTER_Y] - w2;
-              RegionMatrix[g2 + REGION_SIZE] = w2;
-              RegionMatrix[g2 + REGION_NEXT_SIBLING] = g2 + PPR;
-              RegionMatrix[g2 + REGION_FIRST_CHILD] = -1;
-              RegionMatrix[g2 + REGION_MASS] = 0;
-              RegionMatrix[g2 + REGION_MASS_CENTER_X] = 0;
-              RegionMatrix[g2 + REGION_MASS_CENTER_Y] = 0;
-              g2 += PPR;
-              RegionMatrix[g2 + REGION_NODE] = -1;
-              RegionMatrix[g2 + REGION_CENTER_X] = RegionMatrix[r2 + REGION_CENTER_X] + w2;
-              RegionMatrix[g2 + REGION_CENTER_Y] = RegionMatrix[r2 + REGION_CENTER_Y] + w2;
-              RegionMatrix[g2 + REGION_SIZE] = w2;
-              RegionMatrix[g2 + REGION_NEXT_SIBLING] = RegionMatrix[r2 + REGION_NEXT_SIBLING];
-              RegionMatrix[g2 + REGION_FIRST_CHILD] = -1;
-              RegionMatrix[g2 + REGION_MASS] = 0;
-              RegionMatrix[g2 + REGION_MASS_CENTER_X] = 0;
-              RegionMatrix[g2 + REGION_MASS_CENTER_Y] = 0;
-              l2 += 4;
-              if (NodeMatrix[RegionMatrix[r2 + REGION_NODE] + NODE_X] < RegionMatrix[r2 + REGION_CENTER_X]) {
-                if (NodeMatrix[RegionMatrix[r2 + REGION_NODE] + NODE_Y] < RegionMatrix[r2 + REGION_CENTER_Y]) {
-                  q2 = RegionMatrix[r2 + REGION_FIRST_CHILD];
+              RegionMatrix[r + REGION_FIRST_CHILD] = l * PPR;
+              w = RegionMatrix[r + REGION_SIZE] / 2;
+              g = RegionMatrix[r + REGION_FIRST_CHILD];
+              RegionMatrix[g + REGION_NODE] = -1;
+              RegionMatrix[g + REGION_CENTER_X] = RegionMatrix[r + REGION_CENTER_X] - w;
+              RegionMatrix[g + REGION_CENTER_Y] = RegionMatrix[r + REGION_CENTER_Y] - w;
+              RegionMatrix[g + REGION_SIZE] = w;
+              RegionMatrix[g + REGION_NEXT_SIBLING] = g + PPR;
+              RegionMatrix[g + REGION_FIRST_CHILD] = -1;
+              RegionMatrix[g + REGION_MASS] = 0;
+              RegionMatrix[g + REGION_MASS_CENTER_X] = 0;
+              RegionMatrix[g + REGION_MASS_CENTER_Y] = 0;
+              g += PPR;
+              RegionMatrix[g + REGION_NODE] = -1;
+              RegionMatrix[g + REGION_CENTER_X] = RegionMatrix[r + REGION_CENTER_X] - w;
+              RegionMatrix[g + REGION_CENTER_Y] = RegionMatrix[r + REGION_CENTER_Y] + w;
+              RegionMatrix[g + REGION_SIZE] = w;
+              RegionMatrix[g + REGION_NEXT_SIBLING] = g + PPR;
+              RegionMatrix[g + REGION_FIRST_CHILD] = -1;
+              RegionMatrix[g + REGION_MASS] = 0;
+              RegionMatrix[g + REGION_MASS_CENTER_X] = 0;
+              RegionMatrix[g + REGION_MASS_CENTER_Y] = 0;
+              g += PPR;
+              RegionMatrix[g + REGION_NODE] = -1;
+              RegionMatrix[g + REGION_CENTER_X] = RegionMatrix[r + REGION_CENTER_X] + w;
+              RegionMatrix[g + REGION_CENTER_Y] = RegionMatrix[r + REGION_CENTER_Y] - w;
+              RegionMatrix[g + REGION_SIZE] = w;
+              RegionMatrix[g + REGION_NEXT_SIBLING] = g + PPR;
+              RegionMatrix[g + REGION_FIRST_CHILD] = -1;
+              RegionMatrix[g + REGION_MASS] = 0;
+              RegionMatrix[g + REGION_MASS_CENTER_X] = 0;
+              RegionMatrix[g + REGION_MASS_CENTER_Y] = 0;
+              g += PPR;
+              RegionMatrix[g + REGION_NODE] = -1;
+              RegionMatrix[g + REGION_CENTER_X] = RegionMatrix[r + REGION_CENTER_X] + w;
+              RegionMatrix[g + REGION_CENTER_Y] = RegionMatrix[r + REGION_CENTER_Y] + w;
+              RegionMatrix[g + REGION_SIZE] = w;
+              RegionMatrix[g + REGION_NEXT_SIBLING] = RegionMatrix[r + REGION_NEXT_SIBLING];
+              RegionMatrix[g + REGION_FIRST_CHILD] = -1;
+              RegionMatrix[g + REGION_MASS] = 0;
+              RegionMatrix[g + REGION_MASS_CENTER_X] = 0;
+              RegionMatrix[g + REGION_MASS_CENTER_Y] = 0;
+              l += 4;
+              if (NodeMatrix[RegionMatrix[r + REGION_NODE] + NODE_X] < RegionMatrix[r + REGION_CENTER_X]) {
+                if (NodeMatrix[RegionMatrix[r + REGION_NODE] + NODE_Y] < RegionMatrix[r + REGION_CENTER_Y]) {
+                  q = RegionMatrix[r + REGION_FIRST_CHILD];
                 } else {
-                  q2 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR;
+                  q = RegionMatrix[r + REGION_FIRST_CHILD] + PPR;
                 }
               } else {
-                if (NodeMatrix[RegionMatrix[r2 + REGION_NODE] + NODE_Y] < RegionMatrix[r2 + REGION_CENTER_Y]) {
-                  q2 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR * 2;
+                if (NodeMatrix[RegionMatrix[r + REGION_NODE] + NODE_Y] < RegionMatrix[r + REGION_CENTER_Y]) {
+                  q = RegionMatrix[r + REGION_FIRST_CHILD] + PPR * 2;
                 } else {
-                  q2 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR * 3;
+                  q = RegionMatrix[r + REGION_FIRST_CHILD] + PPR * 3;
                 }
               }
-              RegionMatrix[r2 + REGION_MASS] = NodeMatrix[RegionMatrix[r2 + REGION_NODE] + NODE_MASS];
-              RegionMatrix[r2 + REGION_MASS_CENTER_X] = NodeMatrix[RegionMatrix[r2 + REGION_NODE] + NODE_X];
-              RegionMatrix[r2 + REGION_MASS_CENTER_Y] = NodeMatrix[RegionMatrix[r2 + REGION_NODE] + NODE_Y];
-              RegionMatrix[q2 + REGION_NODE] = RegionMatrix[r2 + REGION_NODE];
-              RegionMatrix[r2 + REGION_NODE] = -1;
-              if (NodeMatrix[n2 + NODE_X] < RegionMatrix[r2 + REGION_CENTER_X]) {
-                if (NodeMatrix[n2 + NODE_Y] < RegionMatrix[r2 + REGION_CENTER_Y]) {
-                  q22 = RegionMatrix[r2 + REGION_FIRST_CHILD];
+              RegionMatrix[r + REGION_MASS] = NodeMatrix[RegionMatrix[r + REGION_NODE] + NODE_MASS];
+              RegionMatrix[r + REGION_MASS_CENTER_X] = NodeMatrix[RegionMatrix[r + REGION_NODE] + NODE_X];
+              RegionMatrix[r + REGION_MASS_CENTER_Y] = NodeMatrix[RegionMatrix[r + REGION_NODE] + NODE_Y];
+              RegionMatrix[q + REGION_NODE] = RegionMatrix[r + REGION_NODE];
+              RegionMatrix[r + REGION_NODE] = -1;
+              if (NodeMatrix[n + NODE_X] < RegionMatrix[r + REGION_CENTER_X]) {
+                if (NodeMatrix[n + NODE_Y] < RegionMatrix[r + REGION_CENTER_Y]) {
+                  q2 = RegionMatrix[r + REGION_FIRST_CHILD];
                 } else {
-                  q22 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR;
+                  q2 = RegionMatrix[r + REGION_FIRST_CHILD] + PPR;
                 }
               } else {
-                if (NodeMatrix[n2 + NODE_Y] < RegionMatrix[r2 + REGION_CENTER_Y]) {
-                  q22 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR * 2;
+                if (NodeMatrix[n + NODE_Y] < RegionMatrix[r + REGION_CENTER_Y]) {
+                  q2 = RegionMatrix[r + REGION_FIRST_CHILD] + PPR * 2;
                 } else {
-                  q22 = RegionMatrix[r2 + REGION_FIRST_CHILD] + PPR * 3;
+                  q2 = RegionMatrix[r + REGION_FIRST_CHILD] + PPR * 3;
                 }
               }
-              if (q2 === q22) {
+              if (q === q2) {
                 if (subdivisionAttempts--) {
-                  r2 = q2;
+                  r = q;
                   continue;
                 } else {
                   subdivisionAttempts = SUBDIVISION_ATTEMPTS;
                   break;
                 }
               }
-              RegionMatrix[q22 + REGION_NODE] = n2;
+              RegionMatrix[q2 + REGION_NODE] = n;
               break;
             }
           }
@@ -338,66 +338,66 @@ var require_iterate = __commonJS(function(exports, module) {
     }
     if (options.barnesHutOptimize) {
       coefficient = options.scalingRatio;
-      for (n2 = 0;n2 < order; n2 += PPN) {
-        r2 = 0;
+      for (n = 0;n < order; n += PPN) {
+        r = 0;
         while (true) {
-          if (RegionMatrix[r2 + REGION_FIRST_CHILD] >= 0) {
-            distance = Math.pow(NodeMatrix[n2 + NODE_X] - RegionMatrix[r2 + REGION_MASS_CENTER_X], 2) + Math.pow(NodeMatrix[n2 + NODE_Y] - RegionMatrix[r2 + REGION_MASS_CENTER_Y], 2);
-            s2 = RegionMatrix[r2 + REGION_SIZE];
-            if (4 * s2 * s2 / distance < thetaSquared) {
-              xDist = NodeMatrix[n2 + NODE_X] - RegionMatrix[r2 + REGION_MASS_CENTER_X];
-              yDist = NodeMatrix[n2 + NODE_Y] - RegionMatrix[r2 + REGION_MASS_CENTER_Y];
+          if (RegionMatrix[r + REGION_FIRST_CHILD] >= 0) {
+            distance = Math.pow(NodeMatrix[n + NODE_X] - RegionMatrix[r + REGION_MASS_CENTER_X], 2) + Math.pow(NodeMatrix[n + NODE_Y] - RegionMatrix[r + REGION_MASS_CENTER_Y], 2);
+            s = RegionMatrix[r + REGION_SIZE];
+            if (4 * s * s / distance < thetaSquared) {
+              xDist = NodeMatrix[n + NODE_X] - RegionMatrix[r + REGION_MASS_CENTER_X];
+              yDist = NodeMatrix[n + NODE_Y] - RegionMatrix[r + REGION_MASS_CENTER_Y];
               if (adjustSizes === true) {
                 if (distance > 0) {
-                  factor = coefficient * NodeMatrix[n2 + NODE_MASS] * RegionMatrix[r2 + REGION_MASS] / distance;
-                  NodeMatrix[n2 + NODE_DX] += xDist * factor;
-                  NodeMatrix[n2 + NODE_DY] += yDist * factor;
+                  factor = coefficient * NodeMatrix[n + NODE_MASS] * RegionMatrix[r + REGION_MASS] / distance;
+                  NodeMatrix[n + NODE_DX] += xDist * factor;
+                  NodeMatrix[n + NODE_DY] += yDist * factor;
                 } else if (distance < 0) {
-                  factor = -coefficient * NodeMatrix[n2 + NODE_MASS] * RegionMatrix[r2 + REGION_MASS] / Math.sqrt(distance);
-                  NodeMatrix[n2 + NODE_DX] += xDist * factor;
-                  NodeMatrix[n2 + NODE_DY] += yDist * factor;
+                  factor = -coefficient * NodeMatrix[n + NODE_MASS] * RegionMatrix[r + REGION_MASS] / Math.sqrt(distance);
+                  NodeMatrix[n + NODE_DX] += xDist * factor;
+                  NodeMatrix[n + NODE_DY] += yDist * factor;
                 }
               } else {
                 if (distance > 0) {
-                  factor = coefficient * NodeMatrix[n2 + NODE_MASS] * RegionMatrix[r2 + REGION_MASS] / distance;
-                  NodeMatrix[n2 + NODE_DX] += xDist * factor;
-                  NodeMatrix[n2 + NODE_DY] += yDist * factor;
+                  factor = coefficient * NodeMatrix[n + NODE_MASS] * RegionMatrix[r + REGION_MASS] / distance;
+                  NodeMatrix[n + NODE_DX] += xDist * factor;
+                  NodeMatrix[n + NODE_DY] += yDist * factor;
                 }
               }
-              r2 = RegionMatrix[r2 + REGION_NEXT_SIBLING];
-              if (r2 < 0)
+              r = RegionMatrix[r + REGION_NEXT_SIBLING];
+              if (r < 0)
                 break;
               continue;
             } else {
-              r2 = RegionMatrix[r2 + REGION_FIRST_CHILD];
+              r = RegionMatrix[r + REGION_FIRST_CHILD];
               continue;
             }
           } else {
-            rn = RegionMatrix[r2 + REGION_NODE];
-            if (rn >= 0 && rn !== n2) {
-              xDist = NodeMatrix[n2 + NODE_X] - NodeMatrix[rn + NODE_X];
-              yDist = NodeMatrix[n2 + NODE_Y] - NodeMatrix[rn + NODE_Y];
+            rn = RegionMatrix[r + REGION_NODE];
+            if (rn >= 0 && rn !== n) {
+              xDist = NodeMatrix[n + NODE_X] - NodeMatrix[rn + NODE_X];
+              yDist = NodeMatrix[n + NODE_Y] - NodeMatrix[rn + NODE_Y];
               distance = xDist * xDist + yDist * yDist;
               if (adjustSizes === true) {
                 if (distance > 0) {
-                  factor = coefficient * NodeMatrix[n2 + NODE_MASS] * NodeMatrix[rn + NODE_MASS] / distance;
-                  NodeMatrix[n2 + NODE_DX] += xDist * factor;
-                  NodeMatrix[n2 + NODE_DY] += yDist * factor;
+                  factor = coefficient * NodeMatrix[n + NODE_MASS] * NodeMatrix[rn + NODE_MASS] / distance;
+                  NodeMatrix[n + NODE_DX] += xDist * factor;
+                  NodeMatrix[n + NODE_DY] += yDist * factor;
                 } else if (distance < 0) {
-                  factor = -coefficient * NodeMatrix[n2 + NODE_MASS] * NodeMatrix[rn + NODE_MASS] / Math.sqrt(distance);
-                  NodeMatrix[n2 + NODE_DX] += xDist * factor;
-                  NodeMatrix[n2 + NODE_DY] += yDist * factor;
+                  factor = -coefficient * NodeMatrix[n + NODE_MASS] * NodeMatrix[rn + NODE_MASS] / Math.sqrt(distance);
+                  NodeMatrix[n + NODE_DX] += xDist * factor;
+                  NodeMatrix[n + NODE_DY] += yDist * factor;
                 }
               } else {
                 if (distance > 0) {
-                  factor = coefficient * NodeMatrix[n2 + NODE_MASS] * NodeMatrix[rn + NODE_MASS] / distance;
-                  NodeMatrix[n2 + NODE_DX] += xDist * factor;
-                  NodeMatrix[n2 + NODE_DY] += yDist * factor;
+                  factor = coefficient * NodeMatrix[n + NODE_MASS] * NodeMatrix[rn + NODE_MASS] / distance;
+                  NodeMatrix[n + NODE_DX] += xDist * factor;
+                  NodeMatrix[n + NODE_DY] += yDist * factor;
                 }
               }
             }
-            r2 = RegionMatrix[r2 + REGION_NEXT_SIBLING];
-            if (r2 < 0)
+            r = RegionMatrix[r + REGION_NEXT_SIBLING];
+            if (r < 0)
               break;
             continue;
           }
@@ -406,64 +406,64 @@ var require_iterate = __commonJS(function(exports, module) {
     } else {
       coefficient = options.scalingRatio;
       for (n1 = 0;n1 < order; n1 += PPN) {
-        for (n22 = 0;n22 < n1; n22 += PPN) {
-          xDist = NodeMatrix[n1 + NODE_X] - NodeMatrix[n22 + NODE_X];
-          yDist = NodeMatrix[n1 + NODE_Y] - NodeMatrix[n22 + NODE_Y];
+        for (n2 = 0;n2 < n1; n2 += PPN) {
+          xDist = NodeMatrix[n1 + NODE_X] - NodeMatrix[n2 + NODE_X];
+          yDist = NodeMatrix[n1 + NODE_Y] - NodeMatrix[n2 + NODE_Y];
           if (adjustSizes === true) {
-            distance = Math.sqrt(xDist * xDist + yDist * yDist) - NodeMatrix[n1 + NODE_SIZE] - NodeMatrix[n22 + NODE_SIZE];
+            distance = Math.sqrt(xDist * xDist + yDist * yDist) - NodeMatrix[n1 + NODE_SIZE] - NodeMatrix[n2 + NODE_SIZE];
             if (distance > 0) {
-              factor = coefficient * NodeMatrix[n1 + NODE_MASS] * NodeMatrix[n22 + NODE_MASS] / distance / distance;
+              factor = coefficient * NodeMatrix[n1 + NODE_MASS] * NodeMatrix[n2 + NODE_MASS] / distance / distance;
               NodeMatrix[n1 + NODE_DX] += xDist * factor;
               NodeMatrix[n1 + NODE_DY] += yDist * factor;
-              NodeMatrix[n22 + NODE_DX] -= xDist * factor;
-              NodeMatrix[n22 + NODE_DY] -= yDist * factor;
+              NodeMatrix[n2 + NODE_DX] -= xDist * factor;
+              NodeMatrix[n2 + NODE_DY] -= yDist * factor;
             } else if (distance < 0) {
-              factor = 100 * coefficient * NodeMatrix[n1 + NODE_MASS] * NodeMatrix[n22 + NODE_MASS];
+              factor = 100 * coefficient * NodeMatrix[n1 + NODE_MASS] * NodeMatrix[n2 + NODE_MASS];
               NodeMatrix[n1 + NODE_DX] += xDist * factor;
               NodeMatrix[n1 + NODE_DY] += yDist * factor;
-              NodeMatrix[n22 + NODE_DX] -= xDist * factor;
-              NodeMatrix[n22 + NODE_DY] -= yDist * factor;
+              NodeMatrix[n2 + NODE_DX] -= xDist * factor;
+              NodeMatrix[n2 + NODE_DY] -= yDist * factor;
             }
           } else {
             distance = Math.sqrt(xDist * xDist + yDist * yDist);
             if (distance > 0) {
-              factor = coefficient * NodeMatrix[n1 + NODE_MASS] * NodeMatrix[n22 + NODE_MASS] / distance / distance;
+              factor = coefficient * NodeMatrix[n1 + NODE_MASS] * NodeMatrix[n2 + NODE_MASS] / distance / distance;
               NodeMatrix[n1 + NODE_DX] += xDist * factor;
               NodeMatrix[n1 + NODE_DY] += yDist * factor;
-              NodeMatrix[n22 + NODE_DX] -= xDist * factor;
-              NodeMatrix[n22 + NODE_DY] -= yDist * factor;
+              NodeMatrix[n2 + NODE_DX] -= xDist * factor;
+              NodeMatrix[n2 + NODE_DY] -= yDist * factor;
             }
           }
         }
       }
     }
-    g2 = options.gravity / options.scalingRatio;
+    g = options.gravity / options.scalingRatio;
     coefficient = options.scalingRatio;
-    for (n2 = 0;n2 < order; n2 += PPN) {
+    for (n = 0;n < order; n += PPN) {
       factor = 0;
-      xDist = NodeMatrix[n2 + NODE_X];
-      yDist = NodeMatrix[n2 + NODE_Y];
+      xDist = NodeMatrix[n + NODE_X];
+      yDist = NodeMatrix[n + NODE_Y];
       distance = Math.sqrt(Math.pow(xDist, 2) + Math.pow(yDist, 2));
       if (options.strongGravityMode) {
         if (distance > 0)
-          factor = coefficient * NodeMatrix[n2 + NODE_MASS] * g2;
+          factor = coefficient * NodeMatrix[n + NODE_MASS] * g;
       } else {
         if (distance > 0)
-          factor = coefficient * NodeMatrix[n2 + NODE_MASS] * g2 / distance;
+          factor = coefficient * NodeMatrix[n + NODE_MASS] * g / distance;
       }
-      NodeMatrix[n2 + NODE_DX] -= xDist * factor;
-      NodeMatrix[n2 + NODE_DY] -= yDist * factor;
+      NodeMatrix[n + NODE_DX] -= xDist * factor;
+      NodeMatrix[n + NODE_DY] -= yDist * factor;
     }
     coefficient = 1 * (options.outboundAttractionDistribution ? outboundAttCompensation : 1);
-    for (e3 = 0;e3 < size; e3 += PPE) {
-      n1 = EdgeMatrix[e3 + EDGE_SOURCE];
-      n22 = EdgeMatrix[e3 + EDGE_TARGET];
-      w2 = EdgeMatrix[e3 + EDGE_WEIGHT];
-      ewc = Math.pow(w2, options.edgeWeightInfluence);
-      xDist = NodeMatrix[n1 + NODE_X] - NodeMatrix[n22 + NODE_X];
-      yDist = NodeMatrix[n1 + NODE_Y] - NodeMatrix[n22 + NODE_Y];
+    for (e = 0;e < size; e += PPE) {
+      n1 = EdgeMatrix[e + EDGE_SOURCE];
+      n2 = EdgeMatrix[e + EDGE_TARGET];
+      w = EdgeMatrix[e + EDGE_WEIGHT];
+      ewc = Math.pow(w, options.edgeWeightInfluence);
+      xDist = NodeMatrix[n1 + NODE_X] - NodeMatrix[n2 + NODE_X];
+      yDist = NodeMatrix[n1 + NODE_Y] - NodeMatrix[n2 + NODE_Y];
       if (adjustSizes === true) {
-        distance = Math.sqrt(xDist * xDist + yDist * yDist) - NodeMatrix[n1 + NODE_SIZE] - NodeMatrix[n22 + NODE_SIZE];
+        distance = Math.sqrt(xDist * xDist + yDist * yDist) - NodeMatrix[n1 + NODE_SIZE] - NodeMatrix[n2 + NODE_SIZE];
         if (options.linLogMode) {
           if (options.outboundAttractionDistribution) {
             if (distance > 0) {
@@ -509,39 +509,39 @@ var require_iterate = __commonJS(function(exports, module) {
       if (distance > 0) {
         NodeMatrix[n1 + NODE_DX] += xDist * factor;
         NodeMatrix[n1 + NODE_DY] += yDist * factor;
-        NodeMatrix[n22 + NODE_DX] -= xDist * factor;
-        NodeMatrix[n22 + NODE_DY] -= yDist * factor;
+        NodeMatrix[n2 + NODE_DX] -= xDist * factor;
+        NodeMatrix[n2 + NODE_DY] -= yDist * factor;
       }
     }
     var force, swinging, traction, nodespeed, newX, newY;
     if (adjustSizes === true) {
-      for (n2 = 0;n2 < order; n2 += PPN) {
-        if (NodeMatrix[n2 + NODE_FIXED] !== 1) {
-          force = Math.sqrt(Math.pow(NodeMatrix[n2 + NODE_DX], 2) + Math.pow(NodeMatrix[n2 + NODE_DY], 2));
+      for (n = 0;n < order; n += PPN) {
+        if (NodeMatrix[n + NODE_FIXED] !== 1) {
+          force = Math.sqrt(Math.pow(NodeMatrix[n + NODE_DX], 2) + Math.pow(NodeMatrix[n + NODE_DY], 2));
           if (force > MAX_FORCE) {
-            NodeMatrix[n2 + NODE_DX] = NodeMatrix[n2 + NODE_DX] * MAX_FORCE / force;
-            NodeMatrix[n2 + NODE_DY] = NodeMatrix[n2 + NODE_DY] * MAX_FORCE / force;
+            NodeMatrix[n + NODE_DX] = NodeMatrix[n + NODE_DX] * MAX_FORCE / force;
+            NodeMatrix[n + NODE_DY] = NodeMatrix[n + NODE_DY] * MAX_FORCE / force;
           }
-          swinging = NodeMatrix[n2 + NODE_MASS] * Math.sqrt((NodeMatrix[n2 + NODE_OLD_DX] - NodeMatrix[n2 + NODE_DX]) * (NodeMatrix[n2 + NODE_OLD_DX] - NodeMatrix[n2 + NODE_DX]) + (NodeMatrix[n2 + NODE_OLD_DY] - NodeMatrix[n2 + NODE_DY]) * (NodeMatrix[n2 + NODE_OLD_DY] - NodeMatrix[n2 + NODE_DY]));
-          traction = Math.sqrt((NodeMatrix[n2 + NODE_OLD_DX] + NodeMatrix[n2 + NODE_DX]) * (NodeMatrix[n2 + NODE_OLD_DX] + NodeMatrix[n2 + NODE_DX]) + (NodeMatrix[n2 + NODE_OLD_DY] + NodeMatrix[n2 + NODE_DY]) * (NodeMatrix[n2 + NODE_OLD_DY] + NodeMatrix[n2 + NODE_DY])) / 2;
+          swinging = NodeMatrix[n + NODE_MASS] * Math.sqrt((NodeMatrix[n + NODE_OLD_DX] - NodeMatrix[n + NODE_DX]) * (NodeMatrix[n + NODE_OLD_DX] - NodeMatrix[n + NODE_DX]) + (NodeMatrix[n + NODE_OLD_DY] - NodeMatrix[n + NODE_DY]) * (NodeMatrix[n + NODE_OLD_DY] - NodeMatrix[n + NODE_DY]));
+          traction = Math.sqrt((NodeMatrix[n + NODE_OLD_DX] + NodeMatrix[n + NODE_DX]) * (NodeMatrix[n + NODE_OLD_DX] + NodeMatrix[n + NODE_DX]) + (NodeMatrix[n + NODE_OLD_DY] + NodeMatrix[n + NODE_DY]) * (NodeMatrix[n + NODE_OLD_DY] + NodeMatrix[n + NODE_DY])) / 2;
           nodespeed = 0.1 * Math.log(1 + traction) / (1 + Math.sqrt(swinging));
-          newX = NodeMatrix[n2 + NODE_X] + NodeMatrix[n2 + NODE_DX] * (nodespeed / options.slowDown);
-          NodeMatrix[n2 + NODE_X] = newX;
-          newY = NodeMatrix[n2 + NODE_Y] + NodeMatrix[n2 + NODE_DY] * (nodespeed / options.slowDown);
-          NodeMatrix[n2 + NODE_Y] = newY;
+          newX = NodeMatrix[n + NODE_X] + NodeMatrix[n + NODE_DX] * (nodespeed / options.slowDown);
+          NodeMatrix[n + NODE_X] = newX;
+          newY = NodeMatrix[n + NODE_Y] + NodeMatrix[n + NODE_DY] * (nodespeed / options.slowDown);
+          NodeMatrix[n + NODE_Y] = newY;
         }
       }
     } else {
-      for (n2 = 0;n2 < order; n2 += PPN) {
-        if (NodeMatrix[n2 + NODE_FIXED] !== 1) {
-          swinging = NodeMatrix[n2 + NODE_MASS] * Math.sqrt((NodeMatrix[n2 + NODE_OLD_DX] - NodeMatrix[n2 + NODE_DX]) * (NodeMatrix[n2 + NODE_OLD_DX] - NodeMatrix[n2 + NODE_DX]) + (NodeMatrix[n2 + NODE_OLD_DY] - NodeMatrix[n2 + NODE_DY]) * (NodeMatrix[n2 + NODE_OLD_DY] - NodeMatrix[n2 + NODE_DY]));
-          traction = Math.sqrt((NodeMatrix[n2 + NODE_OLD_DX] + NodeMatrix[n2 + NODE_DX]) * (NodeMatrix[n2 + NODE_OLD_DX] + NodeMatrix[n2 + NODE_DX]) + (NodeMatrix[n2 + NODE_OLD_DY] + NodeMatrix[n2 + NODE_DY]) * (NodeMatrix[n2 + NODE_OLD_DY] + NodeMatrix[n2 + NODE_DY])) / 2;
-          nodespeed = NodeMatrix[n2 + NODE_CONVERGENCE] * Math.log(1 + traction) / (1 + Math.sqrt(swinging));
-          NodeMatrix[n2 + NODE_CONVERGENCE] = Math.min(1, Math.sqrt(nodespeed * (Math.pow(NodeMatrix[n2 + NODE_DX], 2) + Math.pow(NodeMatrix[n2 + NODE_DY], 2)) / (1 + Math.sqrt(swinging))));
-          newX = NodeMatrix[n2 + NODE_X] + NodeMatrix[n2 + NODE_DX] * (nodespeed / options.slowDown);
-          NodeMatrix[n2 + NODE_X] = newX;
-          newY = NodeMatrix[n2 + NODE_Y] + NodeMatrix[n2 + NODE_DY] * (nodespeed / options.slowDown);
-          NodeMatrix[n2 + NODE_Y] = newY;
+      for (n = 0;n < order; n += PPN) {
+        if (NodeMatrix[n + NODE_FIXED] !== 1) {
+          swinging = NodeMatrix[n + NODE_MASS] * Math.sqrt((NodeMatrix[n + NODE_OLD_DX] - NodeMatrix[n + NODE_DX]) * (NodeMatrix[n + NODE_OLD_DX] - NodeMatrix[n + NODE_DX]) + (NodeMatrix[n + NODE_OLD_DY] - NodeMatrix[n + NODE_DY]) * (NodeMatrix[n + NODE_OLD_DY] - NodeMatrix[n + NODE_DY]));
+          traction = Math.sqrt((NodeMatrix[n + NODE_OLD_DX] + NodeMatrix[n + NODE_DX]) * (NodeMatrix[n + NODE_OLD_DX] + NodeMatrix[n + NODE_DX]) + (NodeMatrix[n + NODE_OLD_DY] + NodeMatrix[n + NODE_DY]) * (NodeMatrix[n + NODE_OLD_DY] + NodeMatrix[n + NODE_DY])) / 2;
+          nodespeed = NodeMatrix[n + NODE_CONVERGENCE] * Math.log(1 + traction) / (1 + Math.sqrt(swinging));
+          NodeMatrix[n + NODE_CONVERGENCE] = Math.min(1, Math.sqrt(nodespeed * (Math.pow(NodeMatrix[n + NODE_DX], 2) + Math.pow(NodeMatrix[n + NODE_DY], 2)) / (1 + Math.sqrt(swinging))));
+          newX = NodeMatrix[n + NODE_X] + NodeMatrix[n + NODE_DX] * (nodespeed / options.slowDown);
+          NodeMatrix[n + NODE_X] = newX;
+          newY = NodeMatrix[n + NODE_Y] + NodeMatrix[n + NODE_DY] * (nodespeed / options.slowDown);
+          NodeMatrix[n + NODE_Y] = newY;
         }
       }
     }
@@ -555,12 +555,12 @@ var require_helpers = __commonJS(function(exports) {
   var PPE = 3;
   exports.assign = function(target) {
     target = target || {};
-    var objects = Array.prototype.slice.call(arguments).slice(1), i3, k2, l2;
-    for (i3 = 0, l2 = objects.length;i3 < l2; i3++) {
-      if (!objects[i3])
+    var objects = Array.prototype.slice.call(arguments).slice(1), i, k, l;
+    for (i = 0, l = objects.length;i < l; i++) {
+      if (!objects[i])
         continue;
-      for (k2 in objects[i3])
-        target[k2] = objects[i3][k2];
+      for (k in objects[i])
+        target[k] = objects[i][k];
     }
     return target;
   };
@@ -595,35 +595,35 @@ var require_helpers = __commonJS(function(exports) {
     var order = graph.order;
     var size = graph.size;
     var index = {};
-    var j2;
+    var j;
     var NodeMatrix = new Float32Array(order * PPN);
     var EdgeMatrix = new Float32Array(size * PPE);
-    j2 = 0;
+    j = 0;
     graph.forEachNode(function(node, attr) {
-      index[node] = j2;
-      NodeMatrix[j2] = attr.x;
-      NodeMatrix[j2 + 1] = attr.y;
-      NodeMatrix[j2 + 2] = 0;
-      NodeMatrix[j2 + 3] = 0;
-      NodeMatrix[j2 + 4] = 0;
-      NodeMatrix[j2 + 5] = 0;
-      NodeMatrix[j2 + 6] = 1;
-      NodeMatrix[j2 + 7] = 1;
-      NodeMatrix[j2 + 8] = attr.size || 1;
-      NodeMatrix[j2 + 9] = attr.fixed ? 1 : 0;
-      j2 += PPN;
+      index[node] = j;
+      NodeMatrix[j] = attr.x;
+      NodeMatrix[j + 1] = attr.y;
+      NodeMatrix[j + 2] = 0;
+      NodeMatrix[j + 3] = 0;
+      NodeMatrix[j + 4] = 0;
+      NodeMatrix[j + 5] = 0;
+      NodeMatrix[j + 6] = 1;
+      NodeMatrix[j + 7] = 1;
+      NodeMatrix[j + 8] = attr.size || 1;
+      NodeMatrix[j + 9] = attr.fixed ? 1 : 0;
+      j += PPN;
     });
-    j2 = 0;
-    graph.forEachEdge(function(edge, attr, source, target, sa, ta, u2) {
+    j = 0;
+    graph.forEachEdge(function(edge, attr, source, target, sa, ta, u) {
       var sj = index[source];
       var tj = index[target];
-      var weight = getEdgeWeight(edge, attr, source, target, sa, ta, u2);
+      var weight = getEdgeWeight(edge, attr, source, target, sa, ta, u);
       NodeMatrix[sj + 6] += weight;
       NodeMatrix[tj + 6] += weight;
-      EdgeMatrix[j2] = sj;
-      EdgeMatrix[j2 + 1] = tj;
-      EdgeMatrix[j2 + 2] = weight;
-      j2 += PPE;
+      EdgeMatrix[j] = sj;
+      EdgeMatrix[j + 1] = tj;
+      EdgeMatrix[j + 2] = weight;
+      j += PPE;
     });
     return {
       nodes: NodeMatrix,
@@ -631,41 +631,41 @@ var require_helpers = __commonJS(function(exports) {
     };
   };
   exports.assignLayoutChanges = function(graph, NodeMatrix, outputReducer) {
-    var i3 = 0;
+    var i = 0;
     graph.updateEachNodeAttributes(function(node, attr) {
-      attr.x = NodeMatrix[i3];
-      attr.y = NodeMatrix[i3 + 1];
-      i3 += PPN;
+      attr.x = NodeMatrix[i];
+      attr.y = NodeMatrix[i + 1];
+      i += PPN;
       return outputReducer ? outputReducer(node, attr) : attr;
     });
   };
   exports.readGraphPositions = function(graph, NodeMatrix) {
-    var i3 = 0;
+    var i = 0;
     graph.forEachNode(function(node, attr) {
-      NodeMatrix[i3] = attr.x;
-      NodeMatrix[i3 + 1] = attr.y;
-      i3 += PPN;
+      NodeMatrix[i] = attr.x;
+      NodeMatrix[i + 1] = attr.y;
+      i += PPN;
     });
   };
   exports.collectLayoutChanges = function(graph, NodeMatrix, outputReducer) {
     var nodes = graph.nodes(), positions = {};
-    for (var i3 = 0, j2 = 0, l2 = NodeMatrix.length;i3 < l2; i3 += PPN) {
+    for (var i = 0, j = 0, l = NodeMatrix.length;i < l; i += PPN) {
       if (outputReducer) {
-        var newAttr = Object.assign({}, graph.getNodeAttributes(nodes[j2]));
-        newAttr.x = NodeMatrix[i3];
-        newAttr.y = NodeMatrix[i3 + 1];
-        newAttr = outputReducer(nodes[j2], newAttr);
-        positions[nodes[j2]] = {
+        var newAttr = Object.assign({}, graph.getNodeAttributes(nodes[j]));
+        newAttr.x = NodeMatrix[i];
+        newAttr.y = NodeMatrix[i + 1];
+        newAttr = outputReducer(nodes[j], newAttr);
+        positions[nodes[j]] = {
           x: newAttr.x,
           y: newAttr.y
         };
       } else {
-        positions[nodes[j2]] = {
-          x: NodeMatrix[i3],
-          y: NodeMatrix[i3 + 1]
+        positions[nodes[j]] = {
+          x: NodeMatrix[i],
+          y: NodeMatrix[i + 1]
         };
       }
-      j2++;
+      j++;
     }
     return positions;
   };
@@ -697,13 +697,13 @@ var require_defaults = __commonJS(function(exports, module) {
 
 // node_modules/graphology-layout-forceatlas2/index.js
 var require_graphology_layout_forceatlas2 = __commonJS(function(exports, module) {
-  var isGraph2 = require_is_graph();
+  var isGraph = require_is_graph();
   var createEdgeWeightGetter = require_getters().createEdgeWeightGetter;
   var iterate = require_iterate();
   var helpers = require_helpers();
-  var DEFAULT_SETTINGS2 = require_defaults();
-  function abstractSynchronousLayout(assign3, graph, params) {
-    if (!isGraph2(graph))
+  var DEFAULT_SETTINGS = require_defaults();
+  function abstractSynchronousLayout(assign, graph, params) {
+    if (!isGraph(graph))
       throw new Error("graphology-layout-forceatlas2: the given graph is not a valid graphology instance.");
     if (typeof params === "number")
       params = { iterations: params };
@@ -714,15 +714,15 @@ var require_graphology_layout_forceatlas2 = __commonJS(function(exports, module)
       throw new Error("graphology-layout-forceatlas2: you should provide a positive number of iterations.");
     var getEdgeWeight = createEdgeWeightGetter("getEdgeWeight" in params ? params.getEdgeWeight : "weight").fromEntry;
     var outputReducer = typeof params.outputReducer === "function" ? params.outputReducer : null;
-    var settings = helpers.assign({}, DEFAULT_SETTINGS2, params.settings);
+    var settings = helpers.assign({}, DEFAULT_SETTINGS, params.settings);
     var validationError = helpers.validateSettings(settings);
     if (validationError)
       throw new Error("graphology-layout-forceatlas2: " + validationError.message);
     var matrices = helpers.graphToByteArrays(graph, getEdgeWeight);
-    var i3;
-    for (i3 = 0;i3 < iterations; i3++)
+    var i;
+    for (i = 0;i < iterations; i++)
       iterate(settings, matrices.nodes, matrices.edges);
-    if (assign3) {
+    if (assign) {
       helpers.assignLayoutChanges(graph, matrices.nodes, outputReducer);
       return;
     }
@@ -990,25 +990,26 @@ function once2(emitter, type, options) {
   var signal = options?.signal;
   if (validateAbortSignal(signal, "options.signal"), signal?.aborted)
     throw new AbortError(undefined, { cause: signal?.reason });
-  let { resolve, reject, promise } = $newPromiseCapability(Promise), errorListener = (err) => {
-    if (emitter.removeListener(type, resolver), signal != null)
-      eventTargetAgnosticRemoveListener(signal, "abort", abortListener);
-    reject(err);
-  }, resolver = (...args) => {
-    if (typeof emitter.removeListener === "function")
-      emitter.removeListener("error", errorListener);
+  return new Promise((resolve, reject) => {
+    let errorListener = (err) => {
+      if (emitter.removeListener(type, resolver), signal != null)
+        eventTargetAgnosticRemoveListener(signal, "abort", abortListener);
+      reject(err);
+    }, resolver = (...args) => {
+      if (typeof emitter.removeListener === "function")
+        emitter.removeListener("error", errorListener);
+      if (signal != null)
+        eventTargetAgnosticRemoveListener(signal, "abort", abortListener);
+      resolve(args);
+    };
+    if (eventTargetAgnosticAddListener(emitter, type, resolver, { once: true }), type !== "error" && typeof emitter.once === "function")
+      emitter.once("error", errorListener);
+    function abortListener() {
+      eventTargetAgnosticRemoveListener(emitter, type, resolver), eventTargetAgnosticRemoveListener(emitter, "error", errorListener), reject(new AbortError(undefined, { cause: signal?.reason }));
+    }
     if (signal != null)
-      eventTargetAgnosticRemoveListener(signal, "abort", abortListener);
-    resolve(args);
-  };
-  if (eventTargetAgnosticAddListener(emitter, type, resolver, { once: true }), type !== "error" && typeof emitter.once === "function")
-    emitter.once("error", errorListener);
-  function abortListener() {
-    eventTargetAgnosticRemoveListener(emitter, type, resolver), eventTargetAgnosticRemoveListener(emitter, "error", errorListener), reject(new AbortError(undefined, { cause: signal?.reason }));
-  }
-  if (signal != null)
-    eventTargetAgnosticAddListener(signal, "abort", abortListener, { once: true });
-  return promise;
+      eventTargetAgnosticAddListener(signal, "abort", abortListener, { once: true });
+  });
 }
 function getEventListeners(emitter, type) {
   return emitter.listeners(type);
@@ -4210,14 +4211,14 @@ function _createClass(e, r, t) {
   }), e;
 }
 function _getPrototypeOf(t) {
-  return _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function(t2) {
-    return t2.__proto__ || Object.getPrototypeOf(t2);
+  return _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function(t) {
+    return t.__proto__ || Object.getPrototypeOf(t);
   }, _getPrototypeOf(t);
 }
 function _isNativeReflectConstruct() {
   try {
     var t = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function() {}));
-  } catch (t2) {}
+  } catch (t) {}
   return (_isNativeReflectConstruct = function() {
     return !!t;
   })();
@@ -4238,8 +4239,8 @@ function _callSuper(t, o, e) {
   return o = _getPrototypeOf(o), _possibleConstructorReturn(t, _isNativeReflectConstruct() ? Reflect.construct(o, e || [], _getPrototypeOf(t).constructor) : o.apply(t, e));
 }
 function _setPrototypeOf(t, e) {
-  return _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function(t2, e2) {
-    return t2.__proto__ = e2, t2;
+  return _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function(t, e) {
+    return t.__proto__ = e, t;
   }, _setPrototypeOf(t, e);
 }
 function _inherits(t, e) {
@@ -4273,8 +4274,8 @@ function _iterableToArrayLimit(r, l) {
       } else
         for (;!(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = true)
           ;
-    } catch (r2) {
-      o = true, n = r2;
+    } catch (r) {
+      o = true, n = r;
     } finally {
       try {
         if (!f && t.return != null && (u = t.return(), Object(u) !== u))
@@ -4560,8 +4561,8 @@ function ownKeys(e, r) {
   var t = Object.keys(e);
   if (Object.getOwnPropertySymbols) {
     var o = Object.getOwnPropertySymbols(e);
-    r && (o = o.filter(function(r2) {
-      return Object.getOwnPropertyDescriptor(e, r2).enumerable;
+    r && (o = o.filter(function(r) {
+      return Object.getOwnPropertyDescriptor(e, r).enumerable;
     })), t.push.apply(t, o);
   }
   return t;
@@ -4569,10 +4570,10 @@ function ownKeys(e, r) {
 function _objectSpread2(e) {
   for (var r = 1;r < arguments.length; r++) {
     var t = arguments[r] != null ? arguments[r] : {};
-    r % 2 ? ownKeys(Object(t), true).forEach(function(r2) {
-      _defineProperty(e, r2, t[r2]);
-    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function(r2) {
-      Object.defineProperty(e, r2, Object.getOwnPropertyDescriptor(t, r2));
+    r % 2 ? ownKeys(Object(t), true).forEach(function(r) {
+      _defineProperty(e, r, t[r]);
+    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function(r) {
+      Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
     });
   }
   return e;
@@ -4593,8 +4594,8 @@ function _get() {
 }
 function _superPropGet(t, o, e, r) {
   var p = _get(_getPrototypeOf(1 & r ? t.prototype : t), o, e);
-  return 2 & r && typeof p == "function" ? function(t2) {
-    return p.apply(e, t2);
+  return 2 & r && typeof p == "function" ? function(t) {
+    return p.apply(e, t);
   } : p;
 }
 function getAttributeItemsCount(attr) {
@@ -4659,8 +4660,8 @@ var PICKING_PREFIX = `#define PICKING_MODE
 `;
 var SIZE_FACTOR_PER_ATTRIBUTE_TYPE = _defineProperty(_defineProperty(_defineProperty(_defineProperty(_defineProperty(_defineProperty(_defineProperty(_defineProperty({}, WebGL2RenderingContext.BOOL, 1), WebGL2RenderingContext.BYTE, 1), WebGL2RenderingContext.UNSIGNED_BYTE, 1), WebGL2RenderingContext.SHORT, 2), WebGL2RenderingContext.UNSIGNED_SHORT, 2), WebGL2RenderingContext.INT, 4), WebGL2RenderingContext.UNSIGNED_INT, 4), WebGL2RenderingContext.FLOAT, 4);
 var Program = /* @__PURE__ */ function() {
-  function Program2(gl, pickingBuffer, renderer) {
-    _classCallCheck(this, Program2);
+  function Program(gl, pickingBuffer, renderer) {
+    _classCallCheck(this, Program);
     _defineProperty(this, "array", new Float32Array);
     _defineProperty(this, "constantArray", new Float32Array);
     _defineProperty(this, "capacity", 0);
@@ -4695,7 +4696,7 @@ var Program = /* @__PURE__ */ function() {
       this.STRIDE = this.ATTRIBUTES_ITEMS_COUNT;
     }
   }
-  return _createClass(Program2, [{
+  return _createClass(Program, [{
     key: "kill",
     value: function kill() {
       killProgram(this.normalProgram);
@@ -4896,15 +4897,15 @@ var Program = /* @__PURE__ */ function() {
   }]);
 }();
 var NodeProgram = /* @__PURE__ */ function(_ref) {
-  function NodeProgram2() {
-    _classCallCheck(this, NodeProgram2);
-    return _callSuper(this, NodeProgram2, arguments);
+  function NodeProgram() {
+    _classCallCheck(this, NodeProgram);
+    return _callSuper(this, NodeProgram, arguments);
   }
-  _inherits(NodeProgram2, _ref);
-  return _createClass(NodeProgram2, [{
+  _inherits(NodeProgram, _ref);
+  return _createClass(NodeProgram, [{
     key: "kill",
     value: function kill() {
-      _superPropGet(NodeProgram2, "kill", this, 3)([]);
+      _superPropGet(NodeProgram, "kill", this, 3)([]);
     }
   }, {
     key: "process",
@@ -4921,21 +4922,21 @@ var NodeProgram = /* @__PURE__ */ function(_ref) {
   }]);
 }(Program);
 var EdgeProgram = /* @__PURE__ */ function(_ref) {
-  function EdgeProgram2() {
+  function EdgeProgram() {
     var _this;
-    _classCallCheck(this, EdgeProgram2);
+    _classCallCheck(this, EdgeProgram);
     for (var _len = arguments.length, args = new Array(_len), _key = 0;_key < _len; _key++) {
       args[_key] = arguments[_key];
     }
-    _this = _callSuper(this, EdgeProgram2, [].concat(args));
+    _this = _callSuper(this, EdgeProgram, [].concat(args));
     _defineProperty(_this, "drawLabel", undefined);
     return _this;
   }
-  _inherits(EdgeProgram2, _ref);
-  return _createClass(EdgeProgram2, [{
+  _inherits(EdgeProgram, _ref);
+  return _createClass(EdgeProgram, [{
     key: "kill",
     value: function kill() {
-      _superPropGet(EdgeProgram2, "kill", this, 3)([]);
+      _superPropGet(EdgeProgram, "kill", this, 3)([]);
     }
   }, {
     key: "process",
@@ -4956,8 +4957,8 @@ function createEdgeCompoundProgram(programClasses, drawLabel) {
     function EdgeCompoundProgram(gl, pickingBuffer, renderer) {
       _classCallCheck(this, EdgeCompoundProgram);
       _defineProperty(this, "drawLabel", drawLabel);
-      this.programs = programClasses.map(function(Program2) {
-        return new Program2(gl, pickingBuffer, renderer);
+      this.programs = programClasses.map(function(Program) {
+        return new Program(gl, pickingBuffer, renderer);
       });
     }
     return _createClass(EdgeCompoundProgram, [{
@@ -5172,12 +5173,12 @@ var UNSIGNED_BYTE$3 = _WebGLRenderingContex$3.UNSIGNED_BYTE;
 var FLOAT$3 = _WebGLRenderingContex$3.FLOAT;
 var UNIFORMS$3 = ["u_sizeRatio", "u_correctionRatio", "u_matrix"];
 var NodeCircleProgram = /* @__PURE__ */ function(_NodeProgram) {
-  function NodeCircleProgram2() {
-    _classCallCheck(this, NodeCircleProgram2);
-    return _callSuper(this, NodeCircleProgram2, arguments);
+  function NodeCircleProgram() {
+    _classCallCheck(this, NodeCircleProgram);
+    return _callSuper(this, NodeCircleProgram, arguments);
   }
-  _inherits(NodeCircleProgram2, _NodeProgram);
-  return _createClass(NodeCircleProgram2, [{
+  _inherits(NodeCircleProgram, _NodeProgram);
+  return _createClass(NodeCircleProgram, [{
     key: "getDefinition",
     value: function getDefinition() {
       return {
@@ -5210,7 +5211,7 @@ var NodeCircleProgram = /* @__PURE__ */ function(_NodeProgram) {
           size: 1,
           type: FLOAT$3
         }],
-        CONSTANT_DATA: [[NodeCircleProgram2.ANGLE_1], [NodeCircleProgram2.ANGLE_2], [NodeCircleProgram2.ANGLE_3]]
+        CONSTANT_DATA: [[NodeCircleProgram.ANGLE_1], [NodeCircleProgram.ANGLE_2], [NodeCircleProgram.ANGLE_3]]
       };
     }
   }, {
@@ -5718,12 +5719,12 @@ var UNSIGNED_BYTE = _WebGLRenderingContex.UNSIGNED_BYTE;
 var FLOAT = _WebGLRenderingContex.FLOAT;
 var UNIFORMS = ["u_matrix", "u_zoomRatio", "u_sizeRatio", "u_correctionRatio", "u_pixelRatio", "u_feather", "u_minEdgeThickness"];
 var EdgeRectangleProgram = /* @__PURE__ */ function(_EdgeProgram) {
-  function EdgeRectangleProgram2() {
-    _classCallCheck(this, EdgeRectangleProgram2);
-    return _callSuper(this, EdgeRectangleProgram2, arguments);
+  function EdgeRectangleProgram() {
+    _classCallCheck(this, EdgeRectangleProgram);
+    return _callSuper(this, EdgeRectangleProgram, arguments);
   }
-  _inherits(EdgeRectangleProgram2, _EdgeProgram);
-  return _createClass(EdgeRectangleProgram2, [{
+  _inherits(EdgeRectangleProgram, _EdgeProgram);
+  return _createClass(EdgeRectangleProgram, [{
     key: "getDefinition",
     value: function getDefinition() {
       return {
@@ -5817,40 +5818,40 @@ var EdgeRectangleProgram = /* @__PURE__ */ function(_EdgeProgram) {
 
 // node_modules/sigma/types/dist/sigma-types.esm.js
 var TypedEventEmitter = /* @__PURE__ */ function(_ref) {
-  function TypedEventEmitter2() {
+  function TypedEventEmitter() {
     var _this;
-    _classCallCheck(this, TypedEventEmitter2);
-    _this = _callSuper(this, TypedEventEmitter2);
+    _classCallCheck(this, TypedEventEmitter);
+    _this = _callSuper(this, TypedEventEmitter);
     _this.rawEmitter = _this;
     return _this;
   }
-  _inherits(TypedEventEmitter2, _ref);
-  return _createClass(TypedEventEmitter2);
+  _inherits(TypedEventEmitter, _ref);
+  return _createClass(TypedEventEmitter);
 }(EventEmitter);
 
 // node_modules/sigma/dist/normalization-be445518.esm.js
-var import_is_graph = __toESM(require_is_graph(), 1);
-var linear = function linear2(k) {
+var import_is_graph = __toESM(require_is_graph());
+var linear = function linear(k) {
   return k;
 };
-var quadraticIn = function quadraticIn2(k) {
+var quadraticIn = function quadraticIn(k) {
   return k * k;
 };
-var quadraticOut = function quadraticOut2(k) {
+var quadraticOut = function quadraticOut(k) {
   return k * (2 - k);
 };
-var quadraticInOut = function quadraticInOut2(k) {
+var quadraticInOut = function quadraticInOut(k) {
   if ((k *= 2) < 1)
     return 0.5 * k * k;
   return -0.5 * (--k * (k - 2) - 1);
 };
-var cubicIn = function cubicIn2(k) {
+var cubicIn = function cubicIn(k) {
   return k * k * k;
 };
-var cubicOut = function cubicOut2(k) {
+var cubicOut = function cubicOut(k) {
   return --k * k * k + 1;
 };
-var cubicInOut = function cubicInOut2(k) {
+var cubicInOut = function cubicInOut(k) {
   if ((k *= 2) < 1)
     return 0.5 * k * k * k;
   return 0.5 * ((k -= 2) * k * k + 2);
@@ -5953,7 +5954,7 @@ function getMatrixImpact(matrix, cameraState, viewportDimensions) {
   var _multiplyVec = multiplyVec2(matrix, {
     x: Math.cos(cameraState.angle),
     y: Math.sin(cameraState.angle)
-  }, 0), x = _multiplyVec.x, y = _multiplyVec.y;
+  }, 0), { x, y } = _multiplyVec;
   return 1 / Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)) / viewportDimensions.width;
 }
 function graphExtent(graph) {
@@ -6029,7 +6030,7 @@ function createNormalizationFunction(extent) {
     dX = 0;
   if (isNaN(dY))
     dY = 0;
-  var fn = function fn2(data) {
+  var fn = function fn(data) {
     return {
       x: 0.5 + (data.x - dX) / ratio,
       y: 0.5 + (data.y - dY) / ratio
@@ -6052,10 +6053,10 @@ function createNormalizationFunction(extent) {
 // node_modules/sigma/dist/data-11df7124.esm.js
 function _typeof(o) {
   "@babel/helpers - typeof";
-  return _typeof = typeof Symbol == "function" && typeof Symbol.iterator == "symbol" ? function(o2) {
-    return typeof o2;
-  } : function(o2) {
-    return o2 && typeof Symbol == "function" && o2.constructor === Symbol && o2 !== Symbol.prototype ? "symbol" : typeof o2;
+  return _typeof = typeof Symbol == "function" && typeof Symbol.iterator == "symbol" ? function(o) {
+    return typeof o;
+  } : function(o) {
+    return o && typeof Symbol == "function" && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o;
   }, _typeof(o);
 }
 function extend(array, values) {
@@ -6165,13 +6166,13 @@ function resolveSettings(settings) {
 }
 
 // node_modules/sigma/dist/sigma.esm.js
-var import_is_graph2 = __toESM(require_is_graph(), 1);
+var import_is_graph2 = __toESM(require_is_graph());
 var DEFAULT_ZOOMING_RATIO = 1.5;
 var Camera = /* @__PURE__ */ function(_TypedEventEmitter) {
-  function Camera2() {
+  function Camera() {
     var _this;
-    _classCallCheck(this, Camera2);
-    _this = _callSuper(this, Camera2);
+    _classCallCheck(this, Camera);
+    _this = _callSuper(this, Camera);
     _defineProperty(_this, "x", 0.5);
     _defineProperty(_this, "y", 0.5);
     _defineProperty(_this, "angle", 0);
@@ -6188,8 +6189,8 @@ var Camera = /* @__PURE__ */ function(_TypedEventEmitter) {
     _this.previousState = _this.getState();
     return _this;
   }
-  _inherits(Camera2, _TypedEventEmitter);
-  return _createClass(Camera2, [{
+  _inherits(Camera, _TypedEventEmitter);
+  return _createClass(Camera, [{
     key: "enable",
     value: function enable() {
       this.enabled = true;
@@ -6376,12 +6377,12 @@ var Camera = /* @__PURE__ */ function(_TypedEventEmitter) {
   }, {
     key: "copy",
     value: function copy() {
-      return Camera2.from(this.getState());
+      return Camera.from(this.getState());
     }
   }], [{
     key: "from",
     value: function from(state) {
-      var camera = new Camera2;
+      var camera = new Camera;
       return camera.setState(state);
     }
   }]);
@@ -6450,26 +6451,26 @@ function getWheelDelta(e) {
   throw new Error("Captor: could not extract delta from event.");
 }
 var Captor = /* @__PURE__ */ function(_TypedEventEmitter) {
-  function Captor2(container, renderer) {
+  function Captor(container, renderer) {
     var _this;
-    _classCallCheck(this, Captor2);
-    _this = _callSuper(this, Captor2);
+    _classCallCheck(this, Captor);
+    _this = _callSuper(this, Captor);
     _this.container = container;
     _this.renderer = renderer;
     return _this;
   }
-  _inherits(Captor2, _TypedEventEmitter);
-  return _createClass(Captor2);
+  _inherits(Captor, _TypedEventEmitter);
+  return _createClass(Captor);
 }(TypedEventEmitter);
 var MOUSE_SETTINGS_KEYS = ["doubleClickTimeout", "doubleClickZoomingDuration", "doubleClickZoomingRatio", "dragTimeout", "draggedEventsTolerance", "inertiaDuration", "inertiaRatio", "zoomDuration", "zoomingRatio"];
 var DEFAULT_MOUSE_SETTINGS = MOUSE_SETTINGS_KEYS.reduce(function(iter, key) {
   return _objectSpread2(_objectSpread2({}, iter), {}, _defineProperty({}, key, DEFAULT_SETTINGS[key]));
 }, {});
 var MouseCaptor = /* @__PURE__ */ function(_Captor) {
-  function MouseCaptor2(container, renderer) {
+  function MouseCaptor(container, renderer) {
     var _this;
-    _classCallCheck(this, MouseCaptor2);
-    _this = _callSuper(this, MouseCaptor2, [container, renderer]);
+    _classCallCheck(this, MouseCaptor);
+    _this = _callSuper(this, MouseCaptor, [container, renderer]);
     _defineProperty(_this, "enabled", true);
     _defineProperty(_this, "draggedEvents", 0);
     _defineProperty(_this, "downStartTime", null);
@@ -6517,8 +6518,8 @@ var MouseCaptor = /* @__PURE__ */ function(_Captor) {
     });
     return _this;
   }
-  _inherits(MouseCaptor2, _Captor);
-  return _createClass(MouseCaptor2, [{
+  _inherits(MouseCaptor, _Captor);
+  return _createClass(MouseCaptor, [{
     key: "kill",
     value: function kill() {
       var container = this.container;
@@ -6585,7 +6586,7 @@ var MouseCaptor = /* @__PURE__ */ function(_Captor) {
         return;
       if (e.button === 0) {
         this.startCameraState = this.renderer.getCamera().getState();
-        var _getPosition = getPosition(e, this.container), x = _getPosition.x, y = _getPosition.y;
+        var _getPosition = getPosition(e, this.container), { x, y } = _getPosition;
         this.lastMouseX = x;
         this.lastMouseY = y;
         this.draggedEvents = 0;
@@ -6606,7 +6607,7 @@ var MouseCaptor = /* @__PURE__ */ function(_Captor) {
         clearTimeout(this.movingTimeout);
         this.movingTimeout = null;
       }
-      var _getPosition2 = getPosition(e, this.container), x = _getPosition2.x, y = _getPosition2.y;
+      var _getPosition2 = getPosition(e, this.container), { x, y } = _getPosition2;
       var cameraState = camera.getState(), previousCameraState = camera.getPreviousState() || {
         x: 0,
         y: 0
@@ -6658,7 +6659,7 @@ var MouseCaptor = /* @__PURE__ */ function(_Captor) {
           _this4.isMoving = false;
         }, this.settings.dragTimeout);
         var camera = this.renderer.getCamera();
-        var _getPosition3 = getPosition(e, this.container), eX = _getPosition3.x, eY = _getPosition3.y;
+        var _getPosition3 = getPosition(e, this.container), { x: eX, y: eY } = _getPosition3;
         var lastMouse = this.renderer.viewportToFramedGraph({
           x: this.lastMouseX,
           y: this.lastMouseY
@@ -6740,10 +6741,10 @@ var DEFAULT_TOUCH_SETTINGS = TOUCH_SETTINGS_KEYS.reduce(function(iter, key) {
   return _objectSpread2(_objectSpread2({}, iter), {}, _defineProperty({}, key, DEFAULT_SETTINGS[key]));
 }, {});
 var TouchCaptor = /* @__PURE__ */ function(_Captor) {
-  function TouchCaptor2(container, renderer) {
+  function TouchCaptor(container, renderer) {
     var _this;
-    _classCallCheck(this, TouchCaptor2);
-    _this = _callSuper(this, TouchCaptor2, [container, renderer]);
+    _classCallCheck(this, TouchCaptor);
+    _this = _callSuper(this, TouchCaptor, [container, renderer]);
     _defineProperty(_this, "enabled", true);
     _defineProperty(_this, "isMoving", false);
     _defineProperty(_this, "hasMoved", false);
@@ -6771,8 +6772,8 @@ var TouchCaptor = /* @__PURE__ */ function(_Captor) {
     });
     return _this;
   }
-  _inherits(TouchCaptor2, _Captor);
-  return _createClass(TouchCaptor2, [{
+  _inherits(TouchCaptor, _Captor);
+  return _createClass(TouchCaptor, [{
     key: "kill",
     value: function kill() {
       var container = this.container;
@@ -6803,7 +6804,7 @@ var TouchCaptor = /* @__PURE__ */ function(_Captor) {
         return getPosition(touch, _this2.container);
       });
       if (this.touchMode === 2) {
-        var _this$startTouchesPos = _slicedToArray(this.startTouchesPositions, 2), _this$startTouchesPos2 = _this$startTouchesPos[0], x0 = _this$startTouchesPos2.x, y0 = _this$startTouchesPos2.y, _this$startTouchesPos3 = _this$startTouchesPos[1], x1 = _this$startTouchesPos3.x, y1 = _this$startTouchesPos3.y;
+        var _this$startTouchesPos = _slicedToArray(this.startTouchesPositions, 2), _this$startTouchesPos2 = _this$startTouchesPos[0], { x: x0, y: y0 } = _this$startTouchesPos2, _this$startTouchesPos3 = _this$startTouchesPos[1], { x: x1, y: y1 } = _this$startTouchesPos3;
         this.startTouchesAngle = Math.atan2(y1 - y0, x1 - x0);
         this.startTouchesDistance = Math.sqrt(Math.pow(x1 - x0, 2) + Math.pow(y1 - y0, 2));
       }
@@ -6916,8 +6917,8 @@ var TouchCaptor = /* @__PURE__ */ function(_Captor) {
       var padding = this.renderer.getSetting("stagePadding");
       switch (this.touchMode) {
         case 1: {
-          var _this$renderer$viewpo = this.renderer.viewportToFramedGraph((this.startTouchesPositions || [])[0]), xStart = _this$renderer$viewpo.x, yStart = _this$renderer$viewpo.y;
-          var _this$renderer$viewpo2 = this.renderer.viewportToFramedGraph(touchesPositions[0]), x = _this$renderer$viewpo2.x, y = _this$renderer$viewpo2.y;
+          var _this$renderer$viewpo = this.renderer.viewportToFramedGraph((this.startTouchesPositions || [])[0]), { x: xStart, y: yStart } = _this$renderer$viewpo;
+          var _this$renderer$viewpo2 = this.renderer.viewportToFramedGraph(touchesPositions[0]), { x, y } = _this$renderer$viewpo2;
           camera.setState({
             x: startCameraState.x + xStart - x,
             y: startCameraState.y + yStart - y
@@ -6931,8 +6932,8 @@ var TouchCaptor = /* @__PURE__ */ function(_Captor) {
             angle: 0,
             ratio: 1
           };
-          var _touchesPositions$ = touchesPositions[0], x0 = _touchesPositions$.x, y0 = _touchesPositions$.y;
-          var _touchesPositions$2 = touchesPositions[1], x1 = _touchesPositions$2.x, y1 = _touchesPositions$2.y;
+          var _touchesPositions$ = touchesPositions[0], { x: x0, y: y0 } = _touchesPositions$;
+          var _touchesPositions$2 = touchesPositions[1], { x: x1, y: y1 } = _touchesPositions$2;
           var angleDiff = Math.atan2(y1 - y0, x1 - x0) - this.startTouchesAngle;
           var ratioDiff = Math.hypot(y1 - y0, x1 - x0) / this.startTouchesDistance;
           var newRatio = camera.getBoundedRatio(startCameraState.ratio / ratioDiff);
@@ -7004,12 +7005,12 @@ function _objectWithoutProperties(e, t) {
   return i;
 }
 var LabelCandidate = /* @__PURE__ */ function() {
-  function LabelCandidate2(key, size) {
-    _classCallCheck(this, LabelCandidate2);
+  function LabelCandidate(key, size) {
+    _classCallCheck(this, LabelCandidate);
     this.key = key;
     this.size = size;
   }
-  return _createClass(LabelCandidate2, null, [{
+  return _createClass(LabelCandidate, null, [{
     key: "compare",
     value: function compare(first, second) {
       if (first.size > second.size)
@@ -7023,8 +7024,8 @@ var LabelCandidate = /* @__PURE__ */ function() {
   }]);
 }();
 var LabelGrid = /* @__PURE__ */ function() {
-  function LabelGrid2() {
-    _classCallCheck(this, LabelGrid2);
+  function LabelGrid() {
+    _classCallCheck(this, LabelGrid);
     _defineProperty(this, "width", 0);
     _defineProperty(this, "height", 0);
     _defineProperty(this, "cellSize", 0);
@@ -7032,7 +7033,7 @@ var LabelGrid = /* @__PURE__ */ function() {
     _defineProperty(this, "rows", 0);
     _defineProperty(this, "cells", {});
   }
-  return _createClass(LabelGrid2, [{
+  return _createClass(LabelGrid, [{
     key: "resizeAndClear",
     value: function resizeAndClear(dimensions, cellSize) {
       this.width = dimensions.width;
@@ -7420,7 +7421,7 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
         };
         _this3.emit("enterStage", _objectSpread2({}, baseEvent));
       };
-      var createInteractionListener = function createInteractionListener2(eventType) {
+      var createInteractionListener = function createInteractionListener(eventType) {
         return function(e) {
           var event = cleanMouseCoords(e);
           var baseEvent = {
@@ -7626,7 +7627,7 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
       this.nodeExtent = graphExtent(this.graph);
       if (!this.settings.autoRescale) {
         var { width, height } = dimensions;
-        var _this$nodeExtent = this.nodeExtent, x = _this$nodeExtent.x, y = _this$nodeExtent.y;
+        var _this$nodeExtent = this.nodeExtent, { x, y } = _this$nodeExtent;
         this.nodeExtent = {
           x: [(x[0] + x[1]) / 2 - width / 2, (x[0] + x[1]) / 2 + width / 2],
           y: [(y[0] + y[1]) / 2 - height / 2, (y[0] + y[1]) / 2 + height / 2]
@@ -7664,8 +7665,8 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
         nodesPerPrograms[type] = 0;
       }
       if (this.settings.zIndex && this.nodeZExtent[0] !== this.nodeZExtent[1])
-        nodes = zIndexOrdering(this.nodeZExtent, function(node2) {
-          return _this5.nodeDataCache[node2].zIndex;
+        nodes = zIndexOrdering(this.nodeZExtent, function(node) {
+          return _this5.nodeDataCache[node].zIndex;
         }, nodes);
       for (var _i = 0, _l = nodes.length;_i < _l; _i++) {
         var _node = nodes[_i];
@@ -7686,8 +7687,8 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
         edgesPerPrograms[_data2.type] = (edgesPerPrograms[_data2.type] || 0) + 1;
       }
       if (this.settings.zIndex && this.edgeZExtent[0] !== this.edgeZExtent[1])
-        edges = zIndexOrdering(this.edgeZExtent, function(edge2) {
-          return _this5.edgeDataCache[edge2].zIndex;
+        edges = zIndexOrdering(this.edgeZExtent, function(edge) {
+          return _this5.edgeDataCache[edge].zIndex;
         }, edges);
       for (var _type2 in this.edgePrograms) {
         if (!hasOwnProperty.call(this.edgePrograms, _type2)) {
@@ -7796,7 +7797,7 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
       });
       var graphWidth = xMax - xMin;
       var graphHeight = yMax - yMin;
-      var _this$getDimensions = this.getDimensions(), width = _this$getDimensions.width, height = _this$getDimensions.height;
+      var _this$getDimensions = this.getDimensions(), { width, height } = _this$getDimensions;
       var dx = 0;
       var dy = 0;
       if (graphWidth >= width) {
@@ -7858,7 +7859,7 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
           continue;
         if (data.hidden)
           continue;
-        var _this$framedGraphToVi = this.framedGraphToViewport(data), x = _this$framedGraphToVi.x, y = _this$framedGraphToVi.y;
+        var _this$framedGraphToVi = this.framedGraphToViewport(data), { x, y } = _this$framedGraphToVi;
         var size = this.scaleSize(data.size);
         if (!data.forceLabel && size < this.settings.labelRenderedSizeThreshold)
           continue;
@@ -7927,9 +7928,9 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
       var _this7 = this;
       var context = this.canvasContexts.hovers;
       context.clearRect(0, 0, this.width, this.height);
-      var render = function render2(node) {
+      var render = function render(node) {
         var data = _this7.nodeDataCache[node];
-        var _this7$framedGraphToV = _this7.framedGraphToViewport(data), x = _this7$framedGraphToV.x, y = _this7$framedGraphToV.y;
+        var _this7$framedGraphToV = _this7.framedGraphToViewport(data), { x, y } = _this7$framedGraphToV;
         var size = _this7.scaleSize(data.size);
         var defaultDrawNodeHover = _this7.settings.defaultDrawNodeHover;
         var nodeProgram = _this7.nodePrograms[data.type];
@@ -7955,8 +7956,8 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
       });
       var nodesPerPrograms = {};
       nodesToRender.forEach(function(node) {
-        var type2 = _this7.nodeDataCache[node].type;
-        nodesPerPrograms[type2] = (nodesPerPrograms[type2] || 0) + 1;
+        var type = _this7.nodeDataCache[node].type;
+        nodesPerPrograms[type] = (nodesPerPrograms[type] || 0) + 1;
       });
       for (var type in this.nodeHoverPrograms) {
         this.nodeHoverPrograms[type].reallocate(nodesPerPrograms[type] || 0);
@@ -7990,7 +7991,7 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
     value: function render() {
       var _this9 = this;
       this.emit("beforeRender");
-      var exitRender = function exitRender2() {
+      var exitRender = function exitRender() {
         _this9.emit("afterRender");
         return _this9;
       };
@@ -8038,7 +8039,7 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
     }
   }, {
     key: "addNode",
-    value: function addNode2(key) {
+    value: function addNode(key) {
       var attr = Object.assign({}, this.graph.getNodeAttributes(key));
       if (this.settings.nodeReducer)
         attr = this.settings.nodeReducer(key, attr);
@@ -8076,7 +8077,7 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
     }
   }, {
     key: "addEdge",
-    value: function addEdge2(key) {
+    value: function addEdge(key) {
       var attr = Object.assign({}, this.graph.getEdgeAttributes(key));
       if (this.settings.edgeReducer)
         attr = this.settings.edgeReducer(key, attr);
@@ -8196,7 +8197,7 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
   }, {
     key: "getStagePadding",
     value: function getStagePadding() {
-      var _this$settings = this.settings, stagePadding = _this$settings.stagePadding, autoRescale = _this$settings.autoRescale;
+      var _this$settings = this.settings, { stagePadding, autoRescale } = _this$settings;
       return autoRescale ? stagePadding || 0 : 0;
     }
   }, {
@@ -8483,11 +8484,11 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
       if (fullRefresh) {
         this.clearEdgeIndices();
         this.clearNodeIndices();
-        this.graph.forEachNode(function(node2) {
-          return _this10.addNode(node2);
+        this.graph.forEachNode(function(node) {
+          return _this10.addNode(node);
         });
-        this.graph.forEachEdge(function(edge2) {
-          return _this10.addEdge(edge2);
+        this.graph.forEachEdge(function(edge) {
+          return _this10.addEdge(edge);
         });
       } else {
         var _opts$partialGraph, _opts$partialGraph2;
@@ -8543,8 +8544,8 @@ var Sigma$1 = /* @__PURE__ */ function(_TypedEventEmitter) {
   }, {
     key: "getViewportZoomedState",
     value: function getViewportZoomedState(viewportTarget, newRatio) {
-      var _this$camera$getState = this.camera.getState(), ratio = _this$camera$getState.ratio, angle = _this$camera$getState.angle, x = _this$camera$getState.x, y = _this$camera$getState.y;
-      var _this$settings2 = this.settings, minCameraRatio = _this$settings2.minCameraRatio, maxCameraRatio = _this$settings2.maxCameraRatio;
+      var _this$camera$getState = this.camera.getState(), { ratio, angle, x, y } = _this$camera$getState;
+      var _this$settings2 = this.settings, { minCameraRatio, maxCameraRatio } = _this$settings2;
       if (typeof maxCameraRatio === "number")
         newRatio = Math.min(newRatio, maxCameraRatio);
       if (typeof minCameraRatio === "number")
@@ -8954,147 +8955,147 @@ var UNSIGNED_BYTE2 = _WebGLRenderingContex2.UNSIGNED_BYTE;
 var FLOAT2 = _WebGLRenderingContex2.FLOAT;
 
 // node_modules/sigma/utils/dist/sigma-utils.esm.js
-var import_is_graph3 = __toESM(require_is_graph(), 1);
+var import_is_graph3 = __toESM(require_is_graph());
 
 // node_modules/@sigma/edge-curve/dist/sigma-edge-curve.esm.js
-function _toPrimitive2(t2, r2) {
-  if (typeof t2 != "object" || !t2)
-    return t2;
-  var e3 = t2[Symbol.toPrimitive];
-  if (e3 !== undefined) {
-    var i3 = e3.call(t2, r2 || "default");
-    if (typeof i3 != "object")
-      return i3;
+function _toPrimitive2(t, r) {
+  if (typeof t != "object" || !t)
+    return t;
+  var e = t[Symbol.toPrimitive];
+  if (e !== undefined) {
+    var i = e.call(t, r || "default");
+    if (typeof i != "object")
+      return i;
     throw new TypeError("@@toPrimitive must return a primitive value.");
   }
-  return (r2 === "string" ? String : Number)(t2);
+  return (r === "string" ? String : Number)(t);
 }
-function _toPropertyKey2(t2) {
-  var i3 = _toPrimitive2(t2, "string");
-  return typeof i3 == "symbol" ? i3 : i3 + "";
+function _toPropertyKey2(t) {
+  var i = _toPrimitive2(t, "string");
+  return typeof i == "symbol" ? i : i + "";
 }
-function _defineProperty2(e3, r2, t2) {
-  return (r2 = _toPropertyKey2(r2)) in e3 ? Object.defineProperty(e3, r2, {
-    value: t2,
+function _defineProperty2(e, r, t) {
+  return (r = _toPropertyKey2(r)) in e ? Object.defineProperty(e, r, {
+    value: t,
     enumerable: true,
     configurable: true,
     writable: true
-  }) : e3[r2] = t2, e3;
+  }) : e[r] = t, e;
 }
-function ownKeys2(e3, r2) {
-  var t2 = Object.keys(e3);
+function ownKeys2(e, r) {
+  var t = Object.keys(e);
   if (Object.getOwnPropertySymbols) {
-    var o2 = Object.getOwnPropertySymbols(e3);
-    r2 && (o2 = o2.filter(function(r3) {
-      return Object.getOwnPropertyDescriptor(e3, r3).enumerable;
-    })), t2.push.apply(t2, o2);
+    var o = Object.getOwnPropertySymbols(e);
+    r && (o = o.filter(function(r) {
+      return Object.getOwnPropertyDescriptor(e, r).enumerable;
+    })), t.push.apply(t, o);
   }
-  return t2;
+  return t;
 }
-function _objectSpread22(e3) {
-  for (var r2 = 1;r2 < arguments.length; r2++) {
-    var t2 = arguments[r2] != null ? arguments[r2] : {};
-    r2 % 2 ? ownKeys2(Object(t2), true).forEach(function(r3) {
-      _defineProperty2(e3, r3, t2[r3]);
-    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e3, Object.getOwnPropertyDescriptors(t2)) : ownKeys2(Object(t2)).forEach(function(r3) {
-      Object.defineProperty(e3, r3, Object.getOwnPropertyDescriptor(t2, r3));
+function _objectSpread22(e) {
+  for (var r = 1;r < arguments.length; r++) {
+    var t = arguments[r] != null ? arguments[r] : {};
+    r % 2 ? ownKeys2(Object(t), true).forEach(function(r) {
+      _defineProperty2(e, r, t[r]);
+    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys2(Object(t)).forEach(function(r) {
+      Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
     });
   }
-  return e3;
+  return e;
 }
-function _classCallCheck2(a3, n2) {
-  if (!(a3 instanceof n2))
+function _classCallCheck2(a, n) {
+  if (!(a instanceof n))
     throw new TypeError("Cannot call a class as a function");
 }
-function _defineProperties2(e3, r2) {
-  for (var t2 = 0;t2 < r2.length; t2++) {
-    var o2 = r2[t2];
-    o2.enumerable = o2.enumerable || false, o2.configurable = true, "value" in o2 && (o2.writable = true), Object.defineProperty(e3, _toPropertyKey2(o2.key), o2);
+function _defineProperties2(e, r) {
+  for (var t = 0;t < r.length; t++) {
+    var o = r[t];
+    o.enumerable = o.enumerable || false, o.configurable = true, "value" in o && (o.writable = true), Object.defineProperty(e, _toPropertyKey2(o.key), o);
   }
 }
-function _createClass2(e3, r2, t2) {
-  return r2 && _defineProperties2(e3.prototype, r2), t2 && _defineProperties2(e3, t2), Object.defineProperty(e3, "prototype", {
+function _createClass2(e, r, t) {
+  return r && _defineProperties2(e.prototype, r), t && _defineProperties2(e, t), Object.defineProperty(e, "prototype", {
     writable: false
-  }), e3;
+  }), e;
 }
-function _getPrototypeOf2(t2) {
-  return _getPrototypeOf2 = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function(t3) {
-    return t3.__proto__ || Object.getPrototypeOf(t3);
-  }, _getPrototypeOf2(t2);
+function _getPrototypeOf2(t) {
+  return _getPrototypeOf2 = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function(t) {
+    return t.__proto__ || Object.getPrototypeOf(t);
+  }, _getPrototypeOf2(t);
 }
 function _isNativeReflectConstruct2() {
   try {
-    var t2 = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function() {}));
-  } catch (t3) {}
+    var t = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function() {}));
+  } catch (t) {}
   return (_isNativeReflectConstruct2 = function() {
-    return !!t2;
+    return !!t;
   })();
 }
-function _assertThisInitialized2(e3) {
-  if (e3 === undefined)
+function _assertThisInitialized2(e) {
+  if (e === undefined)
     throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
-  return e3;
+  return e;
 }
-function _possibleConstructorReturn2(t2, e3) {
-  if (e3 && (typeof e3 == "object" || typeof e3 == "function"))
-    return e3;
-  if (e3 !== undefined)
+function _possibleConstructorReturn2(t, e) {
+  if (e && (typeof e == "object" || typeof e == "function"))
+    return e;
+  if (e !== undefined)
     throw new TypeError("Derived constructors may only return object or undefined");
-  return _assertThisInitialized2(t2);
+  return _assertThisInitialized2(t);
 }
-function _callSuper2(t2, o2, e3) {
-  return o2 = _getPrototypeOf2(o2), _possibleConstructorReturn2(t2, _isNativeReflectConstruct2() ? Reflect.construct(o2, e3 || [], _getPrototypeOf2(t2).constructor) : o2.apply(t2, e3));
+function _callSuper2(t, o, e) {
+  return o = _getPrototypeOf2(o), _possibleConstructorReturn2(t, _isNativeReflectConstruct2() ? Reflect.construct(o, e || [], _getPrototypeOf2(t).constructor) : o.apply(t, e));
 }
-function _setPrototypeOf2(t2, e3) {
-  return _setPrototypeOf2 = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function(t3, e4) {
-    return t3.__proto__ = e4, t3;
-  }, _setPrototypeOf2(t2, e3);
+function _setPrototypeOf2(t, e) {
+  return _setPrototypeOf2 = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function(t, e) {
+    return t.__proto__ = e, t;
+  }, _setPrototypeOf2(t, e);
 }
-function _inherits2(t2, e3) {
-  if (typeof e3 != "function" && e3 !== null)
+function _inherits2(t, e) {
+  if (typeof e != "function" && e !== null)
     throw new TypeError("Super expression must either be null or a function");
-  t2.prototype = Object.create(e3 && e3.prototype, {
+  t.prototype = Object.create(e && e.prototype, {
     constructor: {
-      value: t2,
+      value: t,
       writable: true,
       configurable: true
     }
-  }), Object.defineProperty(t2, "prototype", {
+  }), Object.defineProperty(t, "prototype", {
     writable: false
-  }), e3 && _setPrototypeOf2(t2, e3);
+  }), e && _setPrototypeOf2(t, e);
 }
-function _arrayLikeToArray2(r2, a3) {
-  (a3 == null || a3 > r2.length) && (a3 = r2.length);
-  for (var e3 = 0, n2 = Array(a3);e3 < a3; e3++)
-    n2[e3] = r2[e3];
-  return n2;
+function _arrayLikeToArray2(r, a) {
+  (a == null || a > r.length) && (a = r.length);
+  for (var e = 0, n = Array(a);e < a; e++)
+    n[e] = r[e];
+  return n;
 }
-function _arrayWithoutHoles2(r2) {
-  if (Array.isArray(r2))
-    return _arrayLikeToArray2(r2);
+function _arrayWithoutHoles2(r) {
+  if (Array.isArray(r))
+    return _arrayLikeToArray2(r);
 }
-function _iterableToArray2(r2) {
-  if (typeof Symbol != "undefined" && r2[Symbol.iterator] != null || r2["@@iterator"] != null)
-    return Array.from(r2);
+function _iterableToArray2(r) {
+  if (typeof Symbol != "undefined" && r[Symbol.iterator] != null || r["@@iterator"] != null)
+    return Array.from(r);
 }
-function _unsupportedIterableToArray2(r2, a3) {
-  if (r2) {
-    if (typeof r2 == "string")
-      return _arrayLikeToArray2(r2, a3);
-    var t2 = {}.toString.call(r2).slice(8, -1);
-    return t2 === "Object" && r2.constructor && (t2 = r2.constructor.name), t2 === "Map" || t2 === "Set" ? Array.from(r2) : t2 === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t2) ? _arrayLikeToArray2(r2, a3) : undefined;
+function _unsupportedIterableToArray2(r, a) {
+  if (r) {
+    if (typeof r == "string")
+      return _arrayLikeToArray2(r, a);
+    var t = {}.toString.call(r).slice(8, -1);
+    return t === "Object" && r.constructor && (t = r.constructor.name), t === "Map" || t === "Set" ? Array.from(r) : t === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray2(r, a) : undefined;
   }
 }
 function _nonIterableSpread2() {
   throw new TypeError(`Invalid attempt to spread non-iterable instance.
 In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`);
 }
-function _toConsumableArray2(r2) {
-  return _arrayWithoutHoles2(r2) || _iterableToArray2(r2) || _unsupportedIterableToArray2(r2) || _nonIterableSpread2();
+function _toConsumableArray2(r) {
+  return _arrayWithoutHoles2(r) || _iterableToArray2(r) || _unsupportedIterableToArray2(r) || _nonIterableSpread2();
 }
-function getCurvePoint(t2, p0, p1, p2) {
-  var x = Math.pow(1 - t2, 2) * p0.x + 2 * (1 - t2) * t2 * p1.x + Math.pow(t2, 2) * p2.x;
-  var y = Math.pow(1 - t2, 2) * p0.y + 2 * (1 - t2) * t2 * p1.y + Math.pow(t2, 2) * p2.y;
+function getCurvePoint(t, p0, p1, p2) {
+  var x = Math.pow(1 - t, 2) * p0.x + 2 * (1 - t) * t * p1.x + Math.pow(t, 2) * p2.x;
+  var y = Math.pow(1 - t, 2) * p0.y + 2 * (1 - t) * t * p1.y + Math.pow(t, 2) * p2.y;
   return {
     x,
     y
@@ -9104,8 +9105,8 @@ function getCurveLength(p0, p1, p2) {
   var steps = 20;
   var length = 0;
   var lastPoint = p0;
-  for (var i3 = 0;i3 < steps; i3++) {
-    var point = getCurvePoint((i3 + 1) / steps, p0, p1, p2);
+  for (var i = 0;i < steps; i++) {
+    var point = getCurvePoint((i + 1) / steps, p0, p1, p2);
     length += Math.sqrt(Math.pow(lastPoint.x - point.x, 2) + Math.pow(lastPoint.y - point.y, 2));
     lastPoint = point;
   }
@@ -9114,7 +9115,7 @@ function getCurveLength(p0, p1, p2) {
 function createDrawCurvedEdgeLabel(_ref) {
   var { curvatureAttribute, defaultCurvature, keepLabelUpright: _ref$keepLabelUpright } = _ref, keepLabelUpright = _ref$keepLabelUpright === undefined ? true : _ref$keepLabelUpright;
   return function(context, edgeData, sourceData, targetData, settings) {
-    var size = settings.edgeLabelSize, curvature = edgeData[curvatureAttribute] || defaultCurvature, font = settings.edgeLabelFont, weight = settings.edgeLabelWeight, color = settings.edgeLabelColor.attribute ? edgeData[settings.edgeLabelColor.attribute] || settings.edgeLabelColor.color || "#000" : settings.edgeLabelColor.color;
+    var size = settings.edgeLabelSize, curvature = edgeData[curvatureAttribute] || defaultCurvature, { edgeLabelFont: font, edgeLabelWeight: weight } = settings, color = settings.edgeLabelColor.attribute ? edgeData[settings.edgeLabelColor.attribute] || settings.edgeLabelColor.color || "#000" : settings.edgeLabelColor.color;
     var label = edgeData.label;
     if (!label)
       return;
@@ -9179,25 +9180,25 @@ function createDrawCurvedEdgeLabel(_ref) {
         return;
     }
     var charactersLengthCache = {};
-    for (var i3 = 0, length = label.length;i3 < length; i3++) {
-      var character = label[i3];
+    for (var i = 0, length = label.length;i < length; i++) {
+      var character = label[i];
       if (!charactersLengthCache[character]) {
         charactersLengthCache[character] = context.measureText(character).width * (1 + curvature * 0.35);
       }
     }
-    var t2 = 0.5 - textLength / curveLength / 2;
+    var t = 0.5 - textLength / curveLength / 2;
     for (var _i = 0, _length = label.length;_i < _length; _i++) {
       var _character = label[_i];
-      var point = getCurvePoint(t2, sourcePoint, anchorPoint, targetPoint);
-      var tangentX = 2 * (1 - t2) * (anchorX - sourceX) + 2 * t2 * (targetX - anchorX);
-      var tangentY = 2 * (1 - t2) * (anchorY - sourceY) + 2 * t2 * (targetY - anchorY);
+      var point = getCurvePoint(t, sourcePoint, anchorPoint, targetPoint);
+      var tangentX = 2 * (1 - t) * (anchorX - sourceX) + 2 * t * (targetX - anchorX);
+      var tangentY = 2 * (1 - t) * (anchorY - sourceY) + 2 * t * (targetY - anchorY);
       var angle = Math.atan2(tangentY, tangentX);
       context.save();
       context.translate(point.x, point.y);
       context.rotate(angle);
       context.fillText(_character, 0, 0);
       context.restore();
-      t2 += charactersLengthCache[_character] / curveLength;
+      t += charactersLengthCache[_character] / curveLength;
     }
   };
 }
@@ -9411,10 +9412,10 @@ var UNSIGNED_BYTE3 = _WebGLRenderingContex3.UNSIGNED_BYTE;
 var FLOAT3 = _WebGLRenderingContex3.FLOAT;
 function createEdgeCurveProgram(inputOptions) {
   var options = _objectSpread22(_objectSpread22({}, DEFAULT_EDGE_CURVE_PROGRAM_OPTIONS), inputOptions || {});
-  var _ref = options, arrowHead = _ref.arrowHead, curvatureAttribute = _ref.curvatureAttribute, drawLabel = _ref.drawLabel;
+  var _ref = options, { arrowHead, curvatureAttribute, drawLabel } = _ref;
   var hasTargetArrowHead = (arrowHead === null || arrowHead === undefined ? undefined : arrowHead.extremity) === "target" || (arrowHead === null || arrowHead === undefined ? undefined : arrowHead.extremity) === "both";
   var hasSourceArrowHead = (arrowHead === null || arrowHead === undefined ? undefined : arrowHead.extremity) === "source" || (arrowHead === null || arrowHead === undefined ? undefined : arrowHead.extremity) === "both";
-  var UNIFORMS2 = ["u_matrix", "u_sizeRatio", "u_dimensions", "u_pixelRatio", "u_feather", "u_minEdgeThickness"].concat(_toConsumableArray2(arrowHead ? ["u_lengthToThicknessRatio", "u_widenessToThicknessRatio"] : []));
+  var UNIFORMS = ["u_matrix", "u_sizeRatio", "u_dimensions", "u_pixelRatio", "u_feather", "u_minEdgeThickness"].concat(_toConsumableArray2(arrowHead ? ["u_lengthToThicknessRatio", "u_widenessToThicknessRatio"] : []));
   return /* @__PURE__ */ function(_EdgeProgram) {
     _inherits2(EdgeCurveProgram, _EdgeProgram);
     function EdgeCurveProgram() {
@@ -9435,7 +9436,7 @@ function createEdgeCurveProgram(inputOptions) {
           VERTEX_SHADER_SOURCE: getVertexShader(options),
           FRAGMENT_SHADER_SOURCE: getFragmentShader(options),
           METHOD: WebGLRenderingContext.TRIANGLES,
-          UNIFORMS: UNIFORMS2,
+          UNIFORMS,
           ATTRIBUTES: [{
             name: "a_source",
             size: 2,
@@ -9600,14 +9601,14 @@ var lookupHistory = [];
 var currentLookupCnpj = "";
 var currentLookupLabel = "";
 var DEBUG_LOOKUP = true;
-function interpolateColor(c1, c2, t2) {
-  const h2 = (c3) => parseInt(c3.slice(1), 16);
-  const r1 = h2(c1) >> 16 & 255, g1 = h2(c1) >> 8 & 255, b1 = h2(c1) & 255;
-  const r2 = h2(c2) >> 16 & 255, g2 = h2(c2) >> 8 & 255, b22 = h2(c2) & 255;
-  const r3 = Math.round(r1 + (r2 - r1) * t2).toString(16).padStart(2, "0");
-  const g3 = Math.round(g1 + (g2 - g1) * t2).toString(16).padStart(2, "0");
-  const b3 = Math.round(b1 + (b22 - b1) * t2).toString(16).padStart(2, "0");
-  return `#${r3}${g3}${b3}`;
+function interpolateColor(c1, c2, t) {
+  const h = (c) => parseInt(c.slice(1), 16);
+  const r1 = h(c1) >> 16 & 255, g1 = h(c1) >> 8 & 255, b1 = h(c1) & 255;
+  const r2 = h(c2) >> 16 & 255, g2 = h(c2) >> 8 & 255, b2 = h(c2) & 255;
+  const r = Math.round(r1 + (r2 - r1) * t).toString(16).padStart(2, "0");
+  const g = Math.round(g1 + (g2 - g1) * t).toString(16).padStart(2, "0");
+  const b = Math.round(b1 + (b2 - b1) * t).toString(16).padStart(2, "0");
+  return `#${r}${g}${b}`;
 }
 function isCnpj(val) {
   return val.replace(/\D/g, "").length === 14;
@@ -9711,16 +9712,16 @@ function assignEmpresaColor(id) {
   return empresaColorMap.get(id);
 }
 function lighten(hex) {
-  const n2 = parseInt(hex.slice(1), 16);
-  const r2 = Math.min(255, (n2 >> 16 & 255) + 80);
-  const g2 = Math.min(255, (n2 >> 8 & 255) + 80);
-  const b3 = Math.min(255, (n2 & 255) + 80);
-  return `#${r2.toString(16).padStart(2, "0")}${g2.toString(16).padStart(2, "0")}${b3.toString(16).padStart(2, "0")}`;
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (n >> 16 & 255) + 80);
+  const g = Math.min(255, (n >> 8 & 255) + 80);
+  const b = Math.min(255, (n & 255) + 80);
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 function nodeAttrs(type, label, opts) {
-  const o2 = typeof opts === "string" ? { empresaId: opts } : opts ?? {};
-  if (o2.datasetId) {
-    const color = DATASET_COLORS[o2.datasetId] ?? NODE_COLORS[type] ?? "#888888";
+  const o = typeof opts === "string" ? { empresaId: opts } : opts ?? {};
+  if (o.datasetId) {
+    const color = DATASET_COLORS[o.datasetId] ?? NODE_COLORS[type] ?? "#888888";
     return {
       label: "",
       fullLabel: label,
@@ -9731,10 +9732,10 @@ function nodeAttrs(type, label, opts) {
       y: Math.random() * 10
     };
   }
-  const baseColor = o2.empresaId ? assignEmpresaColor(o2.empresaId) : "#aaaaaa";
+  const baseColor = o.empresaId ? assignEmpresaColor(o.empresaId) : "#aaaaaa";
   let size;
   if (type === "empresa") {
-    size = o2.isRoot ? 22 : 18;
+    size = o.isRoot ? 22 : 18;
   } else if (type === "socio") {
     size = 11;
   } else {
@@ -9744,7 +9745,7 @@ function nodeAttrs(type, label, opts) {
     label,
     fullLabel: label,
     size,
-    isRoot: o2.isRoot ?? false,
+    isRoot: o.isRoot ?? false,
     color: type === "empresa" ? baseColor : lighten(baseColor),
     type: "circle",
     x: Math.random() * 10,
@@ -9783,12 +9784,12 @@ function drawHoverInsideNode(ctx, data, settings) {}
 function edgeAttrs() {
   return { type: "curved", color: COLOR_EDGE_BASE, size: 1.2, zIndex: 1 };
 }
-function valueText(v2) {
-  if (v2 == null)
+function valueText(v) {
+  if (v == null)
     return "—";
-  if (typeof v2 === "object")
-    return JSON.stringify(v2);
-  return String(v2);
+  if (typeof v === "object")
+    return JSON.stringify(v);
+  return String(v);
 }
 function trackNodeDetail(nodeId, datasetId, datasetLabel, relatedCompanyCnpj, attributes) {
   const detailKey = `${nodeId}|${datasetId}|${JSON.stringify(attributes)}`;
@@ -9846,21 +9847,21 @@ function radialLayout(graph) {
     return;
   graph.setNodeAttribute(root, "x", 0);
   graph.setNodeAttribute(root, "y", 0);
-  const layer1 = graph.neighbors(root).filter((n2) => graph.hasNode(n2));
+  const layer1 = graph.neighbors(root).filter((n) => graph.hasNode(n));
   if (layer1.length === 0)
     return;
   const childrenOf = new Map;
-  for (const g2 of layer1) {
-    childrenOf.set(g2, graph.neighbors(g2).filter((n2) => n2 !== root));
+  for (const g of layer1) {
+    childrenOf.set(g, graph.neighbors(g).filter((n) => n !== root));
   }
-  const weights = layer1.map((g2) => 1 + (childrenOf.get(g2)?.length ?? 0));
-  const totalWeight = weights.reduce((a3, b3) => a3 + b3, 0);
+  const weights = layer1.map((g) => 1 + (childrenOf.get(g)?.length ?? 0));
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
   const R1 = Math.max(180, layer1.length * 50);
-  const maxLeaves = Math.max(...weights.map((w2) => w2 - 1), 1);
+  const maxLeaves = Math.max(...weights.map((w) => w - 1), 1);
   const R2 = R1 + Math.max(160, maxLeaves * 38);
   let cursor = -Math.PI / 2;
-  layer1.forEach((gId, i3) => {
-    const sector = 2 * Math.PI * weights[i3] / totalWeight;
+  layer1.forEach((gId, i) => {
+    const sector = 2 * Math.PI * weights[i] / totalWeight;
     const gAngle = cursor + sector / 2;
     cursor += sector;
     graph.setNodeAttribute(gId, "x", Math.cos(gAngle) * R1);
@@ -9871,8 +9872,8 @@ function radialLayout(graph) {
     const spread = sector * 0.82;
     const startAngle = gAngle - spread / 2;
     const step = children.length > 1 ? spread / (children.length - 1) : 0;
-    children.forEach((leafId, j2) => {
-      const leafAngle = children.length === 1 ? gAngle : startAngle + j2 * step;
+    children.forEach((leafId, j) => {
+      const leafAngle = children.length === 1 ? gAngle : startAngle + j * step;
       graph.setNodeAttribute(leafId, "x", Math.cos(leafAngle) * R2);
       graph.setNodeAttribute(leafId, "y", Math.sin(leafAngle) * R2);
     });
@@ -9886,22 +9887,22 @@ function radialCompactLayout(graph) {
     return;
   graph.setNodeAttribute(root, "x", 0);
   graph.setNodeAttribute(root, "y", 0);
-  const layer1 = graph.neighbors(root).filter((n2) => graph.hasNode(n2));
+  const layer1 = graph.neighbors(root).filter((n) => graph.hasNode(n));
   if (layer1.length === 0)
     return;
   const childrenOf = new Map;
-  for (const g2 of layer1) {
-    childrenOf.set(g2, graph.neighbors(g2).filter((n2) => n2 !== root));
+  for (const g of layer1) {
+    childrenOf.set(g, graph.neighbors(g).filter((n) => n !== root));
   }
-  const cappedCount = (g2) => Math.min(childrenOf.get(g2)?.length ?? 0, COMPACT_MAX_LEAVES);
-  const weights = layer1.map((g2) => 1 + cappedCount(g2));
-  const totalWeight = weights.reduce((a3, b3) => a3 + b3, 0);
+  const cappedCount = (g) => Math.min(childrenOf.get(g)?.length ?? 0, COMPACT_MAX_LEAVES);
+  const weights = layer1.map((g) => 1 + cappedCount(g));
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
   const R1 = Math.max(180, layer1.length * 50);
-  const maxLeaves = Math.max(...weights.map((w2) => w2 - 1), 1);
+  const maxLeaves = Math.max(...weights.map((w) => w - 1), 1);
   const R2 = R1 + Math.max(160, maxLeaves * 38);
   let cursor = -Math.PI / 2;
-  layer1.forEach((gId, i3) => {
-    const sector = 2 * Math.PI * weights[i3] / totalWeight;
+  layer1.forEach((gId, i) => {
+    const sector = 2 * Math.PI * weights[i] / totalWeight;
     const gAngle = cursor + sector / 2;
     cursor += sector;
     graph.setNodeAttribute(gId, "x", Math.cos(gAngle) * R1);
@@ -9917,8 +9918,8 @@ function radialCompactLayout(graph) {
     const spread = sector * 0.82;
     const startAngle = gAngle - spread / 2;
     const step = slots > 1 ? spread / (slots - 1) : 0;
-    visible.forEach((leafId, j2) => {
-      const leafAngle = slots === 1 ? gAngle : startAngle + j2 * step;
+    visible.forEach((leafId, j) => {
+      const leafAngle = slots === 1 ? gAngle : startAngle + j * step;
       graph.setNodeAttribute(leafId, "x", Math.cos(leafAngle) * R2);
       graph.setNodeAttribute(leafId, "y", Math.sin(leafAngle) * R2);
     });
@@ -9943,20 +9944,20 @@ function buildRootedTree(graph, root) {
   const depth = new Map([[root, 0]]);
   const visited = new Set([root]);
   const queue = [root];
-  const sortNodes = (a3, b3) => {
-    const aType = String(nodeTypeMap.get(a3) ?? "");
-    const bType = String(nodeTypeMap.get(b3) ?? "");
+  const sortNodes = (a, b) => {
+    const aType = String(nodeTypeMap.get(a) ?? "");
+    const bType = String(nodeTypeMap.get(b) ?? "");
     if (aType !== bType)
       return aType.localeCompare(bType);
-    const aLabel = String(graph.getNodeAttribute(a3, "fullLabel") ?? graph.getNodeAttribute(a3, "label") ?? a3);
-    const bLabel = String(graph.getNodeAttribute(b3, "fullLabel") ?? graph.getNodeAttribute(b3, "label") ?? b3);
+    const aLabel = String(graph.getNodeAttribute(a, "fullLabel") ?? graph.getNodeAttribute(a, "label") ?? a);
+    const bLabel = String(graph.getNodeAttribute(b, "fullLabel") ?? graph.getNodeAttribute(b, "label") ?? b);
     return aLabel.localeCompare(bLabel);
   };
   while (queue.length > 0) {
     const node = queue.shift();
     const nodeDepth = depth.get(node) ?? 0;
     const nodeChildren = [];
-    const neighbors = graph.neighbors(node).filter((n2) => graph.hasNode(n2)).sort(sortNodes);
+    const neighbors = graph.neighbors(node).filter((n) => graph.hasNode(n)).sort(sortNodes);
     for (const neighbor of neighbors) {
       if (visited.has(neighbor))
         continue;
@@ -9979,9 +9980,9 @@ function collapsibleTreeLayout(graph) {
   const assignRows = (node) => {
     const nodeChildren = children.get(node) ?? [];
     if (nodeChildren.length === 0) {
-      const row2 = nextRow++;
-      rowOrder.set(node, row2);
-      return row2;
+      const row = nextRow++;
+      rowOrder.set(node, row);
+      return row;
     }
     const childRows = nodeChildren.map(assignRows);
     const row = (childRows[0] + childRows[childRows.length - 1]) / 2;
@@ -9998,14 +9999,14 @@ function collapsibleTreeLayout(graph) {
   const rootRow = rowOrder.get(root) ?? 0;
   const depthCenterOffset = (maxDepth + 1) * depthSpacing / 2;
   for (const node of visited) {
-    const d2 = depth.get(node) ?? 0;
+    const d = depth.get(node) ?? 0;
     const row = rowOrder.get(node) ?? 0;
     const nodeType = String(nodeTypeMap.get(node) ?? "");
     const typeOffset = nodeType === "group" ? 18 : nodeType === "empresa" ? -12 : nodeType === "socio" ? 12 : 0;
-    graph.setNodeAttribute(node, "x", d2 * depthSpacing - depthCenterOffset + typeOffset);
+    graph.setNodeAttribute(node, "x", d * depthSpacing - depthCenterOffset + typeOffset);
     graph.setNodeAttribute(node, "y", (row - rootRow) * rowSpacing);
   }
-  const detached = graph.nodes().filter((n2) => !visited.has(n2));
+  const detached = graph.nodes().filter((n) => !visited.has(n));
   if (detached.length === 0)
     return;
   const ringRadius = Math.max(220, detached.length * 24);
@@ -10038,7 +10039,7 @@ function packLayout(graph) {
     return false;
   };
   const packSiblings = (ids) => {
-    const sorted = [...ids].sort((a3, b3) => (subtreeWeight.get(b3) ?? 1) - (subtreeWeight.get(a3) ?? 1));
+    const sorted = [...ids].sort((a, b) => (subtreeWeight.get(b) ?? 1) - (subtreeWeight.get(a) ?? 1));
     const circles = [];
     const baseRadius = (id) => Math.max(1, Math.sqrt(subtreeWeight.get(id) ?? 1));
     const spiralStep = 0.35;
@@ -10047,10 +10048,10 @@ function packLayout(graph) {
     for (const id of sorted) {
       const radius = baseRadius(id);
       let best = null;
-      for (let t2 = 0;t2 <= 2200; t2 += spiralStep) {
-        const radial = Math.max(radius + 0.25, radialFactor * Math.sqrt(t2) + radius + 0.12);
-        const x = Math.cos(t2) * radial;
-        const y = Math.sin(t2) * radial;
+      for (let t = 0;t <= 2200; t += spiralStep) {
+        const radial = Math.max(radius + 0.25, radialFactor * Math.sqrt(t) + radius + 0.12);
+        const x = Math.cos(t) * radial;
+        const y = Math.sin(t) * radial;
         if (collides(x, y, radius, circles, padding))
           continue;
         best = { id, x, y, radius };
@@ -10090,14 +10091,14 @@ function packLayout(graph) {
       return;
     const { circles, extentRadius } = packSiblings(nodeChildren);
     const usableRadius = Math.max(radius * 0.86, 28);
-    const scale2 = usableRadius / extentRadius;
+    const scale = usableRadius / extentRadius;
     for (const child of circles) {
-      const childRadius = child.radius * scale2;
-      place(child.id, x + child.x * scale2, y + child.y * scale2, childRadius);
+      const childRadius = child.radius * scale;
+      place(child.id, x + child.x * scale, y + child.y * scale, childRadius);
     }
   };
   place(root, 0, 0, rootRadius);
-  const detached = graph.nodes().filter((n2) => !visited.has(n2));
+  const detached = graph.nodes().filter((n) => !visited.has(n));
   if (detached.length === 0)
     return;
   const detachedRadius = Math.max(220, detached.length * 24);
@@ -10228,6 +10229,12 @@ function injectPanelStyles() {
       overflow: hidden;
       background: #12122b;
       transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+      max-height: 450px;
+      display: flex;
+      flex-direction: column;
+    }
+    .lookup-section-header {
+      flex-shrink: 0;
     }
     .lookup-section:hover {
       border-color: #3a3a68;
@@ -10305,6 +10312,8 @@ function injectPanelStyles() {
     }
     .lookup-section-body.expanded {
       display: block;
+      overflow: auto;
+      min-height: 0;
     }
     .lookup-table {
       width: 100%;
@@ -10566,20 +10575,20 @@ function makeResizable(panel, edge, onResize) {
   panel.appendChild(resizer);
   let resizing = false;
   let startX = 0, startW = 0;
-  resizer.addEventListener("mousedown", (e3) => {
+  resizer.addEventListener("mousedown", (e) => {
     if (isMobileViewport())
       return;
     resizing = true;
-    startX = e3.clientX;
+    startX = e.clientX;
     startW = panel.offsetWidth;
     panel.style.transition = "none";
-    e3.preventDefault();
-    e3.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
   });
-  document.addEventListener("mousemove", (e3) => {
+  document.addEventListener("mousemove", (e) => {
     if (!resizing)
       return;
-    const dx = e3.clientX - startX;
+    const dx = e.clientX - startX;
     const newW = edge === "right" ? startW + dx : startW - dx;
     if (newW >= 240 && newW <= window.innerWidth * 0.9) {
       panel.style.width = newW + "px";
@@ -10604,20 +10613,20 @@ function makeResizable(panel, edge, onResize) {
   panel.appendChild(vResizer);
   let vResizing = false;
   let startY = 0, startH = 0;
-  vResizer.addEventListener("mousedown", (e3) => {
+  vResizer.addEventListener("mousedown", (e) => {
     if (!isMobileViewport())
       return;
     vResizing = true;
-    startY = e3.clientY;
+    startY = e.clientY;
     startH = panel.getBoundingClientRect().height;
     panel.style.transition = "none";
-    e3.preventDefault();
-    e3.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
   });
-  document.addEventListener("mousemove", (e3) => {
+  document.addEventListener("mousemove", (e) => {
     if (!vResizing)
       return;
-    const dy = startY - e3.clientY;
+    const dy = startY - e.clientY;
     const newH = startH + dy;
     const minH = window.innerHeight * 0.2;
     const maxH = window.innerHeight * 0.92;
@@ -10718,7 +10727,7 @@ function showNodeDetails(nodeId, graph) {
   const metaRows = [
     `<tr><th>ID</th><td>${nodeId}</td></tr>`,
     `<tr><th>Tipo</th><td>${nodeType}</td></tr>`,
-    ...Object.entries(attrs).filter(([k2]) => !SKIP_ATTRS.has(k2)).map(([k2, v2]) => `<tr><th>${k2}</th><td>${valueText(v2)}</td></tr>`)
+    ...Object.entries(attrs).filter(([k]) => !SKIP_ATTRS.has(k)).map(([k, v]) => `<tr><th>${k}</th><td>${valueText(v)}</td></tr>`)
   ];
   meta.innerHTML = `<tbody>${metaRows.join("")}</tbody>`;
   body.appendChild(meta);
@@ -10741,12 +10750,12 @@ function showNodeDetails(nodeId, graph) {
     const table = document.createElement("table");
     table.className = "node-detail-table";
     const tbody = document.createElement("tbody");
-    for (const [k2, v2] of Object.entries(detail.attributes)) {
+    for (const [k, v] of Object.entries(detail.attributes)) {
       const tr = document.createElement("tr");
       const th = document.createElement("th");
-      th.textContent = k2;
+      th.textContent = k;
       const td = document.createElement("td");
-      td.textContent = valueText(v2);
+      td.textContent = valueText(v);
       tr.appendChild(th);
       tr.appendChild(td);
       tbody.appendChild(tr);
@@ -10761,7 +10770,7 @@ function renderResultSections(results, cnpj, graph) {
   const body = document.getElementById("lookup-body");
   body.innerHTML = "";
   let firstExpanded = false;
-  const sorted = [...results].sort((a3, b3) => (b3.count > 0 ? 1 : 0) - (a3.count > 0 ? 1 : 0));
+  const sorted = [...results].sort((a, b) => (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0));
   for (const result of sorted) {
     const section = document.createElement("div");
     section.dataset.datasetId = result.id;
@@ -10786,7 +10795,7 @@ function renderResultSections(results, cnpj, graph) {
     if (hasHits && result.rows.length > 0) {
       const cols = Object.keys(result.rows[0]);
       const cnpjCols = new Set(result.cnpjColumnNames ?? []);
-      const tHead = cols.map((c2) => `<th>${c2}</th>`).join("");
+      const tHead = cols.map((c) => `<th>${c}</th>`).join("");
       const table = document.createElement("table");
       table.className = "lookup-table";
       table.innerHTML = `<thead><tr>${tHead}</tr></thead><tbody></tbody>`;
@@ -10808,8 +10817,8 @@ function renderResultSections(results, cnpj, graph) {
             const span = document.createElement("span");
             span.className = "cnpj-link";
             span.textContent = text;
-            span.addEventListener("click", (e3) => {
-              e3.stopPropagation();
+            span.addEventListener("click", (e) => {
+              e.stopPropagation();
               const basico = extractBasico(text);
               window.open(`/?cnpj=${encodeURIComponent(basico)}`, "_blank", "noopener,noreferrer");
             });
@@ -10895,72 +10904,72 @@ async function init() {
   let data;
   try {
     data = await fetchGraph(cnpj);
-  } catch (e3) {
-    setStatus(`Erro ao carregar: ${e3.message}`);
+  } catch (e) {
+    setStatus(`Erro ao carregar: ${e.message}`);
     return;
   }
   const graph = new Graph;
   currentGraph = graph;
-  const rootNode = data.nodes.find((n2) => n2.type === "empresa");
+  const rootNode = data.nodes.find((n) => n.type === "empresa");
   const rootId = rootNode?.id ?? cnpj;
   layoutRootId = rootId;
   const bcLabel = document.getElementById("bc-label");
   if (bcLabel && rootNode?.label)
     bcLabel.textContent = rootNode.label;
-  for (const n2 of data.nodes) {
-    if (n2.inGraph === false)
+  for (const n of data.nodes) {
+    if (n.inGraph === false)
       continue;
-    knownNodeIds.add(n2.id);
-    nodeTypeMap.set(n2.id, n2.type);
-    graph.addNode(n2.id, n2.datasetId ? nodeAttrs(n2.type, n2.label, { datasetId: n2.datasetId }) : nodeAttrs(n2.type, n2.label, {
+    knownNodeIds.add(n.id);
+    nodeTypeMap.set(n.id, n.type);
+    graph.addNode(n.id, n.datasetId ? nodeAttrs(n.type, n.label, { datasetId: n.datasetId }) : nodeAttrs(n.type, n.label, {
       empresaId: rootId,
-      isRoot: n2.id === rootId
+      isRoot: n.id === rootId
     }));
-    if (n2.datasetId && n2.row) {
-      trackNodeDetail(n2.id, n2.datasetId, n2.datasetLabel ?? n2.datasetId, rootId, n2.row);
-      const signature = rowSignature(n2.datasetId, n2.row);
+    if (n.datasetId && n.row) {
+      trackNodeDetail(n.id, n.datasetId, n.datasetLabel ?? n.datasetId, rootId, n.row);
+      const signature = rowSignature(n.datasetId, n.row);
       if (!rowSignatureToNodeIds.has(signature)) {
         rowSignatureToNodeIds.set(signature, new Set);
       }
-      rowSignatureToNodeIds.get(signature).add(n2.id);
+      rowSignatureToNodeIds.get(signature).add(n.id);
     }
   }
-  const socioNodes = data.nodes.filter((n2) => n2.type === "socio");
-  const socioIds = new Set(socioNodes.map((n2) => n2.id));
+  const socioNodes = data.nodes.filter((n) => n.type === "socio");
+  const socioIds = new Set(socioNodes.map((n) => n.id));
   if (socioNodes.length > 0) {
     const socioGroupId = `group:${rootId}:socios`;
     ensureGroupNode(graph, socioGroupId, "Sócios", NODE_COLORS.socio, rootId);
-    for (const n2 of socioNodes) {
-      const edgeKey = `${socioGroupId}→${n2.id}`;
+    for (const n of socioNodes) {
+      const edgeKey = `${socioGroupId}→${n.id}`;
       knownLinkKeys.add(edgeKey);
-      if (!graph.hasEdge(socioGroupId, n2.id)) {
-        graph.addEdge(socioGroupId, n2.id, edgeAttrs());
+      if (!graph.hasEdge(socioGroupId, n.id)) {
+        graph.addEdge(socioGroupId, n.id, edgeAttrs());
       }
     }
   }
   const datasetGroupIds = new Set;
-  for (const n2 of data.nodes) {
-    if (!n2.datasetId)
+  for (const n of data.nodes) {
+    if (!n.datasetId)
       continue;
-    const groupId = `group:${rootId}:${n2.datasetId}`;
+    const groupId = `group:${rootId}:${n.datasetId}`;
     if (!datasetGroupIds.has(groupId)) {
       datasetGroupIds.add(groupId);
-      const groupColor = DATASET_COLORS[n2.datasetId] ?? "#888888";
-      ensureGroupNode(graph, groupId, n2.datasetLabel ?? n2.datasetId, groupColor, rootId);
+      const groupColor = DATASET_COLORS[n.datasetId] ?? "#888888";
+      ensureGroupNode(graph, groupId, n.datasetLabel ?? n.datasetId, groupColor, rootId);
     }
-    const edgeKey = `${groupId}→${n2.id}`;
+    const edgeKey = `${groupId}→${n.id}`;
     knownLinkKeys.add(edgeKey);
-    if (graph.hasNode(groupId) && graph.hasNode(n2.id) && !graph.hasEdge(groupId, n2.id)) {
-      graph.addEdge(groupId, n2.id, edgeAttrs());
+    if (graph.hasNode(groupId) && graph.hasNode(n.id) && !graph.hasEdge(groupId, n.id)) {
+      graph.addEdge(groupId, n.id, edgeAttrs());
     }
   }
-  const groupedIds = new Set([...socioIds, ...data.nodes.filter((n2) => n2.datasetId).map((n2) => n2.id)]);
-  for (const l2 of data.links) {
-    if (groupedIds.has(l2.source) || groupedIds.has(l2.target))
+  const groupedIds = new Set([...socioIds, ...data.nodes.filter((n) => n.datasetId).map((n) => n.id)]);
+  for (const l of data.links) {
+    if (groupedIds.has(l.source) || groupedIds.has(l.target))
       continue;
-    knownLinkKeys.add(`${l2.source}→${l2.target}`);
-    if (graph.hasNode(l2.source) && graph.hasNode(l2.target) && !graph.hasEdge(l2.source, l2.target)) {
-      graph.addEdge(l2.source, l2.target, edgeAttrs());
+    knownLinkKeys.add(`${l.source}→${l.target}`);
+    if (graph.hasNode(l.source) && graph.hasNode(l.target) && !graph.hasEdge(l.source, l.target)) {
+      graph.addEdge(l.source, l.target, edgeAttrs());
     }
   }
   renderer = new Sigma(graph, container, {
@@ -10974,8 +10983,8 @@ async function init() {
     labelSize: 12,
     labelWeight: "500",
     labelColor: { color: "#c8d0e0" },
-    nodeReducer: (node, data2) => {
-      const res = { ...data2 };
+    nodeReducer: (node, data) => {
+      const res = { ...data };
       if (currentLayout === "radial-compact" && compactHiddenNodeIds.has(node)) {
         return { ...res, hidden: true };
       }
@@ -11000,7 +11009,7 @@ async function init() {
         if (isSelected) {
           res.highlighted = true;
           res.color = COLOR_SELECTED;
-          res.size = (data2.size ?? 12) * 1.25;
+          res.size = (data.size ?? 12) * 1.25;
           res.zIndex = 10;
         } else if (isNeighbor) {
           res.zIndex = 5;
@@ -11012,18 +11021,18 @@ async function init() {
         }
       } else if (hoveredNode !== null) {
         if (node === hoveredNode) {
-          res.size = (data2.size ?? 12) * 1.15;
+          res.size = (data.size ?? 12) * 1.15;
           res.zIndex = 10;
         }
       }
       return res;
     },
-    edgeReducer: (edge, data2) => {
-      const res = { ...data2 };
-      const g2 = renderer?.getGraph();
-      if (currentLayout === "radial-compact" && g2) {
-        const src = g2.source(edge);
-        const tgt = g2.target(edge);
+    edgeReducer: (edge, data) => {
+      const res = { ...data };
+      const g = renderer?.getGraph();
+      if (currentLayout === "radial-compact" && g) {
+        const src = g.source(edge);
+        const tgt = g.target(edge);
         if (compactHiddenNodeIds.has(src) || compactHiddenNodeIds.has(tgt)) {
           return { ...res, hidden: true };
         }
@@ -11034,8 +11043,8 @@ async function init() {
         res.color = "rgba(96,122,176,0.45)";
       }
       if (selectedNode !== null) {
-        const src = g2?.source(edge);
-        const tgt = g2?.target(edge);
+        const src = g?.source(edge);
+        const tgt = g?.target(edge);
         const touchesSelected = src === selectedNode || tgt === selectedNode;
         if (touchesSelected) {
           res.color = COLOR_EDGE_HOVER;
@@ -11047,8 +11056,8 @@ async function init() {
           res.zIndex = 0;
         }
       } else if (hoveredNode !== null) {
-        const src = g2?.source(edge);
-        const tgt = g2?.target(edge);
+        const src = g?.source(edge);
+        const tgt = g?.target(edge);
         if (src === hoveredNode || tgt === hoveredNode) {
           res.color = COLOR_EDGE_HOVER;
           res.size = currentLayout === "collapsible-tree" ? 1.5 : 2;
@@ -11082,12 +11091,12 @@ async function init() {
   }
   const overlay = document.getElementById("loading-overlay");
   const nodesByDataset = new Map;
-  for (const n2 of data.nodes) {
-    if (!n2.datasetId)
+  for (const n of data.nodes) {
+    if (!n.datasetId)
       continue;
-    if (!nodesByDataset.has(n2.datasetId))
-      nodesByDataset.set(n2.datasetId, []);
-    nodesByDataset.get(n2.datasetId).push(n2);
+    if (!nodesByDataset.has(n.datasetId))
+      nodesByDataset.set(n.datasetId, []);
+    nodesByDataset.get(n.datasetId).push(n);
   }
   const lookupResults = Object.entries(DATASET_META).map(([id, meta]) => {
     const nodes = nodesByDataset.get(id) ?? [];
@@ -11097,7 +11106,7 @@ async function init() {
       id,
       label: meta.label,
       count: nodes.length,
-      rows: nodes.map((n2) => n2.row ?? { [meta.nodeLabelField ?? "label"]: n2.label }),
+      rows: nodes.map((n) => n.row ?? { [meta.nodeLabelField ?? "label"]: n.label }),
       cnpjColumnNames: meta.cnpjColumnNames,
       nodeType: meta.nodeType,
       nodeIdField: meta.nodeIdField,
@@ -11123,11 +11132,11 @@ async function init() {
     const nodeY = graph.getNodeAttribute(node, "y");
     dragOffset = { dx: nodeX - mousePos.x, dy: nodeY - mousePos.y };
   });
-  renderer.getMouseCaptor().on("mousemovebody", (e3) => {
+  renderer.getMouseCaptor().on("mousemovebody", (e) => {
     if (!draggedNode)
       return;
     isDragging = true;
-    const pos = renderer.viewportToGraph({ x: e3.x, y: e3.y });
+    const pos = renderer.viewportToGraph({ x: e.x, y: e.y });
     graph.setNodeAttribute(draggedNode, "x", pos.x + dragOffset.dx);
     graph.setNodeAttribute(draggedNode, "y", pos.y + dragOffset.dy);
   });
@@ -11164,4 +11173,4 @@ async function init() {
     showNodeDetails(node, graph);
   });
 }
-init().catch((e3) => setStatus(`Erro fatal: ${e3.message}`));
+init().catch((e) => setStatus(`Erro fatal: ${e.message}`));
