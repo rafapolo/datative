@@ -271,10 +271,10 @@ function safeNodeIdAndLabel(
 ): { nodeId: string; nodeLabel: string } {
   const docColumns = ds.cnpjColumns.map((c) => c.name);
   const rawId = row[idField] ?? fallbackIndex;
-  const idValue = isPersonalDocColumn(idField, docColumns) ? sanitizeCpfValue(rawId) : sanitizeAnyValue(rawId);
+  const idValue = isPersonalDocColumn(idField, docColumns) ? sanitizeCpfValue(rawId) : sanitizeAnyValue(rawId, idField);
   const nodeId = `${ds.id}:${idValue}`;
   const rawLabel = row[labelField];
-  const labelValue = isPersonalDocColumn(labelField, docColumns) ? sanitizeCpfValue(rawLabel) : sanitizeAnyValue(rawLabel);
+  const labelValue = isPersonalDocColumn(labelField, docColumns) ? sanitizeCpfValue(rawLabel) : sanitizeAnyValue(rawLabel, labelField);
   const nodeLabel = String(labelValue ?? nodeId);
   return { nodeId, nodeLabel };
 }

@@ -49,20 +49,46 @@ export function isPersonalDocColumn(columnName: string, cnpjColumnNames: readonl
 }
 
 // The fully punctuated form ("123.456.789-00") is unambiguous — no id, amount
-// or code is written that way — so it's masked in ANY column, not just
-// document columns. Found live: CVM's fca_escriturador has rows whose
-// `Escriturador` (a name field) holds the person's punctuated CPF.
-const PUNCTUATED_CPF = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+// or code is written that way — so it's masked wherever it appears, even
+// inside free text, in ANY column. Found live: CVM fca_escriturador's
+// `Escriturador` (a name field) holding a raw CPF, MGI's
+// `descricao_detalhada` quoting one mid-sentence.
+const PUNCTUATED_CPF_ANYWHERE = /(?<![\d.])\d{3}\.\d{3}\.\d{3}-\d{2}(?![\d-])/g;
 
-export function sanitizeAnyValue(value: unknown): unknown {
-  if (typeof value !== "string" || !PUNCTUATED_CPF.test(value.trim())) return value;
-  return maskCpf(value.replace(/\D/g, ""));
+// A bare 11-digit value is ambiguous (TSE `sequencial_candidato`, amounts and
+// other ids look the same and can pass the check digit by chance), so it's
+// masked outside document columns only when the column is a name/description
+// field — where a number can only be a person's document typed into the
+// wrong box (TSE `nome_fornecedor`/`nome_doador`, MIDES `razao_social`) —
+// AND it carries a valid CPF check digit — as the whole value or as a
+// standalone token inside it.
+const NAME_LIKE_COLUMN = /nome|razao|descri|fornecedor|doador|titular|interessado|empregador|infrator|embargado|sancionado|favorecido|contratad|vencedor|participante|responsavel|escriturador|acionista|label/i;
+
+const BARE_11_DIGITS = /(?<![\d.\/-])\d{11}(?![\d.\/-])/g;
+
+export function isValidCpf(digits: string): boolean {
+  if (!/^\d{11}$/.test(digits) || /^(\d)\1{10}$/.test(digits)) return false;
+  for (const len of [9, 10]) {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += Number(digits[i]) * (len + 1 - i);
+    if (((sum * 10) % 11) % 10 !== Number(digits[len])) return false;
+  }
+  return true;
+}
+
+export function sanitizeAnyValue(value: unknown, columnName = ""): unknown {
+  if (typeof value !== "string") return value;
+  const masked = value.replace(PUNCTUATED_CPF_ANYWHERE, (m) => maskCpf(m.replace(/\D/g, "")));
+  if (!NAME_LIKE_COLUMN.test(columnName)) return masked;
+  // Also catches a CPF appended to a name ("JOSE ... 03807593659", MIDES) or
+  // quoted in a description ("DEP. IDENT. CHEQUE 29950768810", TSE).
+  return masked.replace(BARE_11_DIGITS, (m) => (isValidCpf(m) ? maskCpf(m) : m));
 }
 
 export function sanitizeRow<T extends Record<string, unknown>>(row: T, cnpjColumnNames: readonly string[]): T {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(row)) {
-    out[k] = isPersonalDocColumn(k, cnpjColumnNames) ? sanitizeCpfValue(v) : sanitizeAnyValue(v);
+    out[k] = isPersonalDocColumn(k, cnpjColumnNames) ? sanitizeCpfValue(v) : sanitizeAnyValue(v, k);
   }
   return out as T;
 }

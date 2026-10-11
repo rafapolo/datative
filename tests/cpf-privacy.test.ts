@@ -137,3 +137,31 @@ describe("sanitizeAnyValue", () => {
     });
   });
 });
+
+describe("sanitizeAnyValue (free text and name fields)", () => {
+  test("masks a punctuated CPF inside free text", () => {
+    expect(sanitizeAnyValue("CONTRATADO 129.290.337-62 CONFORME PROCESSO", "descricao_detalhada")).toBe(
+      `CONTRATADO ${maskCpf("12929033762")} CONFORME PROCESSO`,
+    );
+  });
+
+  test("masks a bare valid CPF in a name field", () => {
+    expect(sanitizeAnyValue("03807593659", "razao_social")).toBe(maskCpf("03807593659"));
+  });
+
+  test("masks a bare valid CPF appended to a name", () => {
+    expect(sanitizeAnyValue("JOSE RICARDO COSTA ANDRE 03807593659", "razao_social")).toBe(`JOSE RICARDO COSTA ANDRE ${maskCpf("03807593659")}`);
+  });
+
+  test("leaves a 14-digit CNPJ inside a name untouched", () => {
+    expect(sanitizeAnyValue("EMPRESA X 12345678000195", "nome")).toBe("EMPRESA X 12345678000195");
+  });
+
+  test("leaves a bare 11-digit id alone in an id field even with a valid check digit", () => {
+    expect(sanitizeAnyValue("50000000132", "sequencial_candidato")).toBe("50000000132");
+  });
+
+  test("leaves a bare 11-digit value with an invalid check digit alone in a name field", () => {
+    expect(sanitizeAnyValue("12345678900", "nome")).toBe("12345678900");
+  });
+});
