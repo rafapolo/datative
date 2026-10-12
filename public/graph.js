@@ -9545,6 +9545,83 @@ var EdgeCurvedDoubleArrowProgram = createEdgeCurveProgram({
 
 // src/graph-client.ts
 var import_graphology_layout_forceatlas2 = __toESM(require_graphology_layout_forceatlas2(), 1);
+
+// src/lookup-sort.ts
+var DATE_COL = /data|date|(^|_)dt(_|$)|(^|_)dat(_|$)/i;
+function parseDateValue(v) {
+  if (v == null || v === "")
+    return null;
+  if (typeof v === "number") {
+    if (v > 100000000000) {
+      const d = new Date(v);
+      return d.getUTCFullYear() * 1e4 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+    }
+    return null;
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m)
+    return +m[1] * 1e4 + +m[2] * 100 + +m[3];
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m)
+    return +m[3] * 1e4 + +m[2] * 100 + +m[1];
+  if (/^\d{12,}$/.test(s))
+    return parseDateValue(Number(s));
+  return null;
+}
+function yearMonthKey(row, anoCol, mesCol) {
+  const ano = Number(row[anoCol]);
+  if (Number.isInteger(ano) && ano >= 180001 && ano <= 220012) {
+    const mes = ano % 100;
+    return mes >= 1 && mes <= 12 ? Math.floor(ano / 100) * 1e4 + mes * 100 : null;
+  }
+  if (!Number.isInteger(ano) || ano < 1800 || ano > 2200)
+    return null;
+  const mes = mesCol ? Number(row[mesCol]) : NaN;
+  return ano * 1e4 + (Number.isInteger(mes) && mes >= 1 && mes <= 12 ? mes * 100 : 0);
+}
+function rowDateKey(rows) {
+  if (rows.length === 0)
+    return null;
+  const cols = Object.keys(rows[0]);
+  const anoCol = cols.find((c) => /^ano/i.test(c));
+  const mesCol = cols.find((c) => /^mes(_|$)/i.test(c));
+  const byYear = anoCol ? (r) => yearMonthKey(r, anoCol, mesCol) : null;
+  for (const col of cols) {
+    if (!DATE_COL.test(col))
+      continue;
+    let filled = 0;
+    let parsed = 0;
+    for (const r of rows) {
+      const v = r[col];
+      if (v == null || v === "")
+        continue;
+      filled++;
+      if (parseDateValue(v) != null)
+        parsed++;
+    }
+    if (filled > 0 && parsed / filled >= 0.8) {
+      return (r) => parseDateValue(r[col]) ?? byYear?.(r) ?? null;
+    }
+  }
+  return byYear;
+}
+function sortRowsNewestFirst(rows) {
+  const key = rowDateKey(rows);
+  if (!key)
+    return rows;
+  return rows.map((row, i) => ({ row, i, k: key(row) })).sort((a, b) => {
+    if (a.k == null && b.k == null)
+      return a.i - b.i;
+    if (a.k == null)
+      return 1;
+    if (b.k == null)
+      return -1;
+    return b.k - a.k || a.i - b.i;
+  }).map((x) => x.row);
+}
+
+// src/graph-client.ts
 var EMPRESA_COLORS = [
   "#4a72a0",
   "#c07830",
@@ -11203,7 +11280,7 @@ async function init() {
       id,
       label: meta.label,
       count: nodes.length,
-      rows: nodes.map((n) => n.row ?? { [meta.nodeLabelField ?? "label"]: n.label }),
+      rows: sortRowsNewestFirst(nodes.map((n) => n.row ?? { [meta.nodeLabelField ?? "label"]: n.label })),
       cnpjColumnNames: meta.cnpjColumnNames,
       nodeType: meta.nodeType,
       nodeIdField: meta.nodeIdField,

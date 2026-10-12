@@ -3,6 +3,7 @@ import Sigma from "sigma";
 import { createEdgeCurveProgram } from "@sigma/edge-curve";
 import { drawDiscNodeLabel, drawDiscNodeHover } from "sigma/rendering";
 import forceAtlas2 from "graphology-layout-forceatlas2";
+import { sortRowsNewestFirst } from "./lookup-sort";
 
 interface GraphNode {
   id: string;
@@ -2154,7 +2155,9 @@ async function init() {
         id,
         label: meta.label,
         count: nodes.length,
-        rows: nodes.map((n) => n.row ?? { [meta.nodeLabelField ?? "label"]: n.label }),
+        rows: sortRowsNewestFirst(
+          nodes.map((n) => n.row ?? { [meta.nodeLabelField ?? "label"]: n.label }),
+        ),
         cnpjColumnNames: meta.cnpjColumnNames,
         nodeType: meta.nodeType,
         nodeIdField: meta.nodeIdField,
