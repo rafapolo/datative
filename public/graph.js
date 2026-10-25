@@ -10293,6 +10293,34 @@ function injectPanelStyles() {
     body[data-lookup-dock="right"] #node-details-panel.open {
       transform: translateX(0);
     }
+    /* With the lookup panel at the bottom, the node-details card shares
+       that strip: same height (--bottom-h, synced from the lookup panel in
+       updateGraphLayout), docked bottom-right, and the lookup panel gives
+       up its width (--details-w) while the card is open. */
+    body[data-lookup-dock="bottom"] #node-details-panel {
+      top: auto;
+      bottom: 30px;
+      left: auto;
+      right: 0;
+      width: 34vw;
+      min-width: 260px;
+      max-width: 60vw;
+      height: var(--bottom-h, 40vh);
+      max-height: none;
+      border-bottom: none;
+      border-top: 1px solid #23234a;
+      border-radius: 0;
+      transform: translateY(calc(100% + 30px));
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+    }
+    body[data-lookup-dock="bottom"] #node-details-panel.open {
+      transform: none;
+    }
+    @media (min-width: ${MOBILE_BREAKPOINT_PX + 1}px) {
+      body[data-lookup-dock="bottom"][data-details-open] #lookup-panel {
+        width: calc(100% - var(--details-w, 34vw)) !important;
+      }
+    }
     #lookup-actions {
       display: flex;
       align-items: center;
@@ -10836,7 +10864,14 @@ function updateGraphLayout() {
   if (!container || !panel)
     return;
   const dock = lookupDock();
-  const open = !isMobileViewport() && panel.classList.contains("open");
+  const details = document.getElementById("node-details-panel");
+  const detailsOpen = !!details?.classList.contains("open");
+  document.body.toggleAttribute("data-details-open", detailsOpen);
+  document.body.style.setProperty("--bottom-h", `${panel.offsetHeight}px`);
+  if (details) {
+    document.body.style.setProperty("--details-w", `${details.offsetWidth}px`);
+  }
+  const open = !isMobileViewport() && (panel.classList.contains("open") || dock === "bottom" && detailsOpen);
   const offset = open ? dock === "bottom" ? panel.offsetHeight : panel.offsetWidth : 0;
   const fab = document.getElementById("lookup-fab");
   if (fab)
@@ -10963,8 +10998,12 @@ function createNodeDetailsPanel() {
     if (dock === "bottom" && isMobileViewport())
       return "bottom";
     return dock === "right" ? "right" : "left";
-  });
+  }, updateGraphLayout);
   document.getElementById("lookup-dock")?.addEventListener("click", placeResizers);
+  new MutationObserver(updateGraphLayout).observe(panel, {
+    attributes: true,
+    attributeFilter: ["class"]
+  });
   return panel;
 }
 function showNodeDetails(nodeId, graph) {
