@@ -26,6 +26,7 @@
  * Usage:
  *   bun run scripts/generate-static-entities.ts [--top=50] [--per-dataset-limit=15] [--concurrency=6] [--force]
  *   bun run scripts/generate-static-entities.ts --ids=00000000,60701190   # rebuild only these empresas
+ *   bun run scripts/generate-static-entities.ts --ids=48391060 --add-to-index   # ...and upsert them into the index
  */
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import { resolve } from "path";
@@ -508,20 +509,35 @@ interface IndexEntry {
 // spot-checking a dataset change before a full run. Pessoa entities can't be
 // targeted this way: their public id is a CPF hash, and the raw CPF needed to
 // query beelink only comes out of the ranking pass.
-async function buildOnly(ids: string[]) {
+// With --add-to-index, the rebuilt empresas are also upserted into
+// entities-index.json (every other row kept as is) — for publishing a
+// specific entity on request, outside the top-N. datasetCount there is the
+// number of distinct datasets with hits in the built network, since no
+// ranking pass ran to count tables.
+async function buildOnly(ids: string[], addToIndex: boolean) {
   const t0 = Date.now();
   const built = await buildNetworks(ids.map((id) => ({ type: "empresa" as const, rawId: id, publicId: id })));
+  const entries: IndexEntry[] = [];
   for (const [id, { label, network }] of built) {
     writeFileSync(resolve(ENTITIES_DIR, `${id}.json`), JSON.stringify(network));
     const datasets = new Set(network.nodes.map((n) => n.datasetId).filter(Boolean));
     log("built", id, label, { nodes: network.nodes.length, datasets: datasets.size });
+    entries.push({ id, type: "empresa", label, datasetCount: datasets.size, path: `entities/${id}.json` });
+  }
+  if (addToIndex) {
+    const indexPath = resolve(OUT_DIR, "entities-index.json");
+    const previous: IndexEntry[] = existsSync(indexPath) ? JSON.parse(readFileSync(indexPath, "utf8")) : [];
+    const builtIds = new Set(entries.map((e) => e.id));
+    const index = [...previous.filter((e) => !builtIds.has(e.id)), ...entries];
+    writeFileSync(indexPath, JSON.stringify(index, null, 2));
+    log("index updated", { added: entries.length, total: index.length });
   }
   log("done", { entities: built.size, ms: Date.now() - t0 });
 }
 
 async function main() {
   if (args.ids) {
-    await buildOnly(args.ids.split(",").map((x) => x.trim()).filter(Boolean));
+    await buildOnly(args.ids.split(",").map((x) => x.trim()).filter(Boolean), args["add-to-index"] === "true");
     return;
   }
   const ranked = await rankEntities();
