@@ -549,7 +549,10 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     label: "PGFN · Dívida Ativa",
     color: "#991b1b",
     table: "basedosdados.br_pgfn_dividaativa.divida",
-    cnpjColumns: [{ name: "CPF_CNPJ", type: "mixed", normalize: true }],
+    // cnpj_basico (clean root, companies only; the table is sorted by it since 2026-10-25) instead
+    // of CPF_CNPJ: individuals' CPFs come masked (XXX048.379XX), so the mixed column only ever
+    // matched companies, through a regexp over 49.7M rows per batch
+    cnpjColumns: [{ name: "cnpj_basico", type: "basico" }],
     displayFields: ["NOME_DEVEDOR", "CPF_CNPJ", "TIPO_DEVEDOR", "RECEITA_PRINCIPAL", "VALOR_CONSOLIDADO", "SITUACAO_INSCRICAO", "DATA_INSCRICAO", "UF_DEVEDOR"],
     nodeIdField: "NUMERO_INSCRICAO",
     nodeLabelField: "NOME_DEVEDOR",
