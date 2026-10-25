@@ -16,6 +16,7 @@
  */
 import { mkdirSync, writeFileSync, cpSync, existsSync, readFileSync } from "fs";
 import { resolve } from "path";
+import { createHash } from "crypto";
 import { loadEntitiesIndex, renderGraphLanding, renderGraphPage, type LinkScheme } from "../src/render";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -29,17 +30,24 @@ function log(...args: unknown[]) {
   console.log(`[${new Date().toISOString().slice(11, 23)}]`, ...args);
 }
 
-const STATIC_LINKS: LinkScheme = {
-  home: "index.html",
-  favicon: "favicon.svg",
-  graphJs: "graph.js",
-  entityHref: (id) => `e-${id}.html`,
-};
+// graph.js carries a content hash in its URL: the pages reference a fixed
+// path, so without it a browser (or Pages' CDN) keeps serving the previous
+// bundle after a deploy and the new pages run against stale client code.
+function staticLinks(graphJs: string): LinkScheme {
+  const v = createHash("sha256").update(graphJs).digest("hex").slice(0, 10);
+  return {
+    home: "index.html",
+    favicon: "favicon.svg",
+    graphJs: `graph.js?v=${v}`,
+    entityHref: (id) => `e-${id}.html`,
+  };
+}
 
 function main() {
   if (!existsSync(GRAPH_JS_PATH)) {
     throw new Error("public/graph.js not found — run `bun run build:graph` first.");
   }
+  const STATIC_LINKS = staticLinks(readFileSync(GRAPH_JS_PATH, "utf-8"));
   const entitiesIndex = loadEntitiesIndex();
   if (entitiesIndex.length === 0) {
     log("WARNING: static/entities-index.json is empty or missing — landing page will show no entities.");

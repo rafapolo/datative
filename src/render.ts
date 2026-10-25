@@ -13,6 +13,27 @@ export interface EntityIndexEntry {
   path: string;
 }
 
+// A curated set of published entities — e.g. every company and person a
+// write-up cites — shown on the landing as a shortcut and opened with ?c=<id>,
+// which narrows both panels to the set. Entities must already be published.
+export interface Collection {
+  id: string;
+  title: string;
+  description: string;
+  href?: string; // the write-up the set comes from
+  ids: string[];
+}
+
+const COLLECTIONS_PATH = resolve(STATIC_DIR, "collections.json");
+
+export function loadCollections(): Collection[] {
+  try {
+    return JSON.parse(readFileSync(COLLECTIONS_PATH, "utf-8")) as Collection[];
+  } catch {
+    return [];
+  }
+}
+
 export function loadEntitiesIndex(): EntityIndexEntry[] {
   try {
     return JSON.parse(readFileSync(ENTITIES_INDEX_PATH, "utf-8")) as EntityIndexEntry[];
@@ -40,11 +61,13 @@ export interface LinkScheme {
   entityHref: (id: string) => string; // landing row -> that entity's graph page
 }
 
-function renderEntityRow(e: EntityIndexEntry, links: LinkScheme): string {
+function renderEntityRow(e: EntityIndexEntry, links: LinkScheme, collectionsOf: Map<string, string[]>): string {
   // data-search feeds the landing's client-side filter (lowercased, accents
-  // stripped in the inline script's normalizer on both sides).
+  // stripped in the inline script's normalizer on both sides); data-c lists
+  // the collections the row belongs to, for the ?c= filter.
+  const c = (collectionsOf.get(e.id) ?? []).join(" ");
   return (
-    `<a href="${escHtml(links.entityHref(e.id))}" class="ci-row ci-${e.type}" data-search="${escHtml(`${e.id} ${e.label}`)}">` +
+    `<a href="${escHtml(links.entityHref(e.id))}" class="ci-row ci-${e.type}" data-search="${escHtml(`${e.id} ${e.label}`)}" data-c="${escHtml(c)}">` +
     `<span class="ci-cnpj">${escHtml(e.id)}</span>` +
     `<span class="ci-name">${escHtml(e.label)}</span>` +
     `<span class="ci-porte" title="${e.datasetCount} bases com registro">${e.datasetCount}<span class="ci-porte-unit"> bases</span></span>` +
@@ -52,9 +75,9 @@ function renderEntityRow(e: EntityIndexEntry, links: LinkScheme): string {
   );
 }
 
-function renderEntityPanel(title: string, kind: "empresa" | "pessoa", entities: EntityIndexEntry[], links: LinkScheme): string {
+function renderEntityPanel(title: string, kind: "empresa" | "pessoa", entities: EntityIndexEntry[], links: LinkScheme, collectionsOf: Map<string, string[]>): string {
   const rows = entities.length
-    ? entities.map((e) => renderEntityRow(e, links)).join("")
+    ? entities.map((e) => renderEntityRow(e, links, collectionsOf)).join("")
     : `<div style="padding:1rem 1.2rem;color:var(--muted);font-size:0.8rem">Nenhuma entidade pré-computada ainda — rode <code>bun run generate:static</code>.</div>`;
   return `<aside class="ci-panel ci-panel-${kind}">
       <div class="ci-panel-header">
@@ -68,9 +91,16 @@ function renderEntityPanel(title: string, kind: "empresa" | "pessoa", entities: 
     </aside>`;
 }
 
-export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: LinkScheme): string {
+export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: LinkScheme, collections: Collection[] = loadCollections()): string {
   const empresas = entitiesIndex.filter((e) => e.type === "empresa");
   const pessoas = entitiesIndex.filter((e) => e.type === "pessoa");
+  const collectionsOf = new Map<string, string[]>();
+  for (const c of collections) for (const id of c.ids) collectionsOf.set(id, [...(collectionsOf.get(id) ?? []), c.id]);
+  const collectionsNav = collections.length
+    ? `<nav class="ci-collections" aria-label="Coleções">` +
+      collections.map((c) => `<a class="ci-chip" href="?c=${encodeURIComponent(c.id)}">${escHtml(c.title)} <span>${c.ids.length}</span></a>`).join("") +
+      `</nav>`
+    : "";
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -313,6 +343,20 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
     }
     .ci-search::placeholder { color: var(--muted); }
     .ci-search:focus { border-color: var(--gold); }
+    .ci-collections { display: flex; flex-wrap: wrap; gap: 0.4rem; max-width: 460px; margin-bottom: 0.6rem; }
+    .ci-chip {
+      font: 400 0.75rem 'Space Mono', monospace; color: var(--gold); text-decoration: none;
+      border: 1px solid var(--border); border-radius: 999px; padding: 0.25rem 0.7rem;
+    }
+    .ci-chip span { color: var(--muted); margin-left: 0.3em; }
+    .ci-chip:hover, .ci-chip.active { border-color: var(--gold); }
+    .ci-collection {
+      max-width: 460px; margin: 0.2rem 0 0.6rem; padding: 0.7rem 0.9rem;
+      border-left: 2px solid var(--gold); background: #0b0b1c; font-size: 0.82rem; line-height: 1.5;
+    }
+    .ci-collection strong { display: block; color: var(--text); margin-bottom: 0.25rem; }
+    .ci-collection p { color: var(--muted); margin-bottom: 0.4rem; }
+    .ci-collection a { color: var(--gold); margin-right: 1rem; }
     .ci-tabs { display: none; }
     /* Below this, the desktop 3-column row (logo | Empresas | Pessoas) has no
        room to breathe — stack them instead. The page still never scrolls as
@@ -386,14 +430,16 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
       <div class="gold-rule"></div>
       <p class="tagline">Cruzamento de CNPJs com bases públicas federais — Receita Federal, CGU, TSE, SIAFI e mais.</p>
       <p class="tagline">Entidades pré-computadas, sem consulta ao vivo — clique numa entidade abaixo para ver a rede.</p>
+      ${collectionsNav}
+      <div id="ci-collection" class="ci-collection" hidden></div>
       <input id="entity-search" class="ci-search" type="search" placeholder="Buscar empresa, pessoa ou CNPJ" autocomplete="off" spellcheck="false" aria-label="Buscar entidade">
       <div class="ci-tabs" role="tablist">
         <button type="button" class="ci-tab active" data-tab="empresa" role="tab" aria-selected="true">Empresas <span>${empresas.length}</span></button>
         <button type="button" class="ci-tab" data-tab="pessoa" role="tab" aria-selected="false">Pessoas <span>${pessoas.length}</span></button>
       </div>
     </main>
-    ${renderEntityPanel("Empresas", "empresa", empresas, links)}
-    ${renderEntityPanel("Pessoas", "pessoa", pessoas, links)}
+    ${renderEntityPanel("Empresas", "empresa", empresas, links, collectionsOf)}
+    ${renderEntityPanel("Pessoas", "pessoa", pessoas, links, collectionsOf)}
   </div>
   <script>
     (function () {
@@ -401,22 +447,40 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
       var rows = Array.prototype.slice.call(document.querySelectorAll(".ci-row"));
       rows.forEach(function (r) { r.dataset.search = norm(r.dataset.search || ""); });
       var input = document.getElementById("entity-search");
-      input.addEventListener("input", function () {
+      var collections = ${JSON.stringify(collections.map(({ id, title, description, href }) => ({ id, title, description, href })))
+        .replace(/</g, "\\u003c")};
+      var cid = new URLSearchParams(location.search).get("c");
+      var coll = collections.filter(function (c) { return c.id === cid; })[0] || null;
+      if (coll) {
+        var box = document.getElementById("ci-collection");
+        var h = document.createElement("strong"); h.textContent = coll.title;
+        var p = document.createElement("p"); p.textContent = coll.description;
+        box.append(h, p);
+        if (coll.href) { var a = document.createElement("a"); a.href = coll.href; a.target = "_blank"; a.rel = "noopener"; a.textContent = "ler a análise →"; box.appendChild(a); }
+        var all = document.createElement("a"); all.href = "?"; all.textContent = "ver todas as entidades"; box.appendChild(all);
+        box.hidden = false;
+        document.querySelectorAll('.ci-chip[href="?c=' + encodeURIComponent(coll.id) + '"]').forEach(function (c) { c.classList.add("active"); });
+      }
+      var inColl = function (r) { return !coll || (" " + r.dataset.c + " ").indexOf(" " + coll.id + " ") !== -1; };
+      var apply = function () {
         var q = norm(input.value.trim()).replace(/[.\/-]/g, "");
+        var filtering = q || coll;
         document.querySelectorAll(".ci-panel").forEach(function (panel) {
           var shown = 0;
           panel.querySelectorAll(".ci-row").forEach(function (r) {
-            var hit = !q || r.dataset.search.replace(/[.\/-]/g, "").indexOf(q) !== -1;
+            var hit = inColl(r) && (!q || r.dataset.search.replace(/[.\/-]/g, "").indexOf(q) !== -1);
             r.hidden = !hit;
             if (hit) shown++;
           });
           var count = panel.querySelector(".ci-panel-count");
-          count.textContent = q ? shown + "/" + count.dataset.total : count.dataset.total;
+          count.textContent = filtering ? shown + "/" + count.dataset.total : count.dataset.total;
           panel.querySelector(".ci-empty").hidden = shown > 0;
           var tab = document.querySelector('.ci-tab[data-tab="' + (panel.classList.contains("ci-panel-pessoa") ? "pessoa" : "empresa") + '"] span');
-          if (tab) tab.textContent = q ? String(shown) : count.dataset.total;
+          if (tab) tab.textContent = filtering ? String(shown) : count.dataset.total;
         });
-      });
+      };
+      input.addEventListener("input", apply);
+      apply();
       var layout = document.querySelector(".layout");
       layout.dataset.tab = "empresa";
       document.querySelectorAll(".ci-tab").forEach(function (btn) {

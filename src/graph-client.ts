@@ -1191,6 +1191,7 @@ function injectPanelStyles() {
       text-decoration: underline dotted;
     }
     .cnpj-link:hover { color: #fff; }
+    .node-entity-link { display: inline-block; margin: 0 0 0.6rem; font-size: 0.8rem; }
     .lookup-more {
       display: block;
       width: 100%;
@@ -1625,6 +1626,18 @@ function showNodeDetails(nodeId: string, graph: Graph) {
       .map(([k, v]) => `<tr><th>${k}</th><td>${valueText(v)}</td></tr>`),
   ];
   meta.innerHTML = `<tbody>${metaRows.join("")}</tbody>`;
+  // A sócio with a full CPF has id hashCpf(cpf) and an empresa node has its
+  // cnpj_basico — the same public ids the generator publishes pages under, so
+  // a node with its own page links straight to that entity's network.
+  if (nodeId !== currentLookupCnpj && PUBLISHED_IDS.has(nodeId)) {
+    const open = document.createElement("a");
+    open.className = "cnpj-link node-entity-link";
+    open.textContent = "abrir a rede desta entidade →";
+    open.href = ENTITY_HREF_TEMPLATE.replace("__ID__", encodeURIComponent(nodeId));
+    open.target = "_blank";
+    open.rel = "noopener";
+    body.appendChild(open);
+  }
   body.appendChild(meta);
 
   const openPanel = () => {
@@ -1923,8 +1936,10 @@ async function init() {
   const graph = new Graph();
   currentGraph = graph;
 
-  // The first empresa node is the root cnpj
-  const rootNode = data.nodes.find((n) => n.type === "empresa");
+  // The root is the entity's own node (id = the page's cnpj_basico or CPF
+  // hash). A pessoa's network lists its companies as empresa nodes too, so
+  // "first empresa node" would put one of them at the center.
+  const rootNode = data.nodes.find((n) => n.id === cnpj) ?? data.nodes.find((n) => n.type === "empresa");
   const rootId = rootNode?.id ?? cnpj;
   layoutRootId = rootId;
   // Update breadcrumb with company name
@@ -1957,8 +1972,9 @@ async function init() {
     }
   }
 
-  // Group socios under a "Sócios" hub node instead of direct empresa→socio edges
-  const socioNodes = data.nodes.filter((n) => n.type === "socio");
+  // Group socios under a "Sócios" hub node instead of direct empresa→socio edges.
+  // On a pessoa page the root is itself a socio node — never group it.
+  const socioNodes = data.nodes.filter((n) => n.type === "socio" && n.id !== rootId && n.inGraph !== false);
   const socioIds = new Set(socioNodes.map((n) => n.id));
   if (socioNodes.length > 0) {
     const socioGroupId = `group:${rootId}:socios`;
@@ -1968,6 +1984,22 @@ async function init() {
       knownLinkKeys.add(edgeKey);
       if (!graph.hasEdge(socioGroupId, n.id)) {
         graph.addEdge(socioGroupId, n.id, edgeAttrs());
+      }
+    }
+  }
+
+  // A pessoa's companies (non-dataset empresa nodes) hang off an "Empresas"
+  // hub, the mirror of the "Sócios" hub on an empresa page.
+  const empresaIds = new Set<string>();
+  if (rootNode && rootNode.type !== "empresa") {
+    const empresaNodes = data.nodes.filter((n) => n.type === "empresa" && !n.datasetId && n.id !== rootId && n.inGraph !== false);
+    if (empresaNodes.length > 0) {
+      const empresaGroupId = `group:${rootId}:empresas`;
+      ensureGroupNode(graph, empresaGroupId, "Empresas", NODE_COLORS.empresa, rootId);
+      for (const n of empresaNodes) {
+        empresaIds.add(n.id);
+        knownLinkKeys.add(`${empresaGroupId}→${n.id}`);
+        if (!graph.hasEdge(empresaGroupId, n.id)) graph.addEdge(empresaGroupId, n.id, edgeAttrs());
       }
     }
   }
@@ -1994,7 +2026,7 @@ async function init() {
 
   // Any remaining link not covered by the sócios/dataset grouping above
   // (e.g. empresa→empresa edges from holdings/ownership hits).
-  const groupedIds = new Set<string>([...socioIds, ...data.nodes.filter((n) => n.datasetId).map((n) => n.id)]);
+  const groupedIds = new Set<string>([...socioIds, ...empresaIds, ...data.nodes.filter((n) => n.datasetId).map((n) => n.id)]);
   for (const l of data.links) {
     if (groupedIds.has(l.source) || groupedIds.has(l.target)) continue;
     knownLinkKeys.add(`${l.source}→${l.target}`);

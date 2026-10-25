@@ -986,7 +986,7 @@ EventEmitterPrototype.eventNames = function() {
   return this._eventsCount > 0 ? Reflect.ownKeys(this._events) : [];
 };
 EventEmitterPrototype[kCapture] = false;
-function once2(emitter, type, options) {
+function once(emitter, type, options) {
   var signal = options?.signal;
   if (validateAbortSignal(signal, "options.signal"), signal?.aborted)
     throw new AbortError(undefined, { cause: signal?.reason });
@@ -1014,7 +1014,7 @@ function once2(emitter, type, options) {
 function getEventListeners(emitter, type) {
   return emitter.listeners(type);
 }
-function setMaxListeners2(n, ...eventTargets) {
+function setMaxListeners(n, ...eventTargets) {
   validateNumber(n, "setMaxListeners", 0);
   var length;
   if (eventTargets && (length = eventTargets.length))
@@ -1023,7 +1023,7 @@ function setMaxListeners2(n, ...eventTargets) {
   else
     defaultMaxListeners = n;
 }
-function listenerCount2(emitter, type) {
+function listenerCount(emitter, type) {
   return emitter.listenerCount(type);
 }
 function eventTargetAgnosticRemoveListener(emitter, name, listener, flags) {
@@ -1076,7 +1076,7 @@ function validateBoolean(value, name) {
   if (typeof value !== "boolean")
     throw ERR_INVALID_ARG_TYPE(name, "boolean", value);
 }
-function getMaxListeners2(emitterOrTarget) {
+function getMaxListeners(emitterOrTarget) {
   return emitterOrTarget?._maxListeners ?? defaultMaxListeners;
 }
 function addAbortListener(signal, listener) {
@@ -1099,12 +1099,10 @@ Object.defineProperties(EventEmitter, { captureRejections: { get() {
   return EventEmitterPrototype[kCapture];
 }, set(value) {
   validateBoolean(value, "EventEmitter.captureRejections"), EventEmitterPrototype[kCapture] = value;
-}, enumerable: true }, defaultMaxListeners: { enumerable: true, get: () => {
-  return defaultMaxListeners;
-}, set: (arg) => {
+}, enumerable: true }, defaultMaxListeners: { enumerable: true, get: () => defaultMaxListeners, set: (arg) => {
   validateNumber(arg, "defaultMaxListeners", 0), defaultMaxListeners = arg;
 } }, kMaxEventTargetListeners: { value: kMaxEventTargetListeners, enumerable: false, configurable: false, writable: false }, kMaxEventTargetListenersWarned: { value: kMaxEventTargetListenersWarned, enumerable: false, configurable: false, writable: false } });
-Object.assign(EventEmitter, { once: once2, getEventListeners, getMaxListeners: getMaxListeners2, setMaxListeners: setMaxListeners2, EventEmitter, usingDomains: false, captureRejectionSymbol, errorMonitor: kErrorMonitor, addAbortListener, init: EventEmitter, listenerCount: listenerCount2 });
+Object.assign(EventEmitter, { once, getEventListeners, getMaxListeners, setMaxListeners, EventEmitter, usingDomains: false, captureRejectionSymbol, errorMonitor: kErrorMonitor, addAbortListener, init: EventEmitter, listenerCount });
 
 // node_modules/graphology/dist/graphology.mjs
 function assignPolyfill() {
@@ -10478,6 +10476,7 @@ function injectPanelStyles() {
       text-decoration: underline dotted;
     }
     .cnpj-link:hover { color: #fff; }
+    .node-entity-link { display: inline-block; margin: 0 0 0.6rem; font-size: 0.8rem; }
     .lookup-more {
       display: block;
       width: 100%;
@@ -10857,6 +10856,15 @@ function showNodeDetails(nodeId, graph) {
     ...Object.entries(attrs).filter(([k]) => !SKIP_ATTRS.has(k)).map(([k, v]) => `<tr><th>${k}</th><td>${valueText(v)}</td></tr>`)
   ];
   meta.innerHTML = `<tbody>${metaRows.join("")}</tbody>`;
+  if (nodeId !== currentLookupCnpj && PUBLISHED_IDS.has(nodeId)) {
+    const open = document.createElement("a");
+    open.className = "cnpj-link node-entity-link";
+    open.textContent = "abrir a rede desta entidade →";
+    open.href = ENTITY_HREF_TEMPLATE.replace("__ID__", encodeURIComponent(nodeId));
+    open.target = "_blank";
+    open.rel = "noopener";
+    body.appendChild(open);
+  }
   body.appendChild(meta);
   const openPanel = () => {
     if (isMobileViewport()) {
@@ -11084,7 +11092,7 @@ async function init() {
   }
   const graph = new Graph;
   currentGraph = graph;
-  const rootNode = data.nodes.find((n) => n.type === "empresa");
+  const rootNode = data.nodes.find((n) => n.id === cnpj) ?? data.nodes.find((n) => n.type === "empresa");
   const rootId = rootNode?.id ?? cnpj;
   layoutRootId = rootId;
   const bcLabel = document.getElementById("bc-label");
@@ -11108,7 +11116,7 @@ async function init() {
       rowSignatureToNodeIds.get(signature).add(n.id);
     }
   }
-  const socioNodes = data.nodes.filter((n) => n.type === "socio");
+  const socioNodes = data.nodes.filter((n) => n.type === "socio" && n.id !== rootId && n.inGraph !== false);
   const socioIds = new Set(socioNodes.map((n) => n.id));
   if (socioNodes.length > 0) {
     const socioGroupId = `group:${rootId}:socios`;
@@ -11118,6 +11126,20 @@ async function init() {
       knownLinkKeys.add(edgeKey);
       if (!graph.hasEdge(socioGroupId, n.id)) {
         graph.addEdge(socioGroupId, n.id, edgeAttrs());
+      }
+    }
+  }
+  const empresaIds = new Set;
+  if (rootNode && rootNode.type !== "empresa") {
+    const empresaNodes = data.nodes.filter((n) => n.type === "empresa" && !n.datasetId && n.id !== rootId && n.inGraph !== false);
+    if (empresaNodes.length > 0) {
+      const empresaGroupId = `group:${rootId}:empresas`;
+      ensureGroupNode(graph, empresaGroupId, "Empresas", NODE_COLORS.empresa, rootId);
+      for (const n of empresaNodes) {
+        empresaIds.add(n.id);
+        knownLinkKeys.add(`${empresaGroupId}→${n.id}`);
+        if (!graph.hasEdge(empresaGroupId, n.id))
+          graph.addEdge(empresaGroupId, n.id, edgeAttrs());
       }
     }
   }
@@ -11137,7 +11159,7 @@ async function init() {
       graph.addEdge(groupId, n.id, edgeAttrs());
     }
   }
-  const groupedIds = new Set([...socioIds, ...data.nodes.filter((n) => n.datasetId).map((n) => n.id)]);
+  const groupedIds = new Set([...socioIds, ...empresaIds, ...data.nodes.filter((n) => n.datasetId).map((n) => n.id)]);
   for (const l of data.links) {
     if (groupedIds.has(l.source) || groupedIds.has(l.target))
       continue;
