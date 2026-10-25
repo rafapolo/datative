@@ -1237,5 +1237,96 @@
     "label": "CARBON CER SPE LTDA",
     "datasetCount": 1,
     "path": "entities/52193793.json"
+  },
+  {
+    "id": "8dca70d5329a29bc",
+    "type": "pessoa",
+    "label": "ADILSON BARROSO OLIVEIRA",
+    "datasetCount": 5,
+    "path": "entities/8dca70d5329a29bc.json"
+  },
+  {
+    "id": "b5eecdbc929bb1da",
+    "type": "pessoa",
+    "label": "ANTONIO CARLOS CAMILO ANTUNES",
+    "datasetCount": 1,
+    "path": "entities/b5eecdbc929bb1da.json"
+  },
+  {
+    "id": "54d93e739eb9af94",
+    "type": "pessoa",
+    "label": "CARLOS NANTES BOLSONARO",
+    "datasetCount": 2,
+    "path": "entities/54d93e739eb9af94.json"
+  },
+  {
+    "id": "49d9790f123252e8",
+    "type": "pessoa",
+    "label": "CIRO NOGUEIRA LIMA FILHO",
+    "datasetCount": 3,
+    "path": "entities/49d9790f123252e8.json"
+  },
+  {
+    "id": "dcd84b93a80f3a26",
+    "type": "pessoa",
+    "label": "ELIZIANE PEREIRA GAMA MELO",
+    "datasetCount": 4,
+    "path": "entities/dcd84b93a80f3a26.json"
+  },
+  {
+    "id": "4835e0d6aa1cac6f",
+    "type": "pessoa",
+    "label": "EUGENIO JOSE GUILHERME DE ARAGAO",
+    "datasetCount": 2,
+    "path": "entities/4835e0d6aa1cac6f.json"
+  },
+  {
+    "id": "61176392a128d138",
+    "type": "pessoa",
+    "label": "FERNANDO JOSE DE SOUZA MARANGONI",
+    "datasetCount": 5,
+    "path": "entities/61176392a128d138.json"
+  },
+  {
+    "id": "365a1398378c1993",
+    "type": "pessoa",
+    "label": "FLAVIO NANTES BOLSONARO",
+    "datasetCount": 2,
+    "path": "entities/365a1398378c1993.json"
+  },
+  {
+    "id": "ea96a2ee3be5a4ee",
+    "type": "pessoa",
+    "label": "HIRAN MANUEL GONCALVES DA SILVA",
+    "datasetCount": 3,
+    "path": "entities/ea96a2ee3be5a4ee.json"
+  },
+  {
+    "id": "5d9e0c1b43546019",
+    "type": "pessoa",
+    "label": "JOSE JUSCELINO DOS SANTOS REZENDE FILHO",
+    "datasetCount": 4,
+    "path": "entities/5d9e0c1b43546019.json"
+  },
+  {
+    "id": "7b3a3934ba2aa572",
+    "type": "pessoa",
+    "label": "LIDIA MARIA FIGUEIREDO MAZELLI",
+    "datasetCount": 0,
+    "path": "entities/7b3a3934ba2aa572.json"
+  },
+  {
+    "id": "b6825aa80e924ac8",
+    "type": "pessoa",
+    "label": "WEVERTON ROCHA MARQUES DE SOUSA",
+    "datasetCount": 4,
+    "path": "entities/b6825aa80e924ac8.json"
+  },
+  {
+    "id": "23d51e27cd82d78d",
+    "type": "pessoa",
+    "label": "WILLER TOMAZ DE SOUZA",
+    "datasetCount": 3,
+    "path": "entities/23d51e27cd82d78d.json"
   }
 ]
