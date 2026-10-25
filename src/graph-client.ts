@@ -1029,6 +1029,7 @@ function injectPanelStyles() {
       right: auto;
       left: 0;
       border-left: none;
+      border-top: 1px solid #23234a;
       border-right: 1px solid #23234a;
       border-radius: 0 0 10px 0;
       transform: translateX(-100%);
@@ -1054,7 +1055,7 @@ function injectPanelStyles() {
       /* Same surface and top edge as the lookup panel beside it, so the two
          headers line up as one bar — only the left border divides them. */
       background: #0f0f22;
-      border-top: none;
+      border-top: 1px solid #23234a;
       border-bottom: none;
       border-radius: 0;
       transform: translateY(calc(100% + 30px));
