@@ -30,7 +30,7 @@ No build step for the dev server — Bun JIT-compiles TypeScript directly. `publ
 
 **The app is a fully static site**, servable two ways from the same `render.ts` templates:
 1. **Dev server** (`src/index.ts`, `Bun.serve`) — renders pages on request from `static/`, using absolute (`/foo`) links.
-2. **Static export** (`scripts/build-site.ts` → `dist/`, deployed to GitHub Pages by `.github/workflows/pages.yml`) — pre-renders every page to a file at build time, using relative (`foo`) links, because a GitHub Pages *project* page serves from a subpath (`https://user.github.io/datative/`), not domain root.
+2. **Static export** (`scripts/build-site.ts` → `dist/`, published by rodado under `rodado.xyz/plataformas/datative/`) — pre-renders every page to a file at build time, using relative (`foo`) links, because the site is served from a subpath, not domain root.
 
 Neither ever queries live data — every route/file either serves a hardcoded HTML shell or reads a file under `static/`. All live querying happens offline, in `scripts/generate-static-entities.ts`, run manually against beelink.
 
@@ -55,14 +55,11 @@ Neither ever queries live data — every route/file either serves a hardcoded HT
 
 **Stack:** TypeScript (strict) · Bun runtime · Sigma 3 · server-rendered HTML shell + static JSON · Portuguese UI.
 
-## Deploy — rodado.xyz/plataformas/datative and GitHub Pages
+## Deploy — rodado.xyz/plataformas/datative
 
-The canonical address is `https://rodado.xyz/plataformas/datative/`: the `rafapolo/rodado` Pages workflow checks this repo out, runs `build:graph` + `build:site` and copies `dist/` there on every rodado deploy. `.github/workflows/publica-rodado.yml` sends it a `datative-updated` repository_dispatch on each push here, so a push redeploys rodado without waiting for an unrelated change; it needs the `RODADO_DEPLOY_TOKEN` secret (same token as rios-do-brasil/tse-bens) and just logs and exits while it's unset. Relative links (see Architecture) are what make the same `dist/` work under both subpaths. Links written elsewhere (rodado analyses, `static/collections.json`) should point at the rodado address.
+The site lives at `https://rodado.xyz/plataformas/datative/`: the `rafapolo/rodado` Pages workflow checks this repo out, runs `bun install`, `build:graph` and `build:site` and copies `dist/` there on every rodado deploy. It does **not** run `generate:static` — a GitHub-hosted runner has no SSH key for beelink — so `static/entities/*.json` must already be committed. `.github/workflows/publica-rodado.yml` sends rodado a `datative-updated` repository_dispatch on each push here, so a push redeploys without waiting for an unrelated rodado change; it needs the `RODADO_DEPLOY_TOKEN` secret (same token as rios-do-brasil/tse-bens) and just logs and exits while it's unset. To publish fresh data: run `bun run generate:static` locally, commit `static/`, push.
 
-`.github/workflows/pages.yml` triggers on push to `main`: `bun install`, `bun run build:graph`, `bun run build:site`, then `actions/upload-pages-artifact` + `actions/deploy-pages`. It does **not** run `generate:static` — a GitHub-hosted runner has no SSH key for beelink — so `static/entities/*.json` must already be committed; the workflow only packages whatever is there. To publish fresh data: run `bun run generate:static` locally (needs beelink SSH access), commit `static/`, push — the push itself triggers the deploy.
-
-Pages is configured with `build_type: workflow` (Settings → Pages → source: GitHub Actions), enabled once via `gh api -X POST repos/{owner}/{repo}/pages -f build_type=workflow`. Published at `https://rafapolo.github.io/datative/` — a project page, hence the relative-link requirement in `render.ts` described above.
-
+Nothing on the site points back to GitHub: the footer links to rodado.xyz, and links written elsewhere (rodado analyses, `static/collections.json`) use the rodado address. `rafapolo.github.io/datative/` is only a redirect: `.github/workflows/pages.yml` publishes `redirect/` (`index.html` for the root, the same file as `404.html` for every other path), which sends the visitor to the same page and `?c=` on rodado.xyz. Relative links (see Architecture) are what let the same `dist/` work under any subpath.
 ## Static top-N generator — `scripts/generate-static-entities.ts`
 
 `bun run generate:static` (flags: `--top=50`, `--per-dataset-limit=15` (graph-node cap per dataset), `--panel-limit=500` (row-table fetch cap per dataset), `--concurrency=6`, `--query-timeout-ms=60000`, `--max-distinct=1000000`, `--force`, `--ids=<cnpj_basico>,...` (rebuild only those empresa files, no ranking pass, index untouched — for timing/spot-checking a dataset change)) is the **only** thing in this repo that talks to beelink. Two passes:

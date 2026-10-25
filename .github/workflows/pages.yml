@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Redirect GitHub Pages to rodado.xyz
 
 on:
   push:
@@ -6,9 +6,8 @@ on:
       - main
   workflow_dispatch:
 
-# Does NOT run scripts/generate-static-entities.ts — that talks to beelink
-# over SSH, which this runner has no access/key for. static/entities/*.json
-# must already be committed; this workflow only builds+publishes what's there.
+# rafapolo.github.io/datative/ is kept only as a redirect to the canonical
+# rodado.xyz/plataformas/datative/, so links shared before the move still work.
 
 permissions:
   contents: read
@@ -24,16 +23,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
-      - run: bun run build:graph
-      - run: bun run build:site
+      # The site itself is published by rodado at rodado.xyz/plataformas/datative/
+      # (see publica-rodado.yml). This address only redirects there: index.html
+      # for the root and 404.html for every other path (e-<id>.html), both
+      # keeping the path and the ?c= query.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: redirect
 
   deploy:
     needs: build

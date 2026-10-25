@@ -757,7 +757,7 @@ export function renderGraphPage(
   <footer>
     <span id="status">Carregando…</span>
     <div class="footer-meta">
-      <a href="https://github.com/rafapolo/datative" target="_blank" rel="noopener noreferrer">GITHUB</a>
+      <a href="https://rodado.xyz/" target="_blank" rel="noopener">RODADO.XYZ</a>
     </div>
   </footer>
   <script>
