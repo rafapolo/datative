@@ -764,7 +764,7 @@ export function renderGraphPage(
     window.__ENTITY_ID__ = ${JSON.stringify(id)};
     // Lets the client link a CNPJ in a lookup table to that company's own page
     // — only when one was published, and with the same dev/static URL scheme
-    // the landing uses (an absolute "/?cnpj=" 404s under GitHub Pages).
+    // the landing uses (an absolute "/?cnpj=" 404s when the site is served from a subpath).
     window.__ENTITY_HREF__ = ${JSON.stringify(links.entityHref("__ID__"))};
     window.__PUBLISHED_IDS__ = ${JSON.stringify([...entitiesById.keys()])};
     window.__DATASET_COLORS = ${JSON.stringify(
