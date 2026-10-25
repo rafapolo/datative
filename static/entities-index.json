@@ -1118,5 +1118,124 @@
     "label": "SOLON PORTAL DE EMENDAS LTDA",
     "datasetCount": 2,
     "path": "entities/61364347.json"
+  },
+  {
+    "id": "05238819",
+    "type": "empresa",
+    "label": "WT ADMINISTRACAO DE IMOVEIS E BENS S/A",
+    "datasetCount": 9,
+    "path": "entities/05238819.json"
+  },
+  {
+    "id": "06275598",
+    "type": "empresa",
+    "label": "RADIO E TV DIFUSORA DO MARANHAO LTDA",
+    "datasetCount": 6,
+    "path": "entities/06275598.json"
+  },
+  {
+    "id": "08661220",
+    "type": "empresa",
+    "label": "DIFUSORA COMUNICACAO S/A",
+    "datasetCount": 6,
+    "path": "entities/08661220.json"
+  },
+  {
+    "id": "07158751",
+    "type": "empresa",
+    "label": "RADIO CURIMA LTDA",
+    "datasetCount": 5,
+    "path": "entities/07158751.json"
+  },
+  {
+    "id": "63432751",
+    "type": "empresa",
+    "label": "RADIO CAXIAS LTDA",
+    "datasetCount": 7,
+    "path": "entities/63432751.json"
+  },
+  {
+    "id": "23412791",
+    "type": "empresa",
+    "label": "JOTA COMUNICACAO S/A",
+    "datasetCount": 4,
+    "path": "entities/23412791.json"
+  },
+  {
+    "id": "50570260",
+    "type": "empresa",
+    "label": "ROCHA HOLDING PATRIMONIAL LTDA",
+    "datasetCount": 1,
+    "path": "entities/50570260.json"
+  },
+  {
+    "id": "35711858",
+    "type": "empresa",
+    "label": "F DE A S CAMPOS COMBUSTIVEIS LTDA",
+    "datasetCount": 9,
+    "path": "entities/35711858.json"
+  },
+  {
+    "id": "57780367",
+    "type": "empresa",
+    "label": "AUREA TECNOLOGIA E SOLUCOES LTDA",
+    "datasetCount": 3,
+    "path": "entities/57780367.json"
+  },
+  {
+    "id": "10943907",
+    "type": "empresa",
+    "label": "VOGA SERVICOS CONTABEIS SOCIEDADE SIMPLES LTDA",
+    "datasetCount": 4,
+    "path": "entities/10943907.json"
+  },
+  {
+    "id": "31624699",
+    "type": "empresa",
+    "label": "ARAGAO E TOMAZ ADVOGADOS ASSOCIADOS",
+    "datasetCount": 2,
+    "path": "entities/31624699.json"
+  },
+  {
+    "id": "58311064",
+    "type": "empresa",
+    "label": "NEOVERDE ALLIANCE S/A",
+    "datasetCount": 1,
+    "path": "entities/58311064.json"
+  },
+  {
+    "id": "10332184",
+    "type": "empresa",
+    "label": "JET LINE LOCACOES E SERVICOS AEREOS S/A",
+    "datasetCount": 4,
+    "path": "entities/10332184.json"
+  },
+  {
+    "id": "43143216",
+    "type": "empresa",
+    "label": "DIRECAO TAXI AEREO LTDA",
+    "datasetCount": 5,
+    "path": "entities/43143216.json"
+  },
+  {
+    "id": "61300011",
+    "type": "empresa",
+    "label": "HANBELLSEG SERVICOS E LOCACOES LTDA",
+    "datasetCount": 4,
+    "path": "entities/61300011.json"
+  },
+  {
+    "id": "44722047",
+    "type": "empresa",
+    "label": "PROSPECT CONSULTORIA EMPRESARIAL S/A",
+    "datasetCount": 5,
+    "path": "entities/44722047.json"
+  },
+  {
+    "id": "52193793",
+    "type": "empresa",
+    "label": "CARBON CER SPE LTDA",
+    "datasetCount": 1,
+    "path": "entities/52193793.json"
   }
 ]
