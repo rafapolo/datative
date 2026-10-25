@@ -1097,5 +1097,26 @@
     "label": "MIRIA NOGUEIRA DE LIMA",
     "datasetCount": 5,
     "path": "entities/e853e8fd321fe657.json"
+  },
+  {
+    "id": "48391060",
+    "type": "empresa",
+    "label": "SOLON APOIO ADMINISTRATIVO LTDA",
+    "datasetCount": 4,
+    "path": "entities/48391060.json"
+  },
+  {
+    "id": "54737772",
+    "type": "empresa",
+    "label": "SOLON RECURSOS INTELIGENTES LTDA",
+    "datasetCount": 4,
+    "path": "entities/54737772.json"
+  },
+  {
+    "id": "61364347",
+    "type": "empresa",
+    "label": "SOLON PORTAL DE EMENDAS LTDA",
+    "datasetCount": 2,
+    "path": "entities/61364347.json"
   }
 ]
