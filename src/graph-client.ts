@@ -1023,7 +1023,6 @@ function injectPanelStyles() {
       height: var(--bottom-h, 40vh);
       max-height: none;
       border-bottom: none;
-      border-top: 1px solid #23234a;
       border-radius: 0;
       transform: translateY(calc(100% + 30px));
       box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
@@ -1051,6 +1050,10 @@ function injectPanelStyles() {
       border-bottom: 1px solid #23234a;
       flex-shrink: 0;
       user-select: none;
+      /* Same surface and top edge as the lookup panel beside it, so the two
+         headers line up as one bar — only the left border divides them. */
+      background: #0f0f22;
+      border-top: none;
     }
     #lookup-title,
     #node-details-title {
@@ -1080,6 +1083,10 @@ function injectPanelStyles() {
       color: #fff;
     }
     #lookup-body {
+      /* Equal heights whatever buttons each header holds (the dock glyph is
+         taller than ✕), so side-by-side headers share one bottom line. */
+      box-sizing: border-box;
+      min-height: 53px;
       flex: 1;
       overflow-y: auto;
       padding: 0.5rem 0;
