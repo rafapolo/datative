@@ -9667,6 +9667,10 @@ function isMobileViewport() {
   return window.innerWidth <= MOBILE_BREAKPOINT_PX;
 }
 var COMPACT_MAX_LEAVES = 7;
+var PACK_FROM_NODES = 60;
+function initialLayout(nodeCount) {
+  return nodeCount < PACK_FROM_NODES ? "radial" : "pack";
+}
 var compactHiddenNodeIds = new Set;
 var compactOverflowLabels = new Map;
 var DATASET_COLORS = window.__DATASET_COLORS ?? {};
@@ -10299,6 +10303,7 @@ function injectPanelStyles() {
       height: 40vh;
       min-height: 0;
       max-height: calc(100vh - 46px - 30px - 80px);
+      border-top: 1px solid #23234a;
       transform: translateY(calc(100% + 30px));
       box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
     }
@@ -10335,9 +10340,9 @@ function injectPanelStyles() {
       height: var(--bottom-h, 40vh);
       max-height: none;
       /* Same surface and top edge as the lookup panel beside it, so the two
-         headers line up as one bar — only the left border divides them. */
+         headers line up as one bar — the left border divides them. */
       background: #0f0f22;
-      border-top: none;
+      border-top: 1px solid #23234a;
       border-bottom: none;
       border-radius: 0;
       transform: translateY(calc(100% + 30px));
@@ -11580,6 +11585,7 @@ async function init() {
       canDraw = false;
     }
   }
+  currentLayout = initialLayout(graph.order);
   runLayout(graph, 200);
   const layoutSelect = document.getElementById("layout-select");
   if (layoutSelect) {

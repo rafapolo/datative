@@ -185,7 +185,8 @@ def test_graph_comes_back_after_context_loss(pw, url):
 
 
 def click_a_leaf(pg):
-    """Clicks the most isolated visible non-root node by its screen position, returns its label."""
+    """Clicks the most isolated visible non-root node by its screen position, returns [label, id]
+    (the details title shows either)."""
     x, y, label = pg.evaluate("""(() => {
         const s = window.__sigma, g = s.getGraph(), root = window.__ENTITY_ID__;
         const r = document.getElementById('graph-container').getBoundingClientRect();
@@ -200,7 +201,7 @@ def click_a_leaf(pg):
             const gap = Math.min(...pts.filter(q => q !== p).map(q => Math.hypot(q.x - p.x, q.y - p.y)));
             if (gap > bestGap) { best = p; bestGap = gap; }
         }
-        return [best.x, best.y, String(g.getNodeAttribute(best.n, 'fullLabel') || g.getNodeAttribute(best.n, 'label'))];
+        return [best.x, best.y, [String(g.getNodeAttribute(best.n, 'fullLabel') || g.getNodeAttribute(best.n, 'label')).trim(), best.n]];
     })()""")
     pg.mouse.click(x, y)
     return label
@@ -213,8 +214,8 @@ def test_clicking_a_node_shows_its_details(pw, url):
         pg.goto(url + PAGE)
         ready(pg)
         time.sleep(2)
-        label = click_a_leaf(pg)
-        pg.wait_for_function("t => document.getElementById('node-details-title').textContent.trim() === t", arg=label.strip(), timeout=5000)
+        names = click_a_leaf(pg)
+        pg.wait_for_function("ts => ts.includes(document.getElementById('node-details-title').textContent.trim())", arg=names, timeout=5000)
 
 
 def test_garbled_readback_picks_on_cpu(pw, url):
@@ -224,8 +225,8 @@ def test_garbled_readback_picks_on_cpu(pw, url):
         pg.goto(url + PAGE)
         ready(pg)
         time.sleep(2)
-        label = click_a_leaf(pg)
-        pg.wait_for_function("t => document.getElementById('node-details-title').textContent.trim() === t", arg=label.strip(), timeout=5000)
+        names = click_a_leaf(pg)
+        pg.wait_for_function("ts => ts.includes(document.getElementById('node-details-title').textContent.trim())", arg=names, timeout=5000)
 
 
 # ── the phone ─────────────────────────────────────────────────────────────────

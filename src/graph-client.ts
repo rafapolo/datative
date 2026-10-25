@@ -110,6 +110,19 @@ function isMobileViewport(): boolean {
 // are hidden (node + incident edges) rather than crammed into the same arc,
 // and one of them is repurposed to display a "+N mais" marker in its place.
 const COMPACT_MAX_LEAVES = 7;
+
+// The layout a page opens with, by how many nodes its graph draws; the
+// select still switches freely afterwards. Measured over all 190 published
+// networks (node overlap, label collisions, nodes hidden, 2026-10-25):
+// radial is cleanest for small networks — pack crams a handful of nodes
+// into overlapping circles — while from ~60 nodes radial's single ring of
+// leaves turns into a blur and pack's one cluster per dataset reads best.
+// Summed score (lower is better): always radial 98.3, always pack 112,
+// this rule 61.9, the best layout picked per network 56.6.
+const PACK_FROM_NODES = 60;
+function initialLayout(nodeCount: number): typeof currentLayout {
+  return nodeCount < PACK_FROM_NODES ? "radial" : "pack";
+}
 const compactHiddenNodeIds = new Set<string>();
 const compactOverflowLabels = new Map<string, string>();
 
@@ -1016,6 +1029,7 @@ function injectPanelStyles() {
       height: 40vh;
       min-height: 0;
       max-height: calc(100vh - 46px - 30px - 80px);
+      border-top: 1px solid #23234a;
       transform: translateY(calc(100% + 30px));
       box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
     }
@@ -1029,7 +1043,6 @@ function injectPanelStyles() {
       right: auto;
       left: 0;
       border-left: none;
-      border-top: 1px solid #23234a;
       border-right: 1px solid #23234a;
       border-radius: 0 0 10px 0;
       transform: translateX(-100%);
@@ -1053,7 +1066,7 @@ function injectPanelStyles() {
       height: var(--bottom-h, 40vh);
       max-height: none;
       /* Same surface and top edge as the lookup panel beside it, so the two
-         headers line up as one bar — only the left border divides them. */
+         headers line up as one bar — the left border divides them. */
       background: #0f0f22;
       border-top: 1px solid #23234a;
       border-bottom: none;
@@ -2520,6 +2533,7 @@ async function init() {
     }
   }
 
+  currentLayout = initialLayout(graph.order);
   runLayout(graph, 200);
 
   // Layout select box
