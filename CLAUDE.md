@@ -55,7 +55,9 @@ Neither ever queries live data — every route/file either serves a hardcoded HT
 
 **Stack:** TypeScript (strict) · Bun runtime · Sigma 3 · server-rendered HTML shell + static JSON · Portuguese UI.
 
-## Deploy — GitHub Pages
+## Deploy — rodado.xyz/plataformas/datative and GitHub Pages
+
+The canonical address is `https://rodado.xyz/plataformas/datative/`: the `rafapolo/rodado` Pages workflow checks this repo out, runs `build:graph` + `build:site` and copies `dist/` there on every rodado deploy. `.github/workflows/publica-rodado.yml` sends it a `datative-updated` repository_dispatch on each push here, so a push redeploys rodado without waiting for an unrelated change; it needs the `RODADO_DEPLOY_TOKEN` secret (same token as rios-do-brasil/tse-bens) and just logs and exits while it's unset. Relative links (see Architecture) are what make the same `dist/` work under both subpaths. Links written elsewhere (rodado analyses, `static/collections.json`) should point at the rodado address.
 
 `.github/workflows/pages.yml` triggers on push to `main`: `bun install`, `bun run build:graph`, `bun run build:site`, then `actions/upload-pages-artifact` + `actions/deploy-pages`. It does **not** run `generate:static` — a GitHub-hosted runner has no SSH key for beelink — so `static/entities/*.json` must already be committed; the workflow only packages whatever is there. To publish fresh data: run `bun run generate:static` locally (needs beelink SSH access), commit `static/`, push — the push itself triggers the deploy.
 

@@ -1,0 +1,27 @@
+name: Aciona o deploy no rodado
+
+# O rodado publica este site em rodado.xyz/plataformas/datative/, gerado a
+# partir deste repositório no workflow de Pages de lá. O push aqui manda um
+# repository_dispatch para o rodado reconstruir já neste commit — mesmo padrão
+# do rios-do-brasil e do tse-bens.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Avisa o rodado
+        env:
+          TOKEN: ${{ secrets.RODADO_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "RODADO_DEPLOY_TOKEN ainda não está definido; deploy não acionado."
+            exit 0
+          fi
+          curl -sS -o /dev/null -w "%{http_code}\n" \
+            -X POST "https://api.github.com/repos/rafapolo/rodado/dispatches" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -d "{\"event_type\":\"datative-updated\",\"client_payload\":{\"sha\":\"${{ github.sha }}\"}}"
