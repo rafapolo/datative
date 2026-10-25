@@ -1411,6 +1411,60 @@ export const CNPJ_DATASETS: CnpjDatasetEntry[] = [
     nodeIdField: "id",
     nodeLabelField: "nome",
   },
+  {
+    // legado 2000–2016: view que já traz os dois lados de cada incentivo (quem patrocinou, quem propôs)
+    id: "minc_salic_incentivos",
+    label: "MinC · Incentivos 2000–2016",
+    color: "#d946ef",
+    table: "basedosdados.br_minc_salic.incentivos_detalhe",
+    cnpjColumns: [
+      { name: "patrocinador_cnpjcpf", type: "mixed" },
+      { name: "proponente_cnpjcpf", type: "mixed" },
+    ],
+    displayFields: ["pronac", "projeto", "patrocinador", "patrocinador_cnpjcpf", "proponente", "proponente_cnpjcpf", "valor", "recibos_count", "last_recibo_at", "uf"],
+    nodeType: "doacao",
+    nodeIdField: "incentivo_id",
+    nodeLabelField: "projeto",
+  },
+  {
+    id: "minc_salic_projetos",
+    label: "MinC · Projetos (Proponente)",
+    color: "#c026d3",
+    table: "basedosdados.br_minc_salic.projetos_api",
+    cnpjColumns: [{ name: "cgccpf", type: "mixed" }],
+    displayFields: ["pronac", "nome", "proponente", "cgccpf", "segmento", "situacao", "valor_aprovado", "valor_captado", "data_inicio", "municipio", "uf"],
+    nodeIdField: "pronac",
+    nodeLabelField: "nome",
+  },
+  {
+    // 2019–2026: view com o doador e o proponente do projeto na mesma linha
+    id: "minc_salic_captacoes",
+    label: "MinC · Captações 2019–2026",
+    color: "#a21caf",
+    table: "basedosdados.br_minc_salic.captacoes_detalhe",
+    cnpjColumns: [
+      { name: "doador_cgccpf", type: "mixed" },
+      { name: "proponente_cgccpf", type: "mixed" },
+    ],
+    displayFields: ["pronac", "projeto", "nome_doador", "doador_cgccpf", "proponente", "proponente_cgccpf", "valor", "data_recibo", "uf"],
+    nodeType: "doacao",
+    nodeLabelField: "projeto",
+  },
+  {
+    // quem a verba incentivada pagou: fornecedor e proponente do projeto na mesma linha
+    id: "minc_salic_pagamentos",
+    label: "MinC · Pagamentos a Fornecedores",
+    color: "#86198f",
+    table: "basedosdados.br_minc_salic.pagamentos_detalhe",
+    cnpjColumns: [
+      { name: "fornecedor_cgccpf", type: "mixed" },
+      { name: "proponente_cgccpf", type: "mixed" },
+    ],
+    displayFields: ["pronac", "projeto", "nome_fornecedor", "fornecedor_cgccpf", "proponente", "proponente_cgccpf", "item", "valor_pagamento", "data_pagamento"],
+    nodeType: "pagamento",
+    nodeIdField: "id_comprovante_pagamento",
+    nodeLabelField: "nome_fornecedor",
+  },
 
   // --- Transferegov · SICONV ---
   {

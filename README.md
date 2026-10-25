@@ -39,7 +39,7 @@ Para navegar: comece pelo nó central, clique num nó-hub colorido para abrir a 
 
 ## Datasets consultados
 
-Para cada entidade, o gerador procura correspondências de CNPJ/CPF nas 117 tabelas abaixo (todas usando o [rodado.xyz](https://rodado.xyz)). Além delas, `br_me_cnpj.empresas` e `br_me_cnpj.socios` montam a base da rede (empresa ↔ sócios). Tabelas com CPF só entram quando a pessoa aparece em papel de prestação de contas pública (sanções, TSE, TCU, IBAMA, administradores na CVM, fornecedores/beneficiários de recursos públicos) — programas sociais, folha de servidores e filiação partidária ficam de fora de propósito.
+Para cada entidade, o gerador procura correspondências de CNPJ/CPF nas 121 tabelas abaixo (todas usando o [rodado.xyz](https://rodado.xyz)). Além delas, `br_me_cnpj.empresas` e `br_me_cnpj.socios` montam a base da rede (empresa ↔ sócios). Tabelas com CPF só entram quando a pessoa aparece em papel de prestação de contas pública (sanções, TSE, TCU, IBAMA, administradores na CVM, fornecedores/beneficiários de recursos públicos) — programas sociais, folha de servidores e filiação partidária ficam de fora de propósito.
 
 | Dataset | Descrição |
 |---|---|
@@ -153,7 +153,11 @@ Para cada entidade, o gerador procura correspondências de CNPJ/CPF nas 117 tabe
 | Saúde · Farmácia Popular | Farmácias credenciadas no Farmácia Popular |
 | CGU · Terceirizados (Empresa) | Empresas que fornecem terceirizados ao governo federal |
 | CGU · Gás do Povo (Revenda) | Revendas credenciadas no programa Gás do Povo |
-| MinC · SALIC (Lei Rouanet) | Proponentes de projetos culturais da Lei Rouanet |
+| MinC · SALIC (Lei Rouanet) | Proponentes e patrocinadores da Lei Rouanet (cadastro, até 2016) |
+| MinC · Incentivos 2000–2016 | Cada incentivo: quem patrocinou e quem propôs o projeto |
+| MinC · Projetos (Proponente) | Projetos de 2019–2026 com valores aprovado e captado |
+| MinC · Captações 2019–2026 | Cada doação: incentivador, projeto e proponente |
+| MinC · Pagamentos a Fornecedores | Quem a verba incentivada pagou, por projeto e proponente |
 | SICONV · Obras (Fornecedor) | Fornecedores de obras pagas com convênios federais |
 | SICONV · Apoiadores de Emendas | Proponentes e solicitantes de emendas parlamentares |
 | SICONV · Consórcios | Consórcios públicos e seus participantes |
