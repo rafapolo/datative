@@ -27,6 +27,7 @@
  *   bun run scripts/generate-static-entities.ts [--top=50] [--per-dataset-limit=15] [--concurrency=6] [--force]
  *   bun run scripts/generate-static-entities.ts --ids=00000000,60701190   # rebuild only these empresas
  *   bun run scripts/generate-static-entities.ts --ids=48391060 --add-to-index   # ...and upsert them into the index
+ *   bun run scripts/generate-static-entities.ts --cpfs-file=cpfs.txt --add-to-index   # pessoas: "<cpf>[\t<label>]" per line
  */
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import { resolve } from "path";
@@ -506,23 +507,29 @@ interface IndexEntry {
 
 // --ids=<cnpj_basico>,... rebuilds just those empresa entities' files, skipping
 // the ranking pass and leaving entities-index.json alone — for timing or
-// spot-checking a dataset change before a full run. Pessoa entities can't be
-// targeted this way: their public id is a CPF hash, and the raw CPF needed to
-// query beelink only comes out of the ranking pass.
+// spot-checking a dataset change before a full run. Pessoa entities are
+// targeted with --cpfs-file=<path> instead (one CPF per line, read from a
+// local file so raw CPFs stay out of shell history and argv); they're
+// published under hashCpf(cpf), the same public id the ranking pass uses.
 // With --add-to-index, the rebuilt empresas are also upserted into
 // entities-index.json (every other row kept as is) — for publishing a
 // specific entity on request, outside the top-N. datasetCount there is the
 // number of distinct datasets with hits in the built network, since no
 // ranking pass ran to count tables.
-async function buildOnly(ids: string[], addToIndex: boolean) {
+async function buildOnly(targets: BuildTarget[], addToIndex: boolean, labels = new Map<string, string>()) {
   const t0 = Date.now();
-  const built = await buildNetworks(ids.map((id) => ({ type: "empresa" as const, rawId: id, publicId: id })));
+  const built = await buildNetworks(targets);
+  const typeOf = new Map(targets.map((t) => [t.publicId, t.type]));
   const entries: IndexEntry[] = [];
-  for (const [id, { label, network }] of built) {
+  for (const [id, built1] of built) {
+    const network = built1.network;
+    const label = labels.get(id) ?? built1.label;
+    const root = network.nodes.find((n) => n.id === id);
+    if (root) root.label = label;
     writeFileSync(resolve(ENTITIES_DIR, `${id}.json`), JSON.stringify(network));
     const datasets = new Set(network.nodes.map((n) => n.datasetId).filter(Boolean));
     log("built", id, label, { nodes: network.nodes.length, datasets: datasets.size });
-    entries.push({ id, type: "empresa", label, datasetCount: datasets.size, path: `entities/${id}.json` });
+    entries.push({ id, type: typeOf.get(id) ?? "empresa", label, datasetCount: datasets.size, path: `entities/${id}.json` });
   }
   if (addToIndex) {
     const indexPath = resolve(OUT_DIR, "entities-index.json");
@@ -536,8 +543,26 @@ async function buildOnly(ids: string[], addToIndex: boolean) {
 }
 
 async function main() {
-  if (args.ids) {
-    await buildOnly(args.ids.split(",").map((x) => x.trim()).filter(Boolean), args["add-to-index"] === "true");
+  if (args.ids || args["cpfs-file"]) {
+    const empresas: BuildTarget[] = (args.ids ?? "").split(",").map((x) => x.trim()).filter(Boolean)
+      .map((id) => ({ type: "empresa", rawId: id, publicId: id }));
+    // Line format: "<cpf>" or "<cpf>\t<label>". The label overrides the one
+    // derived from socios/cross-dataset rows — a pessoa who is no company's
+    // sócio otherwise gets whatever name-ish field the first hit carries
+    // (a TSE receita description, for one).
+    const labels = new Map<string, string>();
+    const pessoas: BuildTarget[] = [];
+    if (args["cpfs-file"]) {
+      for (const line of readFileSync(args["cpfs-file"], "utf8").split("\n")) {
+        const [doc, ...rest] = line.split("\t");
+        const cpf = (doc ?? "").replace(/\D/g, "");
+        if (cpf.length !== 11) continue;
+        const publicId = hashCpf(cpf);
+        if (rest.join("\t").trim()) labels.set(publicId, rest.join("\t").trim());
+        pessoas.push({ type: "pessoa", rawId: cpf, publicId });
+      }
+    }
+    await buildOnly([...empresas, ...pessoas], args["add-to-index"] === "true", labels);
     return;
   }
   const ranked = await rankEntities();
