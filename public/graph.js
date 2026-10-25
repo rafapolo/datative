@@ -9769,17 +9769,44 @@ function focusLookupSection(datasetId) {
   panel.classList.add("open");
   section.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+function showLoadFailure(message, retry = false) {
+  setStatus(message);
+  const overlay = document.getElementById("loading-overlay");
+  if (!overlay)
+    return;
+  overlay.style.display = "";
+  overlay.classList.add("failed");
+  const text = overlay.querySelector(".loading-text");
+  if (text)
+    text.textContent = message;
+  overlay.querySelector(".loading-retry")?.remove();
+  if (!retry)
+    return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "loading-retry";
+  button.textContent = "Tentar de novo";
+  button.addEventListener("click", () => location.reload());
+  overlay.appendChild(button);
+}
+var FETCH_TIMEOUT_MS = 20000;
 async function fetchGraph(cnpj) {
   const url = `entities/${cnpj}.json`;
   debugLog("GET", { url });
-  const res = await fetch(url);
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    console.error(`[fetch] ${res.status} ${url}`, body);
-    throw new Error(`API error ${res.status}`);
+  const abort = new AbortController;
+  const timer = setTimeout(() => abort.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: abort.signal });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error(`[fetch] ${res.status} ${url}`, body);
+      throw new Error(`API error ${res.status}`);
+    }
+    debugLog("GET done", { url, status: res.status });
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
   }
-  debugLog("GET done", { url, status: res.status });
-  return res.json();
 }
 function assignEmpresaColor(id) {
   if (!empresaColorMap.has(id)) {
@@ -10307,8 +10334,11 @@ function injectPanelStyles() {
       max-width: 60vw;
       height: var(--bottom-h, 40vh);
       max-height: none;
+      /* Same surface and top edge as the lookup panel beside it, so the two
+         headers line up as one bar — only the left border divides them. */
+      background: #0f0f22;
+      border-top: none;
       border-bottom: none;
-      border-top: 1px solid #23234a;
       border-radius: 0;
       transform: translateY(calc(100% + 30px));
       box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
@@ -10336,6 +10366,10 @@ function injectPanelStyles() {
       border-bottom: 1px solid #23234a;
       flex-shrink: 0;
       user-select: none;
+      /* Equal heights whatever buttons each header holds (the dock glyph is
+         taller than ✕), so side-by-side headers share one bottom line. */
+      box-sizing: border-box;
+      min-height: 53px;
     }
     #lookup-title,
     #node-details-title {
@@ -10858,6 +10892,29 @@ function makeResizable(panel, edgeOf, onResize) {
 function closePanel(panel) {
   panel.classList.remove("open");
 }
+function keepInertWhileClosed(panel) {
+  const sync = () => {
+    panel.inert = !panel.classList.contains("open");
+  };
+  sync();
+  new MutationObserver(sync).observe(panel, {
+    attributes: true,
+    attributeFilter: ["class"]
+  });
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || e.defaultPrevented)
+    return;
+  for (const id of ["node-details-close", "lookup-close"]) {
+    const button = document.getElementById(id);
+    const panel = button?.closest("aside");
+    if (button && panel?.classList.contains("open")) {
+      button.click();
+      e.preventDefault();
+      return;
+    }
+  }
+});
 function updateGraphLayout() {
   const container = document.getElementById("graph-container");
   const panel = document.getElementById("lookup-panel");
@@ -10911,6 +10968,8 @@ function savedLookupDock() {
 function createPanel() {
   const panel = document.createElement("aside");
   panel.id = "lookup-panel";
+  panel.tabIndex = -1;
+  panel.setAttribute("aria-label", "Bases de dados");
   panel.innerHTML = `
     <div id="lookup-header">
       <button id="lookup-back" style="display:none">← Voltar</button>
@@ -10927,18 +10986,27 @@ function createPanel() {
   fab.id = "lookup-fab";
   fab.type = "button";
   fab.textContent = "Bases";
-  fab.addEventListener("click", () => {
+  fab.addEventListener("click", (e) => {
     if (isMobileViewport())
       closePanel(document.getElementById("node-details-panel"));
     panel.classList.add("open");
     updateGraphLayout();
+    if (e.detail === 0) {
+      panel.inert = false;
+      panel.focus({ preventScroll: true });
+    }
   });
   document.body.appendChild(fab);
   document.getElementById("lookup-close").addEventListener("click", () => {
+    const hadFocus = panel.contains(document.activeElement);
     closePanel(panel);
     lookupHistory.length = 0;
     updateGraphLayout();
+    if (hadFocus || document.activeElement === document.body) {
+      fab.focus({ preventScroll: true });
+    }
   });
+  keepInertWhileClosed(panel);
   const placeResizers = makeResizable(panel, () => {
     const dock = lookupDock();
     return dock === "left" ? "right" : dock === "right" ? "left" : "bottom";
@@ -10982,6 +11050,7 @@ function createPanel() {
 function createNodeDetailsPanel() {
   const panel = document.createElement("aside");
   panel.id = "node-details-panel";
+  panel.setAttribute("aria-label", "Detalhes do nó");
   panel.innerHTML = `
     <div id="node-details-header">
       <span id="node-details-title">Detalhes do nó</span>
@@ -11004,6 +11073,7 @@ function createNodeDetailsPanel() {
     attributes: true,
     attributeFilter: ["class"]
   });
+  keepInertWhileClosed(panel);
   return panel;
 }
 function showNodeDetails(nodeId, graph) {
@@ -11261,6 +11331,31 @@ function openLookupPanel(cnpj, graph, results) {
   setStatus(`${hits} base(s) com referência`);
   renderResultSections(results, cnpj, graph);
 }
+function hasWebGL() {
+  try {
+    const canvas = document.createElement("canvas");
+    return !!(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+function nodeAtViewport(r, x, y) {
+  let best = null;
+  let bestDistance = Infinity;
+  for (const node of r.getGraph().nodes()) {
+    const data = r.getNodeDisplayData(node);
+    if (!data || data.hidden)
+      continue;
+    const p = r.framedGraphToViewport(data);
+    const radius = r.scaleSize(data.size);
+    const distance = Math.hypot(p.x - x, p.y - y);
+    if (distance <= radius && distance < bestDistance) {
+      best = node;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
 async function init() {
   const params = new URLSearchParams(location.search);
   const cnpj = params.get("cnpj") ?? window.__ENTITY_ID__ ?? null;
@@ -11278,7 +11373,9 @@ async function init() {
   try {
     data = await fetchGraph(cnpj);
   } catch (e) {
-    setStatus(`Erro ao carregar: ${e.message}`);
+    console.error("[fetch]", e);
+    document.getElementById("lookup-fab")?.remove();
+    showLoadFailure("Não foi possível baixar os dados desta rede. Verifique a conexão e tente de novo.", true);
     return;
   }
   const graph = new Graph;
@@ -11359,7 +11456,7 @@ async function init() {
       graph.addEdge(l.source, l.target, edgeAttrs());
     }
   }
-  renderer = new Sigma(graph, container, {
+  const sigmaSettings = {
     renderEdgeLabels: false,
     defaultEdgeType: "curved",
     edgeProgramClasses: { curved: createEdgeCurveProgram() },
@@ -11455,7 +11552,34 @@ async function init() {
       }
       return res;
     }
-  });
+  };
+  let canDraw = hasWebGL();
+  const mountRenderer = () => {
+    renderer = new Sigma(graph, container, sigmaSettings);
+    window.__sigma = renderer;
+    bindRenderer(renderer);
+    let remounting = false;
+    for (const canvas of container.querySelectorAll("canvas")) {
+      canvas.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      canvas.addEventListener("webglcontextrestored", () => {
+        if (remounting)
+          return;
+        remounting = true;
+        requestAnimationFrame(() => {
+          renderer?.kill();
+          mountRenderer();
+        });
+      });
+    }
+  };
+  if (canDraw) {
+    try {
+      mountRenderer();
+    } catch (e) {
+      console.error("[sigma]", e);
+      canDraw = false;
+    }
+  }
   runLayout(graph, 200);
   const layoutSelect = document.getElementById("layout-select");
   if (layoutSelect) {
@@ -11500,65 +11624,80 @@ async function init() {
       nodeLabelField: meta.nodeLabelField
     };
   });
-  if (overlay)
-    overlay.style.display = "none";
+  if (canDraw) {
+    if (overlay)
+      overlay.style.display = "none";
+  } else {
+    showLoadFailure("Este navegador não oferece WebGL, então o grafo não pode ser desenhado. As tabelas das bases continuam no painel.");
+  }
   openLookupPanel(rootId, graph, lookupResults);
   if (!isMobileViewport())
     showNodeDetails(rootId, graph);
-  let draggedNode = null;
-  let isDragging = false;
-  let dragOffset = { dx: 0, dy: 0 };
-  renderer.on("downNode", ({ node, event }) => {
-    draggedNode = node;
-    isDragging = false;
-    renderer.getCamera().disable();
-    const mousePos = renderer.viewportToGraph({
-      x: event.x,
-      y: event.y
+  function bindRenderer(r) {
+    let draggedNode = null;
+    let isDragging = false;
+    let dragOffset = { dx: 0, dy: 0 };
+    r.on("downNode", ({ node, event }) => {
+      draggedNode = node;
+      isDragging = false;
+      r.getCamera().disable();
+      const mousePos = r.viewportToGraph({
+        x: event.x,
+        y: event.y
+      });
+      const nodeX = graph.getNodeAttribute(node, "x");
+      const nodeY = graph.getNodeAttribute(node, "y");
+      dragOffset = { dx: nodeX - mousePos.x, dy: nodeY - mousePos.y };
     });
-    const nodeX = graph.getNodeAttribute(node, "x");
-    const nodeY = graph.getNodeAttribute(node, "y");
-    dragOffset = { dx: nodeX - mousePos.x, dy: nodeY - mousePos.y };
-  });
-  renderer.getMouseCaptor().on("mousemovebody", (e) => {
-    if (!draggedNode)
-      return;
-    isDragging = true;
-    const pos = renderer.viewportToGraph({ x: e.x, y: e.y });
-    graph.setNodeAttribute(draggedNode, "x", pos.x + dragOffset.dx);
-    graph.setNodeAttribute(draggedNode, "y", pos.y + dragOffset.dy);
-  });
-  renderer.getMouseCaptor().on("mouseup", () => {
-    if (draggedNode && !isDragging) {}
-    draggedNode = null;
-    isDragging = false;
-    renderer.getCamera().enable();
-  });
-  renderer.on("enterNode", ({ node }) => {
-    hoveredNode = node;
-    renderer.refresh({ skipIndexation: true });
-  });
-  renderer.on("leaveNode", () => {
-    hoveredNode = null;
-    renderer.refresh({ skipIndexation: true });
-  });
-  renderer.on("clickStage", () => {
-    selectedNode = null;
-    renderer.refresh({ skipIndexation: true });
-    syncLookupRowHighlight();
-  });
-  renderer.on("clickNode", ({ node }) => {
-    selectedNode = selectedNode === node ? null : node;
-    hoveredNode = null;
-    renderer.refresh({ skipIndexation: true });
-    syncLookupRowHighlight();
-    const nodeType = nodeTypeMap.get(node);
-    if (nodeType === "group") {
-      const datasetId = node.startsWith("group:") ? node.split(":").slice(2).join(":") : "";
-      if (datasetId && datasetId !== "socios")
-        focusLookupSection(datasetId);
+    r.getMouseCaptor().on("mousemovebody", (e) => {
+      if (!draggedNode)
+        return;
+      isDragging = true;
+      const pos = r.viewportToGraph({ x: e.x, y: e.y });
+      graph.setNodeAttribute(draggedNode, "x", pos.x + dragOffset.dx);
+      graph.setNodeAttribute(draggedNode, "y", pos.y + dragOffset.dy);
+    });
+    r.getMouseCaptor().on("mouseup", () => {
+      if (draggedNode && !isDragging) {}
+      draggedNode = null;
+      isDragging = false;
+      r.getCamera().enable();
+    });
+    r.on("enterNode", ({ node }) => {
+      hoveredNode = node;
+      r.refresh({ skipIndexation: true });
+    });
+    r.on("leaveNode", () => {
+      hoveredNode = null;
+      r.refresh({ skipIndexation: true });
+    });
+    r.on("clickStage", ({ event }) => {
+      const hit = nodeAtViewport(r, event.x, event.y);
+      if (hit) {
+        selectNode(hit);
+        return;
+      }
+      selectedNode = null;
+      r.refresh({ skipIndexation: true });
+      syncLookupRowHighlight();
+    });
+    r.on("clickNode", ({ node }) => selectNode(node));
+    function selectNode(node) {
+      selectedNode = selectedNode === node ? null : node;
+      hoveredNode = null;
+      r.refresh({ skipIndexation: true });
+      syncLookupRowHighlight();
+      const nodeType = nodeTypeMap.get(node);
+      if (nodeType === "group") {
+        const datasetId = node.startsWith("group:") ? node.split(":").slice(2).join(":") : "";
+        if (datasetId && datasetId !== "socios")
+          focusLookupSection(datasetId);
+      }
+      showNodeDetails(node, graph);
     }
-    showNodeDetails(node, graph);
-  });
+  }
 }
-init().catch((e) => setStatus(`Erro fatal: ${e.message}`));
+init().catch((e) => {
+  console.error(e);
+  showLoadFailure(`Erro ao montar a rede: ${e.message}`, true);
+});

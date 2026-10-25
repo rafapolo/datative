@@ -295,20 +295,49 @@ function focusLookupSection(datasetId: string) {
   section.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+// Replaces the loading spinner with what went wrong, plus a retry button
+// when trying again could help (a failed or stalled download).
+function showLoadFailure(message: string, retry = false) {
+  setStatus(message);
+  const overlay = document.getElementById("loading-overlay");
+  if (!overlay) return;
+  overlay.style.display = "";
+  overlay.classList.add("failed");
+  const text = overlay.querySelector<HTMLElement>(".loading-text");
+  if (text) text.textContent = message;
+  overlay.querySelector(".loading-retry")?.remove();
+  if (!retry) return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "loading-retry";
+  button.textContent = "Tentar de novo";
+  button.addEventListener("click", () => location.reload());
+  overlay.appendChild(button);
+}
+
+// A download that stalls (a phone on poor signal) never errors by itself.
+const FETCH_TIMEOUT_MS = 20000;
+
 async function fetchGraph(cnpj: string): Promise<GraphData> {
   // Relative (no leading slash) so it resolves the same way whether the page
   // is served at "/" (dev server) or published under a subpath, e.g. GitHub
   // Pages project pages serve at "/<repo>/" (scripts/build-site.ts's output).
   const url = `entities/${cnpj}.json`;
   debugLog("GET", { url });
-  const res = await fetch(url);
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    console.error(`[fetch] ${res.status} ${url}`, body);
-    throw new Error(`API error ${res.status}`);
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: abort.signal });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error(`[fetch] ${res.status} ${url}`, body);
+      throw new Error(`API error ${res.status}`);
+    }
+    debugLog("GET done", { url, status: res.status });
+    return (await res.json()) as GraphData;
+  } finally {
+    clearTimeout(timer);
   }
-  debugLog("GET done", { url, status: res.status });
-  return res.json() as Promise<GraphData>;
 }
 
 function assignEmpresaColor(id: string): string {
@@ -1022,6 +1051,10 @@ function injectPanelStyles() {
       max-width: 60vw;
       height: var(--bottom-h, 40vh);
       max-height: none;
+      /* Same surface and top edge as the lookup panel beside it, so the two
+         headers line up as one bar — only the left border divides them. */
+      background: #0f0f22;
+      border-top: none;
       border-bottom: none;
       border-radius: 0;
       transform: translateY(calc(100% + 30px));
@@ -1050,10 +1083,10 @@ function injectPanelStyles() {
       border-bottom: 1px solid #23234a;
       flex-shrink: 0;
       user-select: none;
-      /* Same surface and top edge as the lookup panel beside it, so the two
-         headers line up as one bar — only the left border divides them. */
-      background: #0f0f22;
-      border-top: none;
+      /* Equal heights whatever buttons each header holds (the dock glyph is
+         taller than ✕), so side-by-side headers share one bottom line. */
+      box-sizing: border-box;
+      min-height: 53px;
     }
     #lookup-title,
     #node-details-title {
@@ -1083,10 +1116,6 @@ function injectPanelStyles() {
       color: #fff;
     }
     #lookup-body {
-      /* Equal heights whatever buttons each header holds (the dock glyph is
-         taller than ✕), so side-by-side headers share one bottom line. */
-      box-sizing: border-box;
-      min-height: 53px;
       flex: 1;
       overflow-y: auto;
       padding: 0.5rem 0;
@@ -1603,6 +1632,33 @@ function closePanel(panel: HTMLElement) {
   panel.classList.remove("open");
 }
 
+// A closed panel only slides off screen, so its buttons and rows stayed in
+// the Tab order (and the screen reader's reach). Keep it inert while shut.
+function keepInertWhileClosed(panel: HTMLElement) {
+  const sync = () => {
+    panel.inert = !panel.classList.contains("open");
+  };
+  sync();
+  new MutationObserver(sync).observe(panel, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+}
+
+// Esc closes the open panel — the node-details card first, it sits on top.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || e.defaultPrevented) return;
+  for (const id of ["node-details-close", "lookup-close"]) {
+    const button = document.getElementById(id);
+    const panel = button?.closest("aside");
+    if (button && panel?.classList.contains("open")) {
+      button.click();
+      e.preventDefault();
+      return;
+    }
+  }
+});
+
 // Unlike the floating node-details card, the docked lookup panel actually
 // reflows the graph instead of overlaying it — #graph-container is pushed
 // right by the panel's current width (open + desktop only) and Sigma is
@@ -1684,6 +1740,8 @@ function savedLookupDock(): LookupDock {
 function createPanel(): HTMLElement {
   const panel = document.createElement("aside");
   panel.id = "lookup-panel";
+  panel.tabIndex = -1;
+  panel.setAttribute("aria-label", "Bases de dados");
   panel.innerHTML = `
     <div id="lookup-header">
       <button id="lookup-back" style="display:none">← Voltar</button>
@@ -1704,18 +1762,32 @@ function createPanel(): HTMLElement {
   fab.id = "lookup-fab";
   fab.type = "button";
   fab.textContent = "Bases";
-  fab.addEventListener("click", () => {
+  fab.addEventListener("click", (e) => {
     if (isMobileViewport()) closePanel(document.getElementById("node-details-panel") as HTMLElement);
     panel.classList.add("open");
     updateGraphLayout();
+    // Opened from the keyboard (no pointer, detail 0): take the focus there,
+    // or the next Tab walks the page behind the sheet.
+    if (e.detail === 0) {
+      panel.inert = false; // the observer only lifts it after this handler
+      panel.focus({ preventScroll: true });
+    }
   });
   document.body.appendChild(fab);
 
   document.getElementById("lookup-close")!.addEventListener("click", () => {
+    const hadFocus = panel.contains(document.activeElement);
     closePanel(panel);
     lookupHistory.length = 0;
     updateGraphLayout();
+    // Focus would otherwise fall into the now-inert panel (or was already
+    // lost to <body> when the hidden Bases button let it go): hand it back
+    // to the button that reopens the panel.
+    if (hadFocus || document.activeElement === document.body) {
+      fab.focus({ preventScroll: true });
+    }
   });
+  keepInertWhileClosed(panel);
 
   // Docked to an edge (left by default; the header's dock button cycles
   // left → right → bottom, remembered per browser), deliberately not
@@ -1774,6 +1846,7 @@ function createPanel(): HTMLElement {
 function createNodeDetailsPanel(): HTMLElement {
   const panel = document.createElement("aside");
   panel.id = "node-details-panel";
+  panel.setAttribute("aria-label", "Detalhes do nó");
   panel.innerHTML = `
     <div id="node-details-header">
       <span id="node-details-title">Detalhes do nó</span>
@@ -1809,6 +1882,7 @@ function createNodeDetailsPanel(): HTMLElement {
     attributes: true,
     attributeFilter: ["class"],
   });
+  keepInertWhileClosed(panel);
 
   return panel;
 }
@@ -2138,6 +2212,34 @@ function openLookupPanel(
 }
 
 // --- Init ---
+function hasWebGL(): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    return !!(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+
+// The topmost visible node whose drawn disc contains the viewport point —
+// a CPU stand-in for Sigma's GPU picking (see the clickStage handler).
+function nodeAtViewport(r: Sigma, x: number, y: number): string | null {
+  let best: string | null = null;
+  let bestDistance = Infinity;
+  for (const node of r.getGraph().nodes()) {
+    const data = r.getNodeDisplayData(node);
+    if (!data || data.hidden) continue;
+    const p = r.framedGraphToViewport(data);
+    const radius = r.scaleSize(data.size);
+    const distance = Math.hypot(p.x - x, p.y - y);
+    if (distance <= radius && distance < bestDistance) {
+      best = node;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
 async function init() {
   const params = new URLSearchParams(location.search);
   // Dev server: id comes from the ?cnpj= query param (one shared page, "/").
@@ -2165,7 +2267,13 @@ async function init() {
   try {
     data = await fetchGraph(cnpj);
   } catch (e) {
-    setStatus(`Erro ao carregar: ${(e as Error).message}`);
+    console.error("[fetch]", e);
+    // Nothing to list: "Bases" would open an empty panel.
+    document.getElementById("lookup-fab")?.remove();
+    showLoadFailure(
+      "Não foi possível baixar os dados desta rede. Verifique a conexão e tente de novo.",
+      true,
+    );
     return;
   }
 
@@ -2275,7 +2383,7 @@ async function init() {
     }
   }
 
-  renderer = new Sigma(graph, container, {
+  const sigmaSettings: ConstructorParameters<typeof Sigma>[2] = {
     renderEdgeLabels: false,
     defaultEdgeType: "curved",
     edgeProgramClasses: { curved: createEdgeCurveProgram() },
@@ -2375,7 +2483,41 @@ async function init() {
       }
       return res;
     },
-  });
+  };
+
+  // Sigma draws with WebGL. Without it (Tor "Safer", blocklisted GPUs, a
+  // context the browser refuses) the dataset tables below still work, so
+  // say what's missing instead of spinning for ever.
+  let canDraw = hasWebGL();
+  const mountRenderer = () => {
+    renderer = new Sigma(graph, container, sigmaSettings);
+    // Handle for scripts/test_platforms.py (and the console) to reach the graph.
+    (window as unknown as { __sigma: Sigma }).__sigma = renderer;
+    bindRenderer(renderer);
+    // A backgrounded tab can lose its WebGL context (iOS does it routinely);
+    // Sigma never rebuilds its programs, so the graph stayed blank. Allow the
+    // restore (preventDefault) and remount a fresh renderer on it.
+    let remounting = false;
+    for (const canvas of container.querySelectorAll("canvas")) {
+      canvas.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      canvas.addEventListener("webglcontextrestored", () => {
+        if (remounting) return;
+        remounting = true;
+        requestAnimationFrame(() => {
+          renderer?.kill();
+          mountRenderer();
+        });
+      });
+    }
+  };
+  if (canDraw) {
+    try {
+      mountRenderer();
+    } catch (e) {
+      console.error("[sigma]", e);
+      canDraw = false;
+    }
+  }
 
   runLayout(graph, 200);
 
@@ -2433,76 +2575,100 @@ async function init() {
       };
     },
   );
-  if (overlay) overlay.style.display = "none";
+  if (canDraw) {
+    if (overlay) overlay.style.display = "none";
+  } else {
+    showLoadFailure(
+      "Este navegador não oferece WebGL, então o grafo não pode ser desenhado. As tabelas das bases continuam no painel.",
+    );
+  }
   openLookupPanel(rootId, graph, lookupResults);
   if (!isMobileViewport()) showNodeDetails(rootId, graph);
 
-  // Node dragging
-  let draggedNode: string | null = null;
-  let isDragging = false;
-  let dragOffset = { dx: 0, dy: 0 };
+  // Everything bound to a renderer, so a remount (after a lost WebGL
+  // context) rebinds it — declared, hence hoisted for mountRenderer above.
+  function bindRenderer(r: Sigma) {
+    // Node dragging
+    let draggedNode: string | null = null;
+    let isDragging = false;
+    let dragOffset = { dx: 0, dy: 0 };
 
-  renderer.on("downNode", ({ node, event }) => {
-    draggedNode = node;
-    isDragging = false;
-    renderer!.getCamera().disable();
-    const mousePos = renderer!.viewportToGraph({
-      x: event.x,
-      y: event.y,
+    r.on("downNode", ({ node, event }) => {
+      draggedNode = node;
+      isDragging = false;
+      r.getCamera().disable();
+      const mousePos = r.viewportToGraph({
+        x: event.x,
+        y: event.y,
+      });
+      const nodeX = graph.getNodeAttribute(node, "x") as number;
+      const nodeY = graph.getNodeAttribute(node, "y") as number;
+      dragOffset = { dx: nodeX - mousePos.x, dy: nodeY - mousePos.y };
     });
-    const nodeX = graph.getNodeAttribute(node, "x") as number;
-    const nodeY = graph.getNodeAttribute(node, "y") as number;
-    dragOffset = { dx: nodeX - mousePos.x, dy: nodeY - mousePos.y };
-  });
 
-  renderer.getMouseCaptor().on("mousemovebody", (e) => {
-    if (!draggedNode) return;
-    isDragging = true;
-    const pos = renderer!.viewportToGraph({ x: e.x, y: e.y });
-    graph.setNodeAttribute(draggedNode, "x", pos.x + dragOffset.dx);
-    graph.setNodeAttribute(draggedNode, "y", pos.y + dragOffset.dy);
-  });
+    r.getMouseCaptor().on("mousemovebody", (e) => {
+      if (!draggedNode) return;
+      isDragging = true;
+      const pos = r.viewportToGraph({ x: e.x, y: e.y });
+      graph.setNodeAttribute(draggedNode, "x", pos.x + dragOffset.dx);
+      graph.setNodeAttribute(draggedNode, "y", pos.y + dragOffset.dy);
+    });
 
-  renderer.getMouseCaptor().on("mouseup", () => {
-    if (draggedNode && !isDragging) {
-      // treat as click — already handled by clickNode
+    r.getMouseCaptor().on("mouseup", () => {
+      if (draggedNode && !isDragging) {
+        // treat as click — already handled by clickNode
+      }
+      draggedNode = null;
+      isDragging = false;
+      r.getCamera().enable();
+    });
+
+    r.on("enterNode", ({ node }) => {
+      hoveredNode = node;
+      r.refresh({ skipIndexation: true });
+    });
+
+    r.on("leaveNode", () => {
+      hoveredNode = null;
+      r.refresh({ skipIndexation: true });
+    });
+
+    r.on("clickStage", ({ event }) => {
+      // Sigma finds the clicked node by reading back a picking buffer. Firefox's
+      // resistFingerprinting (LibreWolf, Tor, Mullvad) garbles that readback,
+      // so every click landed on the stage. Check the geometry on the CPU
+      // before treating it as a click on empty space.
+      const hit = nodeAtViewport(r, event.x, event.y);
+      if (hit) {
+        selectNode(hit);
+        return;
+      }
+      selectedNode = null;
+      r.refresh({ skipIndexation: true });
+      syncLookupRowHighlight();
+    });
+
+    r.on("clickNode", ({ node }) => selectNode(node));
+
+    function selectNode(node: string) {
+      selectedNode = selectedNode === node ? null : node;
+      hoveredNode = null;
+      r.refresh({ skipIndexation: true });
+      syncLookupRowHighlight();
+
+      const nodeType = nodeTypeMap.get(node);
+      if (nodeType === "group") {
+        const datasetId = node.startsWith("group:")
+          ? node.split(":").slice(2).join(":")
+          : "";
+        if (datasetId && datasetId !== "socios") focusLookupSection(datasetId);
+      }
+      showNodeDetails(node, graph);
     }
-    draggedNode = null;
-    isDragging = false;
-    renderer!.getCamera().enable();
-  });
-
-  renderer.on("enterNode", ({ node }) => {
-    hoveredNode = node;
-    renderer!.refresh({ skipIndexation: true });
-  });
-
-  renderer.on("leaveNode", () => {
-    hoveredNode = null;
-    renderer!.refresh({ skipIndexation: true });
-  });
-
-  renderer.on("clickStage", () => {
-    selectedNode = null;
-    renderer!.refresh({ skipIndexation: true });
-    syncLookupRowHighlight();
-  });
-
-  renderer.on("clickNode", ({ node }) => {
-    selectedNode = selectedNode === node ? null : node;
-    hoveredNode = null;
-    renderer!.refresh({ skipIndexation: true });
-    syncLookupRowHighlight();
-
-    const nodeType = nodeTypeMap.get(node);
-    if (nodeType === "group") {
-      const datasetId = node.startsWith("group:")
-        ? node.split(":").slice(2).join(":")
-        : "";
-      if (datasetId && datasetId !== "socios") focusLookupSection(datasetId);
-    }
-    showNodeDetails(node, graph);
-  });
+  }
 }
 
-init().catch((e) => setStatus(`Erro fatal: ${(e as Error).message}`));
+init().catch((e) => {
+  console.error(e);
+  showLoadFailure(`Erro ao montar a rede: ${(e as Error).message}`, true);
+});

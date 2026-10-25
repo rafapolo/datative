@@ -12,6 +12,7 @@ bun run build:site      # export the whole site to dist/ (what CI publishes to P
 bun run generate:static # regenerate static/ from beelink (the only thing that talks to live data)
 bun test                # run tests
 bun run typecheck       # TypeScript check
+python3 -m pytest scripts/test_platforms.py -q  # browser regressions (Chromium/WebKit/Firefox) against dist/ — build:graph + build:site first
 ```
 
 No build step for the dev server — Bun JIT-compiles TypeScript directly. `public/graph.js` needs an explicit rebuild; the published static site needs both `build:graph` and `build:site` (CI does both, see Deploy below).

@@ -443,7 +443,9 @@ export function renderGraphLanding(entitiesIndex: EntityIndexEntry[], links: Lin
   </div>
   <script>
     (function () {
-      var norm = function (t) { return t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); };
+      // NFKD also unfolds ligatures pasted from PDFs (ﬁ → fi); iOS Smart
+      // Punctuation types ’ for '.
+      var norm = function (t) { return t.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[\u2018\u2019\u02bc]/g, "'").toLowerCase(); };
       var rows = Array.prototype.slice.call(document.querySelectorAll(".ci-row"));
       rows.forEach(function (r) { r.dataset.search = norm(r.dataset.search || ""); });
       var input = document.getElementById("entity-search");
@@ -712,15 +714,55 @@ export function renderGraphPage(
       letter-spacing: 0.15em;
       text-transform: uppercase;
     }
+    /* A load that can't finish (no JavaScript, no WebGL, a failed or
+       stalled download) says why instead of spinning for ever. */
+    #loading-overlay.failed {
+      pointer-events: auto;
+      padding: 0 1.5rem;
+      text-align: center;
+    }
+    #loading-overlay.failed .spinner { display: none; }
+    #loading-overlay.failed .loading-text,
+    .loading-noscript {
+      max-width: 34rem;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      letter-spacing: 0;
+      text-transform: none;
+      color: #c8d0e0;
+      text-align: center;
+      padding: 0 1.5rem;
+    }
+    .loading-retry {
+      min-height: 44px;
+      padding: 0 1.2rem;
+      font: 700 0.66rem 'Space Mono', monospace;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #0a0a18;
+      background: var(--gold);
+      border: none;
+      border-radius: 22px;
+      cursor: pointer;
+    }
     @media (max-width: 768px) {
       header { padding: 0 0.75rem; gap: 0.6rem; }
       .h-brand { font-size: 1rem; }
       .breadcrumb { font-size: 0.56rem; }
       .breadcrumb .bc-current { max-width: 110px; }
       .control-label { display: none; }
+      /* A 44px touch target: WebKit ignores the height of a natively
+         drawn select, so draw it (and its arrow) ourselves. */
       #layout-select {
         font-size: 0.56rem;
-        padding: 0.15rem 0.3rem;
+        padding: 0.15rem 1.3rem 0.15rem 0.5rem;
+        min-height: 44px;
+        -webkit-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236b7aaa'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
       }
       footer { padding: 0 0.75rem; }
       #status { max-width: 130px; }
@@ -752,6 +794,10 @@ export function renderGraphPage(
     <div id="loading-overlay">
       <div class="spinner"></div>
       <span class="loading-text">carregando rede</span>
+      <noscript>
+        <style>#loading-overlay .spinner, #loading-overlay .loading-text { display: none; }</style>
+        <p class="loading-noscript">Esta página precisa de JavaScript e WebGL para desenhar a rede.</p>
+      </noscript>
     </div>
   </div>
   <footer>
