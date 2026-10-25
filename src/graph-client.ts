@@ -973,6 +973,46 @@ function injectPanelStyles() {
     #lookup-panel.open {
       transform: translateX(0);
     }
+    #lookup-panel[data-dock="right"] {
+      left: auto;
+      right: 0;
+      transform: translateX(100%);
+      box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+    }
+    #lookup-panel[data-dock="bottom"] {
+      top: auto;
+      bottom: 30px;
+      width: 100% !important;
+      max-width: 100%;
+      height: 40vh;
+      min-height: 0;
+      max-height: calc(100vh - 46px - 30px - 80px);
+      transform: translateY(calc(100% + 30px));
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+    }
+    #lookup-panel[data-dock="right"].open,
+    #lookup-panel[data-dock="bottom"].open {
+      transform: none;
+    }
+    /* With the lookup panel on the right, the node-details card swaps to
+       the left so the two don't stack on the same edge. */
+    body[data-lookup-dock="right"] #node-details-panel {
+      right: auto;
+      left: 0;
+      border-left: none;
+      border-right: 1px solid #23234a;
+      border-radius: 0 0 10px 0;
+      transform: translateX(-100%);
+      box-shadow: 4px 4px 20px rgba(0,0,0,0.45);
+    }
+    body[data-lookup-dock="right"] #node-details-panel.open {
+      transform: translateX(0);
+    }
+    #lookup-actions {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
     #lookup-header,
     #node-details-header {
       display: flex;
@@ -995,6 +1035,7 @@ function injectPanelStyles() {
       padding-right: 0.5rem;
     }
     #lookup-close,
+    #lookup-dock,
     #node-details-close {
       background: none;
       border: none;
@@ -1005,6 +1046,7 @@ function injectPanelStyles() {
       border-radius: 4px;
     }
     #lookup-close:hover,
+    #lookup-dock:hover,
     #node-details-close:hover {
       background: #2e2e4e;
       color: #fff;
@@ -1332,42 +1374,57 @@ function injectPanelStyles() {
       font-style: italic;
       padding: 0.4rem 0.2rem;
     }
-    .panel-resizer {
-      display: block;
-    }
-    .panel-resizer-v {
-      display: none;
-    }
+    /* Phones: the lookup panel's dock still applies — left/right become
+       drawers over the graph (no reflow, too narrow to share), bottom the
+       usual bottom sheet. The node-details card takes the opposite side,
+       or is a bottom sheet too while the lookup panel docks at the bottom.
+       Only one of the two is open at a time on a phone. */
     @media (max-width: ${MOBILE_BREAKPOINT_PX}px) {
-      #lookup-panel,
-      #node-details-panel {
-        left: 0 !important;
-        right: 0 !important;
-        top: auto !important;
-        bottom: 0 !important;
+      #lookup-panel[data-dock="left"],
+      #lookup-panel[data-dock="right"] {
+        top: 46px;
+        bottom: 0;
+        width: 88vw;
+        min-width: 0;
+        max-width: 92vw;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+      }
+      body:not([data-lookup-dock="bottom"]) #node-details-panel {
+        width: 88vw;
+        min-width: 0;
+        max-width: 92vw;
+        max-height: calc(100vh - 46px);
+      }
+      #lookup-panel[data-dock="bottom"],
+      body[data-lookup-dock="bottom"] #node-details-panel {
+        left: 0;
+        right: 0;
+        top: auto;
+        bottom: 0;
         width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
+        max-width: 100%;
+        min-width: 0;
         height: auto;
         min-height: 0;
         max-height: 78vh;
         border-radius: 14px 14px 0 0;
         border: none;
         border-top: 1px solid #23234a;
-        transform: translateY(100%) !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-        box-shadow: 0 -8px 24px rgba(0,0,0,0.5) !important;
+        transform: translateY(100%);
+        box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
       }
-      #lookup-panel.open,
-      #node-details-panel.open {
-        transform: translateY(0) !important;
+      #lookup-panel[data-dock="bottom"].open,
+      body[data-lookup-dock="bottom"] #node-details-panel.open {
+        transform: none;
       }
       #lookup-header,
       #node-details-header {
         cursor: default;
       }
       #lookup-close,
+      #lookup-dock,
       #node-details-close,
       #lookup-back {
         min-width: 44px;
@@ -1376,42 +1433,54 @@ function injectPanelStyles() {
       .lookup-section-header {
         min-height: 44px;
       }
+      /* Wider side handle for a finger. */
       .panel-resizer {
-        display: none;
-      }
-      .panel-resizer-v {
-        display: block;
+        width: 16px !important;
       }
     }
   `;
   document.head.appendChild(style);
 }
 
+type PanelEdge = "left" | "right" | "bottom";
+
+// `edge` is the panel's inner edge (the one facing the graph) — a function
+// for the lookup panel, whose dock side can change at runtime. "bottom"
+// means the panel is docked at the bottom, so it resizes by height from
+// its top edge, like the mobile bottom sheet.
 function makeResizable(
   panel: HTMLElement,
-  edge: "left" | "right",
+  edgeOf: PanelEdge | (() => PanelEdge),
   onResize?: () => void,
 ) {
+  const currentEdge = () => (typeof edgeOf === "function" ? edgeOf() : edgeOf);
   const resizer = document.createElement("div");
   resizer.className = "panel-resizer";
+  const placeResizer = () => {
+    const edge = currentEdge();
+    resizer.style.left = edge === "right" ? "auto" : "0";
+    resizer.style.right = edge === "right" ? "0" : "auto";
+    resizer.style.display = edge === "bottom" ? "none" : "block";
+  };
   resizer.style.cssText = `
     position: absolute;
-    ${edge}: 0;
     top: 0;
     width: 6px;
     height: 100%;
     cursor: ew-resize;
     z-index: 10;
     background: transparent;
+    touch-action: none;
   `;
+  placeResizer();
   panel.appendChild(resizer);
 
   let resizing = false;
   let startX = 0,
     startW = 0;
 
-  resizer.addEventListener("mousedown", (e) => {
-    if (isMobileViewport()) return; // bottom sheets resize by height, see below
+  resizer.addEventListener("pointerdown", (e) => {
+    if (currentEdge() === "bottom") return; // resize by height, see below
     resizing = true;
     startX = e.clientX;
     startW = panel.offsetWidth;
@@ -1420,22 +1489,22 @@ function makeResizable(
     e.stopPropagation();
   });
 
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     if (!resizing) return;
     const dx = e.clientX - startX;
-    const newW = edge === "right" ? startW + dx : startW - dx;
+    const newW = currentEdge() === "right" ? startW + dx : startW - dx;
     if (newW >= 240 && newW <= window.innerWidth * 0.9) {
       panel.style.width = newW + "px";
       onResize?.();
     }
   });
 
-  document.addEventListener("mouseup", () => {
+  document.addEventListener("pointerup", () => {
     resizing = false;
   });
 
-  // On mobile the panel is a full-width bottom sheet, so "resizable" means
-  // its height — a drag bar along the top edge instead of a side edge.
+  // Docked at the bottom the panel is a full-width sheet, so "resizable"
+  // means its height — a drag bar along the top edge instead of a side edge.
   const vResizer = document.createElement("div");
   vResizer.className = "panel-resizer-v";
   vResizer.style.cssText = `
@@ -1447,6 +1516,7 @@ function makeResizable(
     cursor: ns-resize;
     z-index: 10;
     background: transparent;
+    touch-action: none;
   `;
   panel.appendChild(vResizer);
 
@@ -1454,8 +1524,8 @@ function makeResizable(
   let startY = 0,
     startH = 0;
 
-  vResizer.addEventListener("mousedown", (e) => {
-    if (!isMobileViewport()) return;
+  vResizer.addEventListener("pointerdown", (e) => {
+    if (currentEdge() !== "bottom") return;
     vResizing = true;
     startY = e.clientY;
     startH = panel.getBoundingClientRect().height;
@@ -1464,7 +1534,7 @@ function makeResizable(
     e.stopPropagation();
   });
 
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     if (!vResizing) return;
     const dy = startY - e.clientY; // dragging up grows the sheet
     const newH = startH + dy;
@@ -1472,12 +1542,26 @@ function makeResizable(
     const maxH = window.innerHeight * 0.92;
     if (newH >= minH && newH <= maxH) {
       panel.style.maxHeight = newH + "px";
+      if (currentEdge() === "bottom") panel.style.height = newH + "px";
+      onResize?.();
     }
   });
 
-  document.addEventListener("mouseup", () => {
+  document.addEventListener("pointerup", () => {
     vResizing = false;
   });
+
+  const placeVResizer = () => {
+    vResizer.style.display = currentEdge() === "bottom" ? "block" : "none";
+  };
+  placeVResizer();
+  const place = () => {
+    placeResizer();
+    placeVResizer();
+  };
+  // The edge can depend on the viewport (see createNodeDetailsPanel).
+  window.addEventListener("resize", place);
+  return place;
 }
 
 function closePanel(panel: HTMLElement) {
@@ -1493,14 +1577,20 @@ function updateGraphLayout() {
   const container = document.getElementById("graph-container");
   const panel = document.getElementById("lookup-panel");
   if (!container || !panel) return;
-  const offset =
-    !isMobileViewport() && panel.classList.contains("open")
-      ? panel.offsetWidth
-      : 0;
+  const dock = lookupDock();
+  const open = !isMobileViewport() && panel.classList.contains("open");
+  const offset = open
+    ? dock === "bottom"
+      ? panel.offsetHeight
+      : panel.offsetWidth
+    : 0;
   const fab = document.getElementById("lookup-fab");
   if (fab) fab.hidden = panel.classList.contains("open");
-  container.style.marginLeft = offset ? `${offset}px` : "";
-  container.style.width = offset ? `calc(100% - ${offset}px)` : "";
+  container.style.marginLeft = offset && dock === "left" ? `${offset}px` : "";
+  container.style.width =
+    offset && dock !== "bottom" ? `calc(100% - ${offset}px)` : "";
+  container.style.marginBottom =
+    offset && dock === "bottom" ? `${offset}px` : "";
   // resize() alone clears the WebGL canvases (changing their width/height
   // attributes wipes the drawing buffer) but never redraws — without an
   // explicit refresh the graph stays blank until something else triggers one.
@@ -1512,6 +1602,39 @@ function updateGraphLayout() {
 // resize, not just drag-resize.
 window.addEventListener("resize", updateGraphLayout);
 
+const LOOKUP_DOCKS = ["left", "right", "bottom"] as const;
+type LookupDock = (typeof LOOKUP_DOCKS)[number];
+// Remembered separately for desktop and phone, which default differently.
+const lookupDockKey = () =>
+  isMobileViewport() ? "datative.lookupDock.mobile" : "datative.lookupDock";
+const LOOKUP_DOCK_ICONS: Record<LookupDock, string> = {
+  left: "⇤",
+  right: "⇥",
+  bottom: "⤓",
+};
+const LOOKUP_DOCK_LABELS: Record<LookupDock, string> = {
+  left: "esquerda",
+  right: "direita",
+  bottom: "embaixo",
+};
+
+function lookupDock(): LookupDock {
+  const dock = document.getElementById("lookup-panel")?.dataset.dock;
+  return (LOOKUP_DOCKS as readonly string[]).includes(dock ?? "")
+    ? (dock as LookupDock)
+    : "left";
+}
+
+function savedLookupDock(): LookupDock {
+  try {
+    const saved = localStorage.getItem(lookupDockKey()) ?? "";
+    if ((LOOKUP_DOCKS as readonly string[]).includes(saved)) {
+      return saved as LookupDock;
+    }
+  } catch {}
+  return isMobileViewport() ? "bottom" : "left";
+}
+
 function createPanel(): HTMLElement {
   const panel = document.createElement("aside");
   panel.id = "lookup-panel";
@@ -1519,7 +1642,10 @@ function createPanel(): HTMLElement {
     <div id="lookup-header">
       <button id="lookup-back" style="display:none">← Voltar</button>
       <span id="lookup-title">CNPJ</span>
-      <button id="lookup-close">✕</button>
+      <div id="lookup-actions">
+        <button id="lookup-dock" type="button"></button>
+        <button id="lookup-close">✕</button>
+      </div>
     </div>
     <div id="lookup-body"></div>
   `;
@@ -1545,10 +1671,56 @@ function createPanel(): HTMLElement {
     updateGraphLayout();
   });
 
-  // Docked to the left edge, deliberately not draggable — only width- (and
-  // on mobile, height-) resizable via makeResizable's handle. Resizing also
-  // reflows the graph (see updateGraphLayout).
-  makeResizable(panel, "right", updateGraphLayout);
+  // Docked to an edge (left by default; the header's dock button cycles
+  // left → right → bottom, remembered per browser), deliberately not
+  // draggable — only width- (bottom dock and mobile: height-) resizable via
+  // makeResizable's handle. Resizing also reflows the graph (see
+  // updateGraphLayout).
+  const placeResizers = makeResizable(
+    panel,
+    () => {
+      const dock = lookupDock();
+      return dock === "left" ? "right" : dock === "right" ? "left" : "bottom";
+    },
+    updateGraphLayout,
+  );
+  const dockBtn = document.getElementById("lookup-dock")!;
+  const applyDock = (dock: LookupDock) => {
+    panel.dataset.dock = dock;
+    document.body.dataset.lookupDock = dock;
+    // Sizes dragged in the previous dock don't carry over to the new one.
+    panel.style.width = "";
+    panel.style.height = "";
+    panel.style.maxHeight = "";
+    // Skip the slide animation, which would sweep across the screen.
+    panel.style.transition = "none";
+    placeResizers();
+    const next = LOOKUP_DOCKS[(LOOKUP_DOCKS.indexOf(dock) + 1) % LOOKUP_DOCKS.length];
+    dockBtn.textContent = LOOKUP_DOCK_ICONS[next];
+    dockBtn.title = `Mover painel para ${LOOKUP_DOCK_LABELS[next]}`;
+    dockBtn.setAttribute("aria-label", dockBtn.title);
+    updateGraphLayout();
+    requestAnimationFrame(() => {
+      panel.style.transition = "";
+    });
+  };
+  dockBtn.addEventListener("click", () => {
+    const dock = lookupDock();
+    const next = LOOKUP_DOCKS[(LOOKUP_DOCKS.indexOf(dock) + 1) % LOOKUP_DOCKS.length];
+    try {
+      localStorage.setItem(lookupDockKey(), next);
+    } catch {}
+    applyDock(next);
+  });
+  applyDock(savedLookupDock());
+  // Crossing the breakpoint (rotation, window resize) switches to that
+  // viewport's own remembered dock.
+  let wasMobile = isMobileViewport();
+  window.addEventListener("resize", () => {
+    if (isMobileViewport() === wasMobile) return;
+    wasMobile = isMobileViewport();
+    applyDock(savedLookupDock());
+  });
 
   return panel;
 }
@@ -1571,9 +1743,16 @@ function createNodeDetailsPanel(): HTMLElement {
       closePanel(panel);
     });
 
-  // Docked to the top-right corner, deliberately not draggable — only
-  // width-resizable via makeResizable's handle.
-  makeResizable(panel, "left");
+  // Docked to the top-right corner (top-left while the lookup panel docks
+  // right; on a phone, a bottom sheet while it docks bottom), deliberately
+  // not draggable — only width-resizable via
+  // makeResizable's handle.
+  const placeResizers = makeResizable(panel, () => {
+    const dock = lookupDock();
+    if (dock === "bottom" && isMobileViewport()) return "bottom";
+    return dock === "right" ? "right" : "left";
+  });
+  document.getElementById("lookup-dock")?.addEventListener("click", placeResizers);
 
   return panel;
 }
@@ -1643,6 +1822,7 @@ function showNodeDetails(nodeId: string, graph: Graph) {
   const openPanel = () => {
     if (isMobileViewport()) {
       closePanel(document.getElementById("lookup-panel") as HTMLElement);
+      updateGraphLayout();
     }
     panel.classList.add("open");
   };

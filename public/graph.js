@@ -10258,6 +10258,46 @@ function injectPanelStyles() {
     #lookup-panel.open {
       transform: translateX(0);
     }
+    #lookup-panel[data-dock="right"] {
+      left: auto;
+      right: 0;
+      transform: translateX(100%);
+      box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+    }
+    #lookup-panel[data-dock="bottom"] {
+      top: auto;
+      bottom: 30px;
+      width: 100% !important;
+      max-width: 100%;
+      height: 40vh;
+      min-height: 0;
+      max-height: calc(100vh - 46px - 30px - 80px);
+      transform: translateY(calc(100% + 30px));
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+    }
+    #lookup-panel[data-dock="right"].open,
+    #lookup-panel[data-dock="bottom"].open {
+      transform: none;
+    }
+    /* With the lookup panel on the right, the node-details card swaps to
+       the left so the two don't stack on the same edge. */
+    body[data-lookup-dock="right"] #node-details-panel {
+      right: auto;
+      left: 0;
+      border-left: none;
+      border-right: 1px solid #23234a;
+      border-radius: 0 0 10px 0;
+      transform: translateX(-100%);
+      box-shadow: 4px 4px 20px rgba(0,0,0,0.45);
+    }
+    body[data-lookup-dock="right"] #node-details-panel.open {
+      transform: translateX(0);
+    }
+    #lookup-actions {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
     #lookup-header,
     #node-details-header {
       display: flex;
@@ -10280,6 +10320,7 @@ function injectPanelStyles() {
       padding-right: 0.5rem;
     }
     #lookup-close,
+    #lookup-dock,
     #node-details-close {
       background: none;
       border: none;
@@ -10290,6 +10331,7 @@ function injectPanelStyles() {
       border-radius: 4px;
     }
     #lookup-close:hover,
+    #lookup-dock:hover,
     #node-details-close:hover {
       background: #2e2e4e;
       color: #fff;
@@ -10617,42 +10659,57 @@ function injectPanelStyles() {
       font-style: italic;
       padding: 0.4rem 0.2rem;
     }
-    .panel-resizer {
-      display: block;
-    }
-    .panel-resizer-v {
-      display: none;
-    }
+    /* Phones: the lookup panel's dock still applies — left/right become
+       drawers over the graph (no reflow, too narrow to share), bottom the
+       usual bottom sheet. The node-details card takes the opposite side,
+       or is a bottom sheet too while the lookup panel docks at the bottom.
+       Only one of the two is open at a time on a phone. */
     @media (max-width: ${MOBILE_BREAKPOINT_PX}px) {
-      #lookup-panel,
-      #node-details-panel {
-        left: 0 !important;
-        right: 0 !important;
-        top: auto !important;
-        bottom: 0 !important;
+      #lookup-panel[data-dock="left"],
+      #lookup-panel[data-dock="right"] {
+        top: 46px;
+        bottom: 0;
+        width: 88vw;
+        min-width: 0;
+        max-width: 92vw;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+      }
+      body:not([data-lookup-dock="bottom"]) #node-details-panel {
+        width: 88vw;
+        min-width: 0;
+        max-width: 92vw;
+        max-height: calc(100vh - 46px);
+      }
+      #lookup-panel[data-dock="bottom"],
+      body[data-lookup-dock="bottom"] #node-details-panel {
+        left: 0;
+        right: 0;
+        top: auto;
+        bottom: 0;
         width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
+        max-width: 100%;
+        min-width: 0;
         height: auto;
         min-height: 0;
         max-height: 78vh;
         border-radius: 14px 14px 0 0;
         border: none;
         border-top: 1px solid #23234a;
-        transform: translateY(100%) !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-        box-shadow: 0 -8px 24px rgba(0,0,0,0.5) !important;
+        transform: translateY(100%);
+        box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
       }
-      #lookup-panel.open,
-      #node-details-panel.open {
-        transform: translateY(0) !important;
+      #lookup-panel[data-dock="bottom"].open,
+      body[data-lookup-dock="bottom"] #node-details-panel.open {
+        transform: none;
       }
       #lookup-header,
       #node-details-header {
         cursor: default;
       }
       #lookup-close,
+      #lookup-dock,
       #node-details-close,
       #lookup-back {
         min-width: 44px;
@@ -10661,34 +10718,40 @@ function injectPanelStyles() {
       .lookup-section-header {
         min-height: 44px;
       }
+      /* Wider side handle for a finger. */
       .panel-resizer {
-        display: none;
-      }
-      .panel-resizer-v {
-        display: block;
+        width: 16px !important;
       }
     }
   `;
   document.head.appendChild(style);
 }
-function makeResizable(panel, edge, onResize) {
+function makeResizable(panel, edgeOf, onResize) {
+  const currentEdge = () => typeof edgeOf === "function" ? edgeOf() : edgeOf;
   const resizer = document.createElement("div");
   resizer.className = "panel-resizer";
+  const placeResizer = () => {
+    const edge = currentEdge();
+    resizer.style.left = edge === "right" ? "auto" : "0";
+    resizer.style.right = edge === "right" ? "0" : "auto";
+    resizer.style.display = edge === "bottom" ? "none" : "block";
+  };
   resizer.style.cssText = `
     position: absolute;
-    ${edge}: 0;
     top: 0;
     width: 6px;
     height: 100%;
     cursor: ew-resize;
     z-index: 10;
     background: transparent;
+    touch-action: none;
   `;
+  placeResizer();
   panel.appendChild(resizer);
   let resizing = false;
   let startX = 0, startW = 0;
-  resizer.addEventListener("mousedown", (e) => {
-    if (isMobileViewport())
+  resizer.addEventListener("pointerdown", (e) => {
+    if (currentEdge() === "bottom")
       return;
     resizing = true;
     startX = e.clientX;
@@ -10697,17 +10760,17 @@ function makeResizable(panel, edge, onResize) {
     e.preventDefault();
     e.stopPropagation();
   });
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     if (!resizing)
       return;
     const dx = e.clientX - startX;
-    const newW = edge === "right" ? startW + dx : startW - dx;
+    const newW = currentEdge() === "right" ? startW + dx : startW - dx;
     if (newW >= 240 && newW <= window.innerWidth * 0.9) {
       panel.style.width = newW + "px";
       onResize?.();
     }
   });
-  document.addEventListener("mouseup", () => {
+  document.addEventListener("pointerup", () => {
     resizing = false;
   });
   const vResizer = document.createElement("div");
@@ -10721,12 +10784,13 @@ function makeResizable(panel, edge, onResize) {
     cursor: ns-resize;
     z-index: 10;
     background: transparent;
+    touch-action: none;
   `;
   panel.appendChild(vResizer);
   let vResizing = false;
   let startY = 0, startH = 0;
-  vResizer.addEventListener("mousedown", (e) => {
-    if (!isMobileViewport())
+  vResizer.addEventListener("pointerdown", (e) => {
+    if (currentEdge() !== "bottom")
       return;
     vResizing = true;
     startY = e.clientY;
@@ -10735,7 +10799,7 @@ function makeResizable(panel, edge, onResize) {
     e.preventDefault();
     e.stopPropagation();
   });
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     if (!vResizing)
       return;
     const dy = startY - e.clientY;
@@ -10744,11 +10808,24 @@ function makeResizable(panel, edge, onResize) {
     const maxH = window.innerHeight * 0.92;
     if (newH >= minH && newH <= maxH) {
       panel.style.maxHeight = newH + "px";
+      if (currentEdge() === "bottom")
+        panel.style.height = newH + "px";
+      onResize?.();
     }
   });
-  document.addEventListener("mouseup", () => {
+  document.addEventListener("pointerup", () => {
     vResizing = false;
   });
+  const placeVResizer = () => {
+    vResizer.style.display = currentEdge() === "bottom" ? "block" : "none";
+  };
+  placeVResizer();
+  const place = () => {
+    placeResizer();
+    placeVResizer();
+  };
+  window.addEventListener("resize", place);
+  return place;
 }
 function closePanel(panel) {
   panel.classList.remove("open");
@@ -10758,16 +10835,44 @@ function updateGraphLayout() {
   const panel = document.getElementById("lookup-panel");
   if (!container || !panel)
     return;
-  const offset = !isMobileViewport() && panel.classList.contains("open") ? panel.offsetWidth : 0;
+  const dock = lookupDock();
+  const open = !isMobileViewport() && panel.classList.contains("open");
+  const offset = open ? dock === "bottom" ? panel.offsetHeight : panel.offsetWidth : 0;
   const fab = document.getElementById("lookup-fab");
   if (fab)
     fab.hidden = panel.classList.contains("open");
-  container.style.marginLeft = offset ? `${offset}px` : "";
-  container.style.width = offset ? `calc(100% - ${offset}px)` : "";
+  container.style.marginLeft = offset && dock === "left" ? `${offset}px` : "";
+  container.style.width = offset && dock !== "bottom" ? `calc(100% - ${offset}px)` : "";
+  container.style.marginBottom = offset && dock === "bottom" ? `${offset}px` : "";
   renderer?.resize();
   renderer?.refresh({ skipIndexation: true });
 }
 window.addEventListener("resize", updateGraphLayout);
+var LOOKUP_DOCKS = ["left", "right", "bottom"];
+var lookupDockKey = () => isMobileViewport() ? "datative.lookupDock.mobile" : "datative.lookupDock";
+var LOOKUP_DOCK_ICONS = {
+  left: "⇤",
+  right: "⇥",
+  bottom: "⤓"
+};
+var LOOKUP_DOCK_LABELS = {
+  left: "esquerda",
+  right: "direita",
+  bottom: "embaixo"
+};
+function lookupDock() {
+  const dock = document.getElementById("lookup-panel")?.dataset.dock;
+  return LOOKUP_DOCKS.includes(dock ?? "") ? dock : "left";
+}
+function savedLookupDock() {
+  try {
+    const saved = localStorage.getItem(lookupDockKey()) ?? "";
+    if (LOOKUP_DOCKS.includes(saved)) {
+      return saved;
+    }
+  } catch {}
+  return isMobileViewport() ? "bottom" : "left";
+}
 function createPanel() {
   const panel = document.createElement("aside");
   panel.id = "lookup-panel";
@@ -10775,7 +10880,10 @@ function createPanel() {
     <div id="lookup-header">
       <button id="lookup-back" style="display:none">← Voltar</button>
       <span id="lookup-title">CNPJ</span>
-      <button id="lookup-close">✕</button>
+      <div id="lookup-actions">
+        <button id="lookup-dock" type="button"></button>
+        <button id="lookup-close">✕</button>
+      </div>
     </div>
     <div id="lookup-body"></div>
   `;
@@ -10796,7 +10904,44 @@ function createPanel() {
     lookupHistory.length = 0;
     updateGraphLayout();
   });
-  makeResizable(panel, "right", updateGraphLayout);
+  const placeResizers = makeResizable(panel, () => {
+    const dock = lookupDock();
+    return dock === "left" ? "right" : dock === "right" ? "left" : "bottom";
+  }, updateGraphLayout);
+  const dockBtn = document.getElementById("lookup-dock");
+  const applyDock = (dock) => {
+    panel.dataset.dock = dock;
+    document.body.dataset.lookupDock = dock;
+    panel.style.width = "";
+    panel.style.height = "";
+    panel.style.maxHeight = "";
+    panel.style.transition = "none";
+    placeResizers();
+    const next = LOOKUP_DOCKS[(LOOKUP_DOCKS.indexOf(dock) + 1) % LOOKUP_DOCKS.length];
+    dockBtn.textContent = LOOKUP_DOCK_ICONS[next];
+    dockBtn.title = `Mover painel para ${LOOKUP_DOCK_LABELS[next]}`;
+    dockBtn.setAttribute("aria-label", dockBtn.title);
+    updateGraphLayout();
+    requestAnimationFrame(() => {
+      panel.style.transition = "";
+    });
+  };
+  dockBtn.addEventListener("click", () => {
+    const dock = lookupDock();
+    const next = LOOKUP_DOCKS[(LOOKUP_DOCKS.indexOf(dock) + 1) % LOOKUP_DOCKS.length];
+    try {
+      localStorage.setItem(lookupDockKey(), next);
+    } catch {}
+    applyDock(next);
+  });
+  applyDock(savedLookupDock());
+  let wasMobile = isMobileViewport();
+  window.addEventListener("resize", () => {
+    if (isMobileViewport() === wasMobile)
+      return;
+    wasMobile = isMobileViewport();
+    applyDock(savedLookupDock());
+  });
   return panel;
 }
 function createNodeDetailsPanel() {
@@ -10813,7 +10958,13 @@ function createNodeDetailsPanel() {
   document.getElementById("node-details-close").addEventListener("click", () => {
     closePanel(panel);
   });
-  makeResizable(panel, "left");
+  const placeResizers = makeResizable(panel, () => {
+    const dock = lookupDock();
+    if (dock === "bottom" && isMobileViewport())
+      return "bottom";
+    return dock === "right" ? "right" : "left";
+  });
+  document.getElementById("lookup-dock")?.addEventListener("click", placeResizers);
   return panel;
 }
 function showNodeDetails(nodeId, graph) {
@@ -10869,6 +11020,7 @@ function showNodeDetails(nodeId, graph) {
   const openPanel = () => {
     if (isMobileViewport()) {
       closePanel(document.getElementById("lookup-panel"));
+      updateGraphLayout();
     }
     panel.classList.add("open");
   };
