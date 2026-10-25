@@ -23,133 +23,143 @@ Datative é um site estático de investigação que mostra as redes das entidade
 - Sem servidor de dados em tempo de request — `src/index.ts` só lê arquivos estáticos.
 
 
-## Peça a análise de uma nova entidade
+## O que dá para descobrir
 
-O site mostra só as 50 empresas e 50 pessoas com maior abrangência entre datasets — mas você pode pedir que uma entidade específica seja analisada. Para isso, [abra uma issue](https://github.com/rafapolo/datative/issues/new) informando o CNPJ ou CPF (só números) da empresa ou pessoa que você quer ver mapeada, junto com o motivo do interesse. Quando a análise for feita, o grafo dessa entidade é publicado e o link é deixado como comentário na própria issue.
+O valor está no cruzamento: cada dataset sozinho é uma lista, mas a mesma entidade aparecendo em vários deles conta uma história. Alguns exemplos de perguntas que o grafo e o painel ajudam a responder:
+
+- **Doou e depois foi contratado?** Uma empresa (ou seu sócio) aparece em *TSE · Receitas de Candidatos* como doadora e, nos anos seguintes, em *CGU · Contratos*, *TCE-RJ · Contratos* ou *SICONV · Obras* como fornecedora do poder público.
+- **Punida, mas ainda vendendo ao governo?** Um CNPJ listado em *CGU · CEIS*, *CNEP* ou *TCU · Empresas Inidôneas* que continua surgindo em *MGI · Compras sem Licitação* ou *MGI · Ofertas em Pregão*. As datas no painel mostram se o contrato veio antes ou durante a sanção.
+- **Devedor que recebe dinheiro público.** Débitos em *PGFN · Dívida Ativa* ao lado de financiamentos do *BNDES*, crédito rural subsidiado no *BCB · SICOR* ou recursos da *Lei Rouanet*.
+- **Passivo ambiental e trabalhista.** A mesma empresa com *IBAMA · Autos de Infração* ou *Termos de Embargo*, presença na *MTE · Lista Suja* e, ao mesmo tempo, *ANM · Portarias de Lavra*, *ANA · Outorgas* ou armazéns de soja mapeados pela *TRASE*.
+- **Quem controla quem.** *Holdings* e *CVM · Acionistas / Posições Acionárias* desenham cadeias de participação; *CVM · Administradores* e *Relações Familiares* mostram as pessoas por trás delas, e os sócios na Receita fecham o círculo.
+- **Política e fornecimento.** Um fornecedor que aparece nas despesas de campanha (*TSE · Despesas de Candidatos*) e também na cota parlamentar (*Câmara · Despesas*, *Senado · CEAPS*), ou um instituto de pesquisa eleitoral pago por quem também contrata com o governo.
+- **Licitações combinadas.** Empresas que disputam as mesmas licitações (*CGU · Participantes*, *MIDES · Participantes*) e compartilham sócios: um sinal clássico de concorrência simulada.
+
+Para navegar: comece pelo nó central, clique num nó-hub colorido para abrir a tabela completa daquele dataset no painel à esquerda (as linhas com data vêm da mais recente para a mais antiga) e cruze com os outros hubs.
 
 ## Datasets consultados
 
-Para cada entidade, o gerador procura correspondências de CNPJ/CPF nas 117 tabelas abaixo (todas do espelho [Base dos Dados](https://basedosdados.org/) em DuckDB). Além delas, `br_me_cnpj.empresas` e `br_me_cnpj.socios` montam a base da rede (empresa ↔ sócios). Tabelas com CPF só entram quando a pessoa aparece em papel de prestação de contas pública (sanções, TSE, TCU, IBAMA, administradores na CVM, fornecedores/beneficiários de recursos públicos) — programas sociais, folha de servidores e filiação partidária ficam de fora de propósito.
+Para cada entidade, o gerador procura correspondências de CNPJ/CPF nas 117 tabelas abaixo (todas usando o [rodado.xyz](https://rodado.xyz)). Além delas, `br_me_cnpj.empresas` e `br_me_cnpj.socios` montam a base da rede (empresa ↔ sócios). Tabelas com CPF só entram quando a pessoa aparece em papel de prestação de contas pública (sanções, TSE, TCU, IBAMA, administradores na CVM, fornecedores/beneficiários de recursos públicos) — programas sociais, folha de servidores e filiação partidária ficam de fora de propósito.
 
-| Dataset | Tabela | Colunas de CNPJ/CPF |
-|---|---|---|
-| CGU · Contratos | `br_cgu_licitacao_contrato.contrato_compra` | `cpf_cnpj_contratado` |
-| CGU · Itens de Licitação | `br_cgu_licitacao_contrato.licitacao_item` | `cpf_cnpj_vencedor` |
-| CGU · Participantes de Licitação | `br_cgu_licitacao_contrato.licitacao_participante` | `cpf_cnpj_participante` |
-| CGU · Cartão Gov. Federal | `br_cgu_cartao_pagamento.microdados_governo_federal` | `cnpj_cpf_favorecido` |
-| CGU · Cartão Defesa Civil | `br_cgu_cartao_pagamento.microdados_defesa_civil` | `cnpj_cpf_favorecido` |
-| CGU · Compras Centralizadas | `br_cgu_cartao_pagamento.microdados_compras_centralizadas` | `cnpj_cpf_favorecido` |
-| TSE · Despesas de Candidatos | `br_tse_eleicoes.despesas_candidato` | `cpf_cnpj_fornecedor`, `cnpj_candidato`, `cnpj_prestador_contas` |
-| TSE · Receitas de Candidatos | `br_tse_eleicoes.receitas_candidato` | `cpf_cnpj_doador`, `cnpj_candidato`, `cnpj_prestador_contas` |
-| TSE · Receitas de Comitê | `br_tse_eleicoes.receitas_comite` | `cpf_cnpj_doador`, `cnpj_prestador_contas` |
-| TSE · Receitas Órgão Partidário | `br_tse_eleicoes.receitas_orgao_partidario` | `cpf_cnpj_doador`, `cnpj_prestador_contas` |
-| MS · CNES Estabelecimentos | `br_ms_cnes.estabelecimento` | `cpf_cnpj`, `cnpj_mantenedora` |
-| Câmara · Despesas | `br_camara_dados_abertos.despesa` | `cnpj_cpf_fornecedor`, `cpf` |
-| Câmara · Contratos | `br_camara_dados_abertos.licitacao_contrato` | `cpf_cnpj_fornecedor` |
-| Anatel · Banda Larga Fixa | `br_anatel_banda_larga_fixa.microdados` | `cnpj` |
-| ANP · Preços Combustíveis | `br_anp_precos_combustiveis.microdados` | `cnpj_revenda` |
-| ANS · Beneficiários | `br_ans_beneficiario.informacao_consolidada` | `cnpj` |
-| BCB · ESTBAN Agências | `br_bcb_estban.agencia` | `cnpj_basico`, `cnpj_agencia` |
-| BCB · SICOR Operações | `br_bcb_sicor.operacao` | `cnpj_basico_instituicao_financeira`, `cnpj_basico_agente_investimento`, `cnpj_basico_cadastrante` |
-| BD · Diretórios Brasil | `br_bd_diretorios_brasil.empresa` | `cnpj_basico` |
-| CVM · Administradores PJ | `br_cvm_administradores_carteira.pessoa_juridica` | `cnpj` |
-| CVM · Ofertas Públicas | `br_cvm_oferta_publica_distribuicao.dia` | `cnpj_emissor`, `cnpj_lider`, `cnpj_ofertante` |
-| INEP · Censo Escolar | `br_inep_censo_escolar.escola` | `cnpj_escola_privada`, `cnpj_mantenedora` |
-| TRASE · Soja Crushing | `br_trase_supply_chain.soy_beans_crushing_facilities` | `cnpj` |
-| TRASE · Soja Armazenamento | `br_trase_supply_chain.soy_beans_storage_facilities` | `cnpj_cpf` |
-| MS · SIH AIHs | `br_ms_sih.aihs_reduzidas` | `cnpj_estabelecimento`, `cnpj_mantenedora` |
-| CNPJ · Estabelecimentos | `br_me_cnpj.estabelecimentos` | `cnpj_basico` |
-| RF · CNO Obras | `br_rf_cno.microdados` | `id_responsavel` |
-| RF · CNO Vínculos | `br_rf_cno.vinculos` | `id_responsavel` |
-| MIDES · Itens de Licitação | `world_wb_mides.licitacao_item` | `documento` |
-| MIDES · Participantes de Licitação | `world_wb_mides.licitacao_participante` | `documento` |
-| BCB · SICOR Cooperados | `br_bcb_sicor.recurso_publico_cooperado` | `cnpj_basico` |
-| BCB · SICOR Mutuários | `br_bcb_sicor.recurso_publico_mutuario` | `cnpj_basico`, `cnpj` |
-| BCB · SICOR Propriedades Rurais | `br_bcb_sicor.recurso_publico_propriedade` | `cnpj_basico` |
-| MS · SIH Serviços Profissionais | `br_ms_sih.servicos_profissionais` | `id_prestador_servico` |
-| Holdings · Sócias (quem me possui) | `br_brasilio_holdings.holdings` | `cnpj` |
-| Holdings · Participações (o que eu possuo) | `br_brasilio_holdings.holdings` | `cnpj_socia` |
-| PGFN · Dívida Ativa | `br_pgfn_dividaativa.divida` | `CPF_CNPJ` |
-| TCU · Empresas Inidôneas | `br_tcu_inidoneos.empresas` | `CPF_CNPJ` |
-| TCU · Contas Julgadas Irregulares | `br_tcu_inidoneos.resp_contas_julgadas_irregulares` | `CPF_CNPJ` |
-| CVM · Fundos de Investimento | `br_cvm_fundos.fundos` | `CNPJ_FUNDO`, `CNPJ_ADMIN`, `CPF_CNPJ_GESTOR`, `CNPJ_AUDITOR`, `CNPJ_CUSTODIANTE`, `CNPJ_CONTROLADOR` |
-| SICAF · Fornecedores | `br_comprasgov_sicaf.fornecedores` | `cnpj` |
-| BNDES · Operações | `br_bndes_operacoes_contratadas.operacoes_nao_automaticas` | `cnpj_cliente`, `cnpj_instituicao_financeira_credenciada` |
-| BCB · Penalidades | `br_bcb_penalidades.penalidades` | `CPF_CNPJ` |
-| TCE-RJ · Contratos (Estado) | `br_tce_rj.contratos_estado` | `CPFCNPJ` |
-| TCE-RJ · Contratos (Município) | `br_tce_rj.contratos_municipio` | `CNPJCPFContratado` |
-| Procon · Reclamações | `br_mjsp_ckan.procon` | `NumeroCNPJ` |
-| CGU · CEIS (Inidôneas e Suspensas) | `br_cgu_sancoes.ceis` | `cpf_cnpj_sancionado` |
-| CGU · CNEP (Empresas Punidas) | `br_cgu_sancoes.cnep` | `cpf_cnpj_sancionado` |
-| CGU · CEPIM (Entidades Impedidas) | `br_cgu_sancoes.cepim` | `cnpj_entidade` |
-| CGU · Acordos de Leniência | `br_cgu_sancoes.acordos_leniencia` | `cnpj_sancionado` |
-| TCU · Inabilitados p/ Função Pública | `br_tcu_inidoneos.inabilitados_funcao_publica` | `CPF` |
-| TCU · Contas Irregulares (Implicação Eleitoral) | `br_tcu_inidoneos.resp_contas_julgadas_irreg_implicacao_eleitoral` | `CPF` |
-| MTE · Lista Suja (Trabalho Escravo) | `br_mte_listasuja.empregadores` | `cpf_cnpj` |
-| MTE · CEAC (Ajuste de Conduta) | `br_mte_listasuja.ceac` | `cpf_cnpj` |
-| IBAMA · Autos de Infração | `br_ibama_autos.auto_infracao` | `cpf_cnpj_infrator` |
-| IBAMA · Termos de Embargo | `br_ibama_embargos_novo.termo_embargo` | `cpf_cnpj_embargado` |
-| IBAMA · Decisões de Embargo | `br_ibama_embargos_novo.decisao` | `cpf_cnpj_interessado` |
-| IBAMA · CTF Atividades Poluidoras | `br_ibama_ctf.app` | `cnpj` |
-| IBAMA · CTF Instrumentos de Defesa Ambiental | `br_ibama_ctf.aida` | `cnpj` |
-| MGI · Fornecedores | `br_mgi_compras_publicas.fornecedor` | `cnpj` |
-| MGI · Itens de Licitação | `br_mgi_compras_publicas.licitacao_item` | `cnpj_fornecedor` |
-| MGI · Compras sem Licitação | `br_mgi_compras_publicas.compra_sem_licitacao_item` | `cnpj_vencedor` |
-| MGI · Ofertas em Pregão | `br_mgi_compras_publicas.pregao_item_oferta` | `cnpj_cpf_fornecedor` |
-| Câmara · Propostas (Fornecedor) | `br_camara_dados_abertos.licitacao_proposta` | `cpf_cnpj_fornecedor` |
-| Câmara · Itens Contratados (Fornecedor) | `br_camara_dados_abertos.licitacao_item` | `cpf_cnpj_fornecedor` |
-| Senado · CEAPS (Cota Parlamentar) | `br_senado_ceaps.despesas` | `cpf_cnpj_fornecedor` |
-| Senado · Contratações | `br_senado_dados_abertos_administrativos.contratacao` | `cpf_cnpj_empresa` |
-| Senado · Empresas Cadastradas | `br_senado_dados_abertos_administrativos.empresa` | `cpf_cnpj` |
-| TSE · Candidaturas | `br_tse_eleicoes.candidatos` | `cpf` |
-| TSE · Pesquisas Eleitorais (Instituto) | `br_tse_eleicoes.pesquisa_eleitoral` | `cnpj_empresa` |
-| TSE · Pesquisas Eleitorais (Contratante) | `br_tse_eleicoes.pesquisa_eleitoral_contratante` | `cpf_cnpj_contratante` |
-| TSE · Pesquisas Eleitorais (Pagante) | `br_tse_eleicoes.pesquisa_eleitoral_pagante` | `cpf_cnpj_pagante` |
-| CVM · Companhias Abertas | `br_cvm_cia_aberta.cadastro` | `CNPJ_CIA`, `CNPJ_AUDITOR` |
-| CVM · Acionistas (quem me possui) | `br_cvm_cia_aberta.fre_posicao_acionaria` | `CNPJ_Companhia` |
-| CVM · Posições Acionárias (o que eu possuo) | `br_cvm_cia_aberta.fre_posicao_acionaria` | `CPF_CNPJ_Acionista` |
-| CVM · Sociedades Participadas | `br_cvm_cia_aberta.fre_participacao_sociedade` | `CNPJ_Companhia` |
-| CVM · Participação de Companhias Abertas | `br_cvm_cia_aberta.fre_participacao_sociedade` | `CNPJ` |
-| CVM · Auditores | `br_cvm_cia_aberta.fre_auditor` | `CNPJ_Companhia`, `CNPJ_Auditor` |
-| CVM · Escrituradores | `br_cvm_cia_aberta.fca_escriturador` | `CNPJ_Companhia`, `CNPJ_Escriturador` |
-| CVM · Administradores e Conselho Fiscal | `br_cvm_cia_aberta.fre_administrador_membro_conselho_fiscal` | `CNPJ_Companhia`, `CPF` |
-| CVM · Relações Familiares de Administradores | `br_cvm_cia_aberta.fre_relacao_familiar` | `CNPJ_Companhia`, `CPF_Administrador`, `CPF_Pessoa_Relacionada` |
-| CVM · Registro de Fundos | `br_cvm_fundos.registro_fundo` | `CNPJ_Fundo`, `CNPJ_Administrador`, `CPF_CNPJ_Gestor` |
-| CVM · Classes de Fundos | `br_cvm_fundos.registro_classe` | `CNPJ_Classe`, `CNPJ_Auditor`, `CNPJ_Custodiante`, `CNPJ_Controlador` |
-| CVM · Responsáveis de Administradoras | `br_cvm_administradores_carteira.responsavel` | `cnpj` |
-| BNDES · Operações Indiretas (Agente) | `br_bndes_operacoes_contratadas.operacoes_indiretas_automaticas` | `cnpj_agente_financeiro` |
-| BNDES · Exportação de Bens | `br_bndes_operacoes_contratadas.operacoes_exportacao_bens` | `cnpj_exportador` |
-| BNDES · Exportação de Serviços | `br_bndes_operacoes_contratadas.operacoes_exportacao_servicos` | `cnpj_exportador` |
-| BCB · IF.data Cadastro | `br_bcb_ifdata.cadastro` | `cnpj_instituicao_lider` |
-| BCB · SICOR Instituições | `br_bcb_sicor.instituicao_financeira` | `cnpj_basico` |
-| BCB · SICOR Agências | `br_bcb_sicor.recurso_publico_complemento_operacao` | `cnpj_agencia` |
-| ANS · Operadoras Ativas | `br_ans_operadoras.operadoras_ativas` | `CNPJ` |
-| ANS · Operadoras Canceladas | `br_ans_operadoras.operadoras_canceladas` | `CNPJ` |
-| ANS · Penalidades | `br_ans_operadoras.penalidades` | `CNPJ` |
-| ANP · Preços de Revenda | `br_anp_combustiveis.precos` | `cnpj` |
-| ANVISA · CMED Preços de Medicamentos | `br_anvisa_cmed.precos` | `cnpj` |
-| ANEEL · Geração Distribuída | `br_aneel_dadosabertos.empreendimento_geracao_distribuida` | `NumCPFCNPJ`, `NumCNPJDistribuidora` |
-| ANEEL · Tarifas Homologadas | `br_aneel_dadosabertos.tarifas_homologadas` | `NumCNPJDistribuidora` |
-| ANTT · RNTRC Transportadores | `br_antt_dadosabertos.rntrc` | `cpfcnpjtransportador` |
-| ANA · Outorgas de Captação | `br_ana_outorgas.captacoes` | `emp_nu_cpfcnpj` |
-| ANA · Outorgas de Lançamento | `br_ana_outorgas.lancamentos` | `emp_nu_cpfcnpj` |
-| ANM · CFEM Arrecadação | `br_anm.cfem_cfem_arrecadacao` | `cpf_cnpj` |
-| ANM · CFEM Autuações | `br_anm.cfem_cfem_autuacao` | `cpf_cnpj` |
-| ANM · Portarias de Lavra | `br_anm.scm_portaria_de_lavra` | `cpf_cnpj_do_titular` |
-| ANM · Alvarás de Pesquisa | `br_anm.scm_alvara_de_pesquisa` | `cpf_cnpj_do_titular` |
-| ANM · Requerimentos de Pesquisa | `br_anm.scm_requerimento_de_pesquisa` | `cpf_cnpj_do_titular` |
-| ANM · Licenciamentos | `br_anm.scm_licenciamento` | `cpf_cnpj_do_titular` |
-| Saúde · Banco de Preços (BPS) | `br_saude_bps.dados` | `cnpj_da_instituicao`, `cnpj_do_fornecedor`, `cnpj_do_fabricante` |
-| Saúde · Farmácia Popular | `br_saude_farmaciapopular.estabelecimentos` | `numero_cnpj`, `numero_cnpj_entidade` |
-| CGU · Terceirizados (Empresa) | `br_cgu_pessoal_executivo_federal.terceirizados` | `cnpj_empresa` |
-| CGU · Gás do Povo (Revenda) | `br_cgu_gas_do_povo.gas_do_povo` | `cnpj_estabelecimento` |
-| MinC · SALIC (Lei Rouanet) | `br_minc_salic.entidades` | `cnpjcpf` |
-| SICONV · Obras (Fornecedor) | `br_transferegov_siconv.siconv_acomp_obras_contratos_medicoes` | `CNPJ_FORNECEDOR_CONTRATO_ACOMPANHAMENTO_OBRA` |
-| SICONV · Apoiadores de Emendas | `br_transferegov_siconv.siconv_apoiadores_emendas_programas` | `CNPJ_PROPONENTE_APOIADORES_EMENDAS`, `CNPJ_PJ_SOLICITANTE_APOIADORES_EMENDAS` |
-| SICONV · Consórcios | `br_transferegov_siconv.siconv_consorcios` | `CNPJ_CONSORCIO`, `CNPJ_PARTICIPANTE` |
-| RF · Fundos Habilitados (Doações DIRPF) | `br_rf_dirpf.fundos_habilitados` | `cnpj_fundo` |
-| RAIS · Estabelecimentos Identificados | `br_me_rais_identificada.estabelecimentos` | `cnpj_basico` |
-| CNPJ · Simples Nacional / MEI | `br_me_cnpj.simples` | `cnpj_basico` |
+| Dataset | Descrição |
+|---|---|
+| CGU · Contratos | Contratos firmados pelo governo federal, com objeto, valor e contratado |
+| CGU · Itens de Licitação | Itens licitados pelo governo federal e quem venceu cada um |
+| CGU · Participantes de Licitação | Empresas e pessoas que disputaram licitações federais |
+| CGU · Cartão Gov. Federal | Gastos com cartão corporativo do governo federal, por favorecido |
+| CGU · Cartão Defesa Civil | Gastos com o cartão de pagamento da Defesa Civil |
+| CGU · Compras Centralizadas | Compras centralizadas pagas com cartão do governo federal |
+| TSE · Despesas de Candidatos | Despesas de campanha declaradas por candidatos, com fornecedor |
+| TSE · Receitas de Candidatos | Doações recebidas por candidatos, com doador |
+| TSE · Receitas de Comitê | Doações recebidas por comitês de campanha |
+| TSE · Receitas Órgão Partidário | Doações recebidas por diretórios partidários |
+| MS · CNES Estabelecimentos | Cadastro nacional de estabelecimentos de saúde e suas mantenedoras |
+| Câmara · Despesas | Despesas da cota parlamentar dos deputados, por fornecedor |
+| Câmara · Contratos | Contratos administrativos da Câmara dos Deputados |
+| Anatel · Banda Larga Fixa | Acessos de banda larga fixa por prestadora e município |
+| ANP · Preços Combustíveis | Preços de combustíveis coletados pela ANP em cada posto |
+| ANS · Beneficiários | Beneficiários de planos de saúde por operadora |
+| BCB · ESTBAN Agências | Saldos contábeis (ESTBAN) das agências bancárias |
+| BCB · SICOR Operações | Operações de crédito rural, com instituição financeira e agentes |
+| BD · Diretórios Brasil | Diretório de empresas da Base dos Dados |
+| CVM · Administradores PJ | Administradoras de carteira (PJ) registradas na CVM |
+| CVM · Ofertas Públicas | Ofertas públicas de valores mobiliários: emissor, líder e ofertante |
+| INEP · Censo Escolar | Escolas do Censo Escolar, com CNPJ da escola privada e mantenedora |
+| TRASE · Soja Crushing | Esmagadoras de soja mapeadas pela TRASE |
+| TRASE · Soja Armazenamento | Armazéns de soja mapeados pela TRASE |
+| MS · SIH AIHs | Internações hospitalares pagas pelo SUS (AIH), por estabelecimento |
+| CNPJ · Estabelecimentos | Filiais e endereços da empresa na Receita Federal |
+| RF · CNO Obras | Obras de construção civil registradas no CNO, por responsável |
+| RF · CNO Vínculos | Vínculos de responsáveis com obras do CNO |
+| MIDES · Itens de Licitação | Itens de licitações municipais (MIDES/Banco Mundial) |
+| MIDES · Participantes de Licitação | Participantes de licitações municipais (MIDES/Banco Mundial) |
+| BCB · SICOR Cooperados | Cooperados beneficiados por crédito rural com recurso público |
+| BCB · SICOR Mutuários | Tomadores de crédito rural com recurso público |
+| BCB · SICOR Propriedades Rurais | Propriedades rurais ligadas a operações de crédito rural |
+| MS · SIH Serviços Profissionais | Serviços profissionais faturados em internações do SUS |
+| Holdings · Sócias (quem me possui) | Empresas que são sócias desta empresa (Brasil.IO) |
+| Holdings · Participações (o que eu possuo) | Empresas das quais esta empresa é sócia (Brasil.IO) |
+| PGFN · Dívida Ativa | Débitos inscritos na dívida ativa da União |
+| TCU · Empresas Inidôneas | Empresas declaradas inidôneas pelo TCU para licitar |
+| TCU · Contas Julgadas Irregulares | Responsáveis por contas julgadas irregulares pelo TCU |
+| CVM · Fundos de Investimento | Fundos de investimento com administrador, gestor, auditor e custodiante |
+| SICAF · Fornecedores | Fornecedores cadastrados no SICAF para vender ao governo |
+| BNDES · Operações | Financiamentos diretos do BNDES, por cliente |
+| BCB · Penalidades | Penalidades aplicadas pelo Banco Central |
+| TCE-RJ · Contratos (Estado) | Contratos do governo do Estado do Rio de Janeiro |
+| TCE-RJ · Contratos (Município) | Contratos dos municípios fluminenses |
+| Procon · Reclamações | Reclamações de consumidores registradas nos Procons |
+| CGU · CEIS (Inidôneas e Suspensas) | Empresas e pessoas inidôneas ou suspensas de contratar com o governo |
+| CGU · CNEP (Empresas Punidas) | Empresas punidas pela Lei Anticorrupção |
+| CGU · CEPIM (Entidades Impedidas) | Entidades sem fins lucrativos impedidas de receber recursos |
+| CGU · Acordos de Leniência | Acordos de leniência firmados com a CGU |
+| TCU · Inabilitados p/ Função Pública | Pessoas inabilitadas pelo TCU para cargo público |
+| TCU · Contas Irregulares (Implicação Eleitoral) | Contas irregulares no TCU com implicação eleitoral |
+| MTE · Lista Suja (Trabalho Escravo) | Empregadores flagrados com trabalho análogo ao escravo |
+| MTE · CEAC (Ajuste de Conduta) | Empregadores com termo de ajuste de conduta trabalhista |
+| IBAMA · Autos de Infração | Autos de infração ambiental lavrados pelo IBAMA |
+| IBAMA · Termos de Embargo | Áreas e atividades embargadas pelo IBAMA |
+| IBAMA · Decisões de Embargo | Decisões em processos de embargo do IBAMA |
+| IBAMA · CTF Atividades Poluidoras | Cadastro técnico de atividades potencialmente poluidoras |
+| IBAMA · CTF Instrumentos de Defesa Ambiental | Cadastro técnico de instrumentos de defesa ambiental |
+| MGI · Fornecedores | Fornecedores do sistema de compras públicas federal |
+| MGI · Itens de Licitação | Itens de licitações federais, por fornecedor |
+| MGI · Compras sem Licitação | Compras federais com dispensa ou inexigibilidade de licitação |
+| MGI · Ofertas em Pregão | Lances e ofertas em pregões federais |
+| Câmara · Propostas (Fornecedor) | Propostas de fornecedores em licitações da Câmara |
+| Câmara · Itens Contratados (Fornecedor) | Itens contratados pela Câmara, por fornecedor |
+| Senado · CEAPS (Cota Parlamentar) | Despesas da cota parlamentar dos senadores, por fornecedor |
+| Senado · Contratações | Contratações administrativas do Senado |
+| Senado · Empresas Cadastradas | Empresas cadastradas como fornecedoras do Senado |
+| TSE · Candidaturas | Candidaturas registradas no TSE |
+| TSE · Pesquisas Eleitorais (Instituto) | Institutos que registraram pesquisas eleitorais |
+| TSE · Pesquisas Eleitorais (Contratante) | Quem contratou pesquisas eleitorais |
+| TSE · Pesquisas Eleitorais (Pagante) | Quem pagou pesquisas eleitorais |
+| CVM · Companhias Abertas | Cadastro de companhias abertas e seus auditores |
+| CVM · Acionistas (quem me possui) | Acionistas relevantes desta companhia aberta |
+| CVM · Posições Acionárias (o que eu possuo) | Companhias abertas em que esta entidade é acionista |
+| CVM · Sociedades Participadas | Sociedades em que a companhia aberta tem participação |
+| CVM · Participação de Companhias Abertas | Companhias abertas que participam desta empresa |
+| CVM · Auditores | Auditores independentes das companhias abertas |
+| CVM · Escrituradores | Escrituradores de ações das companhias abertas |
+| CVM · Administradores e Conselho Fiscal | Diretores, conselheiros e membros do conselho fiscal |
+| CVM · Relações Familiares de Administradores | Relações familiares declaradas entre administradores |
+| CVM · Registro de Fundos | Registro de fundos na CVM, com administrador e gestor |
+| CVM · Classes de Fundos | Classes de fundos, com auditor, custodiante e controlador |
+| CVM · Responsáveis de Administradoras | Responsáveis técnicos por administradoras de carteira |
+| BNDES · Operações Indiretas (Agente) | Operações indiretas do BNDES, pelo agente financeiro repassador |
+| BNDES · Exportação de Bens | Financiamentos do BNDES à exportação de bens |
+| BNDES · Exportação de Serviços | Financiamentos do BNDES à exportação de serviços |
+| BCB · IF.data Cadastro | Cadastro de instituições financeiras e conglomerados (IF.data) |
+| BCB · SICOR Instituições | Instituições financeiras que operam crédito rural |
+| BCB · SICOR Agências | Agências bancárias em operações de crédito rural |
+| ANS · Operadoras Ativas | Operadoras de planos de saúde com registro ativo |
+| ANS · Operadoras Canceladas | Operadoras de planos de saúde com registro cancelado |
+| ANS · Penalidades | Multas e penalidades aplicadas pela ANS a operadoras |
+| ANP · Preços de Revenda | Preços de revenda de combustíveis por posto |
+| ANVISA · CMED Preços de Medicamentos | Preços máximos de medicamentos (CMED), por laboratório |
+| ANEEL · Geração Distribuída | Micro e minigeração distribuída (ex. solar), por titular |
+| ANEEL · Tarifas Homologadas | Tarifas de energia homologadas por distribuidora |
+| ANTT · RNTRC Transportadores | Transportadores rodoviários de carga registrados na ANTT |
+| ANA · Outorgas de Captação | Outorgas de captação de água concedidas pela ANA |
+| ANA · Outorgas de Lançamento | Outorgas de lançamento de efluentes concedidas pela ANA |
+| ANM · CFEM Arrecadação | Royalties de mineração (CFEM) pagos à ANM |
+| ANM · CFEM Autuações | Autuações por falta de pagamento da CFEM |
+| ANM · Portarias de Lavra | Portarias de lavra (direito de extrair minério) |
+| ANM · Alvarás de Pesquisa | Alvarás de pesquisa mineral |
+| ANM · Requerimentos de Pesquisa | Pedidos de pesquisa mineral |
+| ANM · Licenciamentos | Licenciamentos minerais (areia, brita, argila) |
+| Saúde · Banco de Preços (BPS) | Compras de produtos de saúde: instituição, fornecedor e fabricante |
+| Saúde · Farmácia Popular | Farmácias credenciadas no Farmácia Popular |
+| CGU · Terceirizados (Empresa) | Empresas que fornecem terceirizados ao governo federal |
+| CGU · Gás do Povo (Revenda) | Revendas credenciadas no programa Gás do Povo |
+| MinC · SALIC (Lei Rouanet) | Proponentes de projetos culturais da Lei Rouanet |
+| SICONV · Obras (Fornecedor) | Fornecedores de obras pagas com convênios federais |
+| SICONV · Apoiadores de Emendas | Proponentes e solicitantes de emendas parlamentares |
+| SICONV · Consórcios | Consórcios públicos e seus participantes |
+| RF · Fundos Habilitados (Doações DIRPF) | Fundos habilitados a receber doações deduzíveis do IR |
+| RAIS · Estabelecimentos Identificados | Estabelecimentos empregadores declarados na RAIS |
+| CNPJ · Simples Nacional / MEI | Opção pelo Simples Nacional e pelo MEI |
 
 ## Estrutura de arquivos
 
