@@ -10397,6 +10397,15 @@ function injectPanelStyles() {
       padding: 0.25rem 0.5rem;
       border-radius: 4px;
     }
+    #lookup-dock {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+    }
+    #lookup-dock svg {
+      display: block;
+    }
     #lookup-close:hover,
     #lookup-dock:hover,
     #node-details-close:hover {
@@ -10947,10 +10956,11 @@ function updateGraphLayout() {
 window.addEventListener("resize", updateGraphLayout);
 var LOOKUP_DOCKS = ["left", "right", "bottom"];
 var lookupDockKey = () => isMobileViewport() ? "datative.lookupDock.mobile" : "datative.lookupDock";
+var dockIcon = (strip) => `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">` + `<rect x="1.75" y="2.25" width="12.5" height="11.5" rx="1.75"/>${strip}</svg>`;
 var LOOKUP_DOCK_ICONS = {
-  left: "⇤",
-  right: "⇥",
-  bottom: "⤓"
+  left: dockIcon(`<path d="M6 2.25v11.5"/>`),
+  right: dockIcon(`<path d="M10 2.25v11.5"/>`),
+  bottom: dockIcon(`<path d="M1.75 9.5h12.5"/>`)
 };
 var LOOKUP_DOCK_LABELS = {
   left: "esquerda",
@@ -11026,7 +11036,7 @@ function createPanel() {
     panel.style.transition = "none";
     placeResizers();
     const next = LOOKUP_DOCKS[(LOOKUP_DOCKS.indexOf(dock) + 1) % LOOKUP_DOCKS.length];
-    dockBtn.textContent = LOOKUP_DOCK_ICONS[next];
+    dockBtn.innerHTML = LOOKUP_DOCK_ICONS[next];
     dockBtn.title = `Mover painel para ${LOOKUP_DOCK_LABELS[next]}`;
     dockBtn.setAttribute("aria-label", dockBtn.title);
     updateGraphLayout();
