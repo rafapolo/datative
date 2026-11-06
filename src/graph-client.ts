@@ -106,7 +106,7 @@ function isMobileViewport(): boolean {
   return window.innerWidth <= MOBILE_BREAKPOINT_PX;
 }
 
-// Populated by radialCompactLayout: leaves beyond COMPACT_MAX_LEAVES per hub
+// Populated by radialTreeLayout(compact): leaves beyond COMPACT_MAX_LEAVES per hub
 // are hidden (node + incident edges) rather than crammed into the same arc,
 // and one of them is repurposed to display a "+N mais" marker in its place.
 const COMPACT_MAX_LEAVES = 7;
@@ -242,6 +242,26 @@ function sanitizeLookupLimit(raw: string | null | undefined): number {
   return LOOKUP_LIMIT_OPTIONS.has(parsed) ? parsed : 10;
 }
 
+// Source nodes ("TSE", "CVM", …) group two or more dataset hubs that share
+// the label prefix before " · ". Maps source node id → its dataset hub ids.
+const sourceGroupChildren = new Map<string, string[]>();
+
+// Leaf (row-bearing) nodes under a hub, or under every hub of a source node.
+function groupLeafNodes(graph: Graph, groupId: string): string[] {
+  const hubs = sourceGroupChildren.get(groupId) ?? [groupId];
+  const leaves: string[] = [];
+  for (const hub of hubs) {
+    if (!graph.hasNode(hub)) continue;
+    for (const neighbor of graph.neighbors(hub)) {
+      const t = nodeTypeMap.get(neighbor);
+      if (t === "group" || t === "empresa") continue;
+      if (neighbor === layoutRootId) continue;
+      leaves.push(neighbor);
+    }
+  }
+  return leaves;
+}
+
 function selectedRowSignatures(): Set<string> {
   const signatures = new Set<string>();
   if (!selectedNode) return signatures;
@@ -251,10 +271,8 @@ function selectedRowSignatures(): Set<string> {
   const details: NodeDetailEntry[] = [];
 
   if (nodeType === "group" && graph?.hasNode(selectedNode)) {
-    for (const neighbor of graph.neighbors(selectedNode)) {
-      const neighborType = nodeTypeMap.get(neighbor);
-      if (neighborType === "group") continue;
-      details.push(...(nodeDetailsMap.get(neighbor) ?? []));
+    for (const leaf of groupLeafNodes(graph, selectedNode)) {
+      details.push(...(nodeDetailsMap.get(leaf) ?? []));
     }
   } else {
     details.push(...(nodeDetailsMap.get(selectedNode) ?? []));
@@ -562,135 +580,106 @@ function ensureGroupNode(
   }
 }
 
-function radialLayout(graph: Graph) {
-  const root = layoutRootId;
-  if (!root || !graph.hasNode(root)) return;
-
-  graph.setNodeAttribute(root, "x", 0);
-  graph.setNodeAttribute(root, "y", 0);
-
-  // Layer 1: direct neighbors of root
-  const layer1 = graph.neighbors(root).filter((n) => graph.hasNode(n));
-  if (layer1.length === 0) return;
-
-  // Map each layer-1 node to its children (excluding root)
-  const childrenOf = new Map<string, string[]>();
-  for (const g of layer1) {
-    childrenOf.set(
-      g,
-      graph.neighbors(g).filter((n) => n !== root),
-    );
-  }
-
-  // Sector weight = 1 (for the group itself) + number of leaves
-  const weights = layer1.map((g) => 1 + (childrenOf.get(g)?.length ?? 0));
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-
-  // Radii scale with graph size
-  const R1 = Math.max(180, layer1.length * 50);
-  const maxLeaves = Math.max(...weights.map((w) => w - 1), 1);
-  const R2 = R1 + Math.max(160, maxLeaves * 38);
-
-  let cursor = -Math.PI / 2; // start at top
-  layer1.forEach((gId, i) => {
-    const sector = (2 * Math.PI * weights[i]) / totalWeight;
-    const gAngle = cursor + sector / 2;
-    cursor += sector;
-
-    graph.setNodeAttribute(gId, "x", Math.cos(gAngle) * R1);
-    graph.setNodeAttribute(gId, "y", Math.sin(gAngle) * R1);
-
-    const children = childrenOf.get(gId) ?? [];
-    if (children.length === 0) return;
-
-    const spread = sector * 0.82;
-    const startAngle = gAngle - spread / 2;
-    const step = children.length > 1 ? spread / (children.length - 1) : 0;
-    children.forEach((leafId, j) => {
-      const leafAngle = children.length === 1 ? gAngle : startAngle + j * step;
-      graph.setNodeAttribute(leafId, "x", Math.cos(leafAngle) * R2);
-      graph.setNodeAttribute(leafId, "y", Math.sin(leafAngle) * R2);
-    });
-  });
-}
-
-// Same hub placement as radialLayout, but caps visible leaves per hub at
-// COMPACT_MAX_LEAVES — sector weight is computed from the capped count so a
-// hub with 30 hits doesn't hog more angular room than one with 7, and the
-// leaves that do fit get generous spacing instead of being crammed into a
-// sector sized for the full (often 10-15+) hit count. Overflow leaves are
-// hidden (via compactHiddenNodeIds, read by nodeReducer/edgeReducer) and one
-// of them is repurposed in place as a "+N mais" marker (compactOverflowLabels).
-function radialCompactLayout(graph: Graph) {
+// Sector-based radial layout over the rooted tree: every node gets an
+// angular sector proportional to its subtree weight (1 + descendants), its
+// children split that sector by their own weights, and depth d sits on ring
+// R[d]. Works for root → hub → leaf as well as root → source → hub → leaf.
+//
+// compact: caps visible leaf children per node at COMPACT_MAX_LEAVES —
+// weights are computed from the capped count so a hub with 30 hits doesn't
+// hog more angular room than one with 7. Overflow leaves are hidden (via
+// compactHiddenNodeIds, read by nodeReducer/edgeReducer) and one of them is
+// repurposed in place as a "+N mais" marker (compactOverflowLabels).
+function radialTreeLayout(graph: Graph, compact: boolean) {
   compactHiddenNodeIds.clear();
   compactOverflowLabels.clear();
 
   const root = layoutRootId;
   if (!root || !graph.hasNode(root)) return;
+  const { children } = buildRootedTree(graph, root);
 
   graph.setNodeAttribute(root, "x", 0);
   graph.setNodeAttribute(root, "y", 0);
-
-  const layer1 = graph.neighbors(root).filter((n) => graph.hasNode(n));
+  const layer1 = children.get(root) ?? [];
   if (layer1.length === 0) return;
 
-  const childrenOf = new Map<string, string[]>();
-  for (const g of layer1) {
-    childrenOf.set(g, graph.neighbors(g).filter((n) => n !== root));
+  // Visible children per node, after the compact cap on leaf children.
+  const visibleChildren = new Map<string, string[]>();
+  const overflowOf = new Map<string, string[]>();
+  for (const [node, kids] of children) {
+    if (!compact || node === root) {
+      visibleChildren.set(node, kids);
+      continue;
+    }
+    const inner = kids.filter((k) => (children.get(k)?.length ?? 0) > 0);
+    const leaves = kids.filter((k) => (children.get(k)?.length ?? 0) === 0);
+    if (leaves.length <= COMPACT_MAX_LEAVES) {
+      visibleChildren.set(node, kids);
+      continue;
+    }
+    // Keep COMPACT_MAX_LEAVES - 1 leaves plus the marker (the first hidden).
+    const shown = leaves.slice(0, COMPACT_MAX_LEAVES);
+    visibleChildren.set(node, [...inner, ...shown]);
+    overflowOf.set(node, leaves.slice(COMPACT_MAX_LEAVES - 1));
   }
 
-  const cappedCount = (g: string) =>
-    Math.min(childrenOf.get(g)?.length ?? 0, COMPACT_MAX_LEAVES);
-  const weights = layer1.map((g) => 1 + cappedCount(g));
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const weight = new Map<string, number>();
+  const calcWeight = (node: string): number => {
+    const w = 1 + (visibleChildren.get(node) ?? []).reduce((s, c) => s + calcWeight(c), 0);
+    weight.set(node, w);
+    return w;
+  };
+  calcWeight(root);
 
-  const R1 = Math.max(180, layer1.length * 50);
-  const maxLeaves = Math.max(...weights.map((w) => w - 1), 1);
-  const R2 = R1 + Math.max(160, maxLeaves * 38);
-
-  let cursor = -Math.PI / 2;
-  layer1.forEach((gId, i) => {
-    const sector = (2 * Math.PI * weights[i]) / totalWeight;
-    const gAngle = cursor + sector / 2;
-    cursor += sector;
-
-    graph.setNodeAttribute(gId, "x", Math.cos(gAngle) * R1);
-    graph.setNodeAttribute(gId, "y", Math.sin(gAngle) * R1);
-
-    const allChildren = childrenOf.get(gId) ?? [];
-    if (allChildren.length === 0) return;
-
-    const overflow = allChildren.length > COMPACT_MAX_LEAVES;
-    const visibleCount = overflow ? COMPACT_MAX_LEAVES - 1 : allChildren.length;
-    const visible = allChildren.slice(0, visibleCount);
-    const hidden = overflow ? allChildren.slice(visibleCount) : [];
-    const slots = overflow ? COMPACT_MAX_LEAVES : allChildren.length;
-
-    const spread = sector * 0.82;
-    const startAngle = gAngle - spread / 2;
-    const step = slots > 1 ? spread / (slots - 1) : 0;
-
-    visible.forEach((leafId, j) => {
-      const leafAngle = slots === 1 ? gAngle : startAngle + j * step;
-      graph.setNodeAttribute(leafId, "x", Math.cos(leafAngle) * R2);
-      graph.setNodeAttribute(leafId, "y", Math.sin(leafAngle) * R2);
-    });
-
-    if (overflow) {
-      const markerAngle = startAngle + (slots - 1) * step;
-      const markerX = Math.cos(markerAngle) * R2;
-      const markerY = Math.sin(markerAngle) * R2;
-      const [markerId, ...restHidden] = hidden;
-      graph.setNodeAttribute(markerId, "x", markerX);
-      graph.setNodeAttribute(markerId, "y", markerY);
-      compactOverflowLabels.set(markerId, `+${hidden.length} mais`);
-      for (const id of restHidden) {
-        compactHiddenNodeIds.add(id);
-        graph.setNodeAttribute(id, "x", markerX);
-        graph.setNodeAttribute(id, "y", markerY);
-      }
+  // Ring radii: ring 1 scales with how many first-level nodes share it, each
+  // further ring with the widest fan-out of the ring before it.
+  const maxFanOut = new Map<number, number>();
+  const walkDepth = (node: string, d: number) => {
+    const kids = visibleChildren.get(node) ?? [];
+    maxFanOut.set(d, Math.max(maxFanOut.get(d) ?? 0, kids.length));
+    for (const k of kids) walkDepth(k, d + 1);
+  };
+  walkDepth(root, 0);
+  const radius: number[] = [0, Math.max(180, layer1.length * 50)];
+  const ringRadius = (d: number): number => {
+    while (radius.length <= d) {
+      const prev = radius.length - 1;
+      radius.push(radius[prev] + Math.max(160, Math.max(1, maxFanOut.get(prev) ?? 1) * 38));
     }
-  });
+    return radius[d];
+  };
+
+  const place = (node: string, d: number, start: number, sector: number) => {
+    const kids = visibleChildren.get(node) ?? [];
+    if (kids.length === 0) return;
+    const total = kids.reduce((s, k) => s + (weight.get(k) ?? 1), 0);
+    // The root's children fill the whole circle; deeper fans keep a gap
+    // between neighbouring sectors.
+    const spread = d === 0 ? sector : sector * 0.82;
+    let cursor = start + (sector - spread) / 2;
+    const R = ringRadius(d + 1);
+    for (const k of kids) {
+      const kSector = (spread * (weight.get(k) ?? 1)) / total;
+      const angle = cursor + kSector / 2;
+      graph.setNodeAttribute(k, "x", Math.cos(angle) * R);
+      graph.setNodeAttribute(k, "y", Math.sin(angle) * R);
+      place(k, d + 1, cursor, kSector);
+      cursor += kSector;
+    }
+  };
+  place(root, 0, -Math.PI / 2, 2 * Math.PI);
+
+  for (const [, hidden] of overflowOf) {
+    const [markerId, ...rest] = hidden;
+    const mx = graph.getNodeAttribute(markerId, "x") as number;
+    const my = graph.getNodeAttribute(markerId, "y") as number;
+    compactOverflowLabels.set(markerId, `+${hidden.length} mais`);
+    for (const id of rest) {
+      compactHiddenNodeIds.add(id);
+      graph.setNodeAttribute(id, "x", mx);
+      graph.setNodeAttribute(id, "y", my);
+    }
+  }
 }
 
 interface RootedTree {
@@ -953,9 +942,9 @@ function runLayout(graph: Graph, _iterations: number, onDone?: () => void) {
     } else if (currentLayout === "collapsible-tree") {
       collapsibleTreeLayout(graph);
     } else if (currentLayout === "radial-compact") {
-      radialCompactLayout(graph);
+      radialTreeLayout(graph, true);
     } else {
-      radialLayout(graph);
+      radialTreeLayout(graph, false);
     }
     renderer?.refresh();
     onDone?.();
@@ -1926,13 +1915,9 @@ function showNodeDetails(nodeId: string, graph: Graph) {
 
   // For group nodes, aggregate details from child leaf nodes
   if (nodeType === "group" && details.length === 0) {
-    graph.neighbors(nodeId).forEach((neighbor) => {
-      const neighborType = nodeTypeMap.get(neighbor);
-      if (neighborType !== "group" && neighborType !== "empresa") {
-        const neighborDetails = nodeDetailsMap.get(neighbor) ?? [];
-        details = details.concat(neighborDetails);
-      }
-    });
+    for (const leaf of groupLeafNodes(graph, nodeId)) {
+      details = details.concat(nodeDetailsMap.get(leaf) ?? []);
+    }
   }
 
   title.textContent = nodeLabel;
@@ -2380,6 +2365,22 @@ async function init() {
   // Contratos") instead of wiring each dataset hit straight to the root
   // company — otherwise a company with dozens of hits across ~40 datasets
   // renders as one indistinguishable starburst off the root.
+  //
+  // Hubs whose labels share a source prefix ("TSE · Receitas", "TSE ·
+  // Candidatura") hang off one source node ("TSE") when two or more of them
+  // are present, each hub then labelled by the part after " · ".
+  const sourceOf = (label: string) => {
+    const i = label.indexOf(" · ");
+    return i > 0 ? { source: label.slice(0, i), rest: label.slice(i + 3) } : null;
+  };
+  const datasetsBySource = new Map<string, Set<string>>();
+  for (const n of data.nodes) {
+    if (!n.datasetId) continue;
+    const parts = sourceOf(n.datasetLabel ?? n.datasetId);
+    if (!parts) continue;
+    if (!datasetsBySource.has(parts.source)) datasetsBySource.set(parts.source, new Set());
+    datasetsBySource.get(parts.source)!.add(n.datasetId);
+  }
   const datasetGroupIds = new Set<string>();
   for (const n of data.nodes) {
     if (!n.datasetId) continue;
@@ -2387,7 +2388,18 @@ async function init() {
     if (!datasetGroupIds.has(groupId)) {
       datasetGroupIds.add(groupId);
       const groupColor = DATASET_COLORS[n.datasetId] ?? "#888888";
-      ensureGroupNode(graph, groupId, n.datasetLabel ?? n.datasetId, groupColor, rootId);
+      const label = n.datasetLabel ?? n.datasetId;
+      const parts = sourceOf(label);
+      if (parts && (datasetsBySource.get(parts.source)?.size ?? 0) > 1) {
+        const sourceId = `source:${rootId}:${parts.source}`;
+        ensureGroupNode(graph, sourceId, parts.source, groupColor, rootId);
+        graph.setNodeAttribute(sourceId, "size", 18);
+        if (!sourceGroupChildren.has(sourceId)) sourceGroupChildren.set(sourceId, []);
+        sourceGroupChildren.get(sourceId)!.push(groupId);
+        ensureGroupNode(graph, groupId, parts.rest, groupColor, sourceId);
+      } else {
+        ensureGroupNode(graph, groupId, label, groupColor, rootId);
+      }
     }
     const edgeKey = `${groupId}→${n.id}`;
     knownLinkKeys.add(edgeKey);

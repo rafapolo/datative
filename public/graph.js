@@ -9717,6 +9717,24 @@ function sanitizeLookupLimit(raw) {
     return 10;
   return LOOKUP_LIMIT_OPTIONS.has(parsed) ? parsed : 10;
 }
+var sourceGroupChildren = new Map;
+function groupLeafNodes(graph, groupId) {
+  const hubs = sourceGroupChildren.get(groupId) ?? [groupId];
+  const leaves = [];
+  for (const hub of hubs) {
+    if (!graph.hasNode(hub))
+      continue;
+    for (const neighbor of graph.neighbors(hub)) {
+      const t = nodeTypeMap.get(neighbor);
+      if (t === "group" || t === "empresa")
+        continue;
+      if (neighbor === layoutRootId)
+        continue;
+      leaves.push(neighbor);
+    }
+  }
+  return leaves;
+}
 function selectedRowSignatures() {
   const signatures = new Set;
   if (!selectedNode)
@@ -9725,11 +9743,8 @@ function selectedRowSignatures() {
   const nodeType = nodeTypeMap.get(selectedNode);
   const details = [];
   if (nodeType === "group" && graph?.hasNode(selectedNode)) {
-    for (const neighbor of graph.neighbors(selectedNode)) {
-      const neighborType = nodeTypeMap.get(neighbor);
-      if (neighborType === "group")
-        continue;
-      details.push(...nodeDetailsMap.get(neighbor) ?? []);
+    for (const leaf of groupLeafNodes(graph, selectedNode)) {
+      details.push(...nodeDetailsMap.get(leaf) ?? []);
     }
   } else {
     details.push(...nodeDetailsMap.get(selectedNode) ?? []);
@@ -9949,103 +9964,87 @@ function ensureGroupNode(graph, groupId, label, color, parentId) {
     }
   }
 }
-function radialLayout(graph) {
-  const root = layoutRootId;
-  if (!root || !graph.hasNode(root))
-    return;
-  graph.setNodeAttribute(root, "x", 0);
-  graph.setNodeAttribute(root, "y", 0);
-  const layer1 = graph.neighbors(root).filter((n) => graph.hasNode(n));
-  if (layer1.length === 0)
-    return;
-  const childrenOf = new Map;
-  for (const g of layer1) {
-    childrenOf.set(g, graph.neighbors(g).filter((n) => n !== root));
-  }
-  const weights = layer1.map((g) => 1 + (childrenOf.get(g)?.length ?? 0));
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  const R1 = Math.max(180, layer1.length * 50);
-  const maxLeaves = Math.max(...weights.map((w) => w - 1), 1);
-  const R2 = R1 + Math.max(160, maxLeaves * 38);
-  let cursor = -Math.PI / 2;
-  layer1.forEach((gId, i) => {
-    const sector = 2 * Math.PI * weights[i] / totalWeight;
-    const gAngle = cursor + sector / 2;
-    cursor += sector;
-    graph.setNodeAttribute(gId, "x", Math.cos(gAngle) * R1);
-    graph.setNodeAttribute(gId, "y", Math.sin(gAngle) * R1);
-    const children = childrenOf.get(gId) ?? [];
-    if (children.length === 0)
-      return;
-    const spread = sector * 0.82;
-    const startAngle = gAngle - spread / 2;
-    const step = children.length > 1 ? spread / (children.length - 1) : 0;
-    children.forEach((leafId, j) => {
-      const leafAngle = children.length === 1 ? gAngle : startAngle + j * step;
-      graph.setNodeAttribute(leafId, "x", Math.cos(leafAngle) * R2);
-      graph.setNodeAttribute(leafId, "y", Math.sin(leafAngle) * R2);
-    });
-  });
-}
-function radialCompactLayout(graph) {
+function radialTreeLayout(graph, compact) {
   compactHiddenNodeIds.clear();
   compactOverflowLabels.clear();
   const root = layoutRootId;
   if (!root || !graph.hasNode(root))
     return;
+  const { children } = buildRootedTree(graph, root);
   graph.setNodeAttribute(root, "x", 0);
   graph.setNodeAttribute(root, "y", 0);
-  const layer1 = graph.neighbors(root).filter((n) => graph.hasNode(n));
+  const layer1 = children.get(root) ?? [];
   if (layer1.length === 0)
     return;
-  const childrenOf = new Map;
-  for (const g of layer1) {
-    childrenOf.set(g, graph.neighbors(g).filter((n) => n !== root));
-  }
-  const cappedCount = (g) => Math.min(childrenOf.get(g)?.length ?? 0, COMPACT_MAX_LEAVES);
-  const weights = layer1.map((g) => 1 + cappedCount(g));
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  const R1 = Math.max(180, layer1.length * 50);
-  const maxLeaves = Math.max(...weights.map((w) => w - 1), 1);
-  const R2 = R1 + Math.max(160, maxLeaves * 38);
-  let cursor = -Math.PI / 2;
-  layer1.forEach((gId, i) => {
-    const sector = 2 * Math.PI * weights[i] / totalWeight;
-    const gAngle = cursor + sector / 2;
-    cursor += sector;
-    graph.setNodeAttribute(gId, "x", Math.cos(gAngle) * R1);
-    graph.setNodeAttribute(gId, "y", Math.sin(gAngle) * R1);
-    const allChildren = childrenOf.get(gId) ?? [];
-    if (allChildren.length === 0)
-      return;
-    const overflow = allChildren.length > COMPACT_MAX_LEAVES;
-    const visibleCount = overflow ? COMPACT_MAX_LEAVES - 1 : allChildren.length;
-    const visible = allChildren.slice(0, visibleCount);
-    const hidden = overflow ? allChildren.slice(visibleCount) : [];
-    const slots = overflow ? COMPACT_MAX_LEAVES : allChildren.length;
-    const spread = sector * 0.82;
-    const startAngle = gAngle - spread / 2;
-    const step = slots > 1 ? spread / (slots - 1) : 0;
-    visible.forEach((leafId, j) => {
-      const leafAngle = slots === 1 ? gAngle : startAngle + j * step;
-      graph.setNodeAttribute(leafId, "x", Math.cos(leafAngle) * R2);
-      graph.setNodeAttribute(leafId, "y", Math.sin(leafAngle) * R2);
-    });
-    if (overflow) {
-      const markerAngle = startAngle + (slots - 1) * step;
-      const markerX = Math.cos(markerAngle) * R2;
-      const markerY = Math.sin(markerAngle) * R2;
-      const [markerId, ...restHidden] = hidden;
-      graph.setNodeAttribute(markerId, "x", markerX);
-      graph.setNodeAttribute(markerId, "y", markerY);
-      compactOverflowLabels.set(markerId, `+${hidden.length} mais`);
-      for (const id of restHidden) {
-        compactHiddenNodeIds.add(id);
-        graph.setNodeAttribute(id, "x", markerX);
-        graph.setNodeAttribute(id, "y", markerY);
-      }
+  const visibleChildren = new Map;
+  const overflowOf = new Map;
+  for (const [node, kids] of children) {
+    if (!compact || node === root) {
+      visibleChildren.set(node, kids);
+      continue;
     }
-  });
+    const inner = kids.filter((k) => (children.get(k)?.length ?? 0) > 0);
+    const leaves = kids.filter((k) => (children.get(k)?.length ?? 0) === 0);
+    if (leaves.length <= COMPACT_MAX_LEAVES) {
+      visibleChildren.set(node, kids);
+      continue;
+    }
+    const shown = leaves.slice(0, COMPACT_MAX_LEAVES);
+    visibleChildren.set(node, [...inner, ...shown]);
+    overflowOf.set(node, leaves.slice(COMPACT_MAX_LEAVES - 1));
+  }
+  const weight = new Map;
+  const calcWeight = (node) => {
+    const w = 1 + (visibleChildren.get(node) ?? []).reduce((s, c) => s + calcWeight(c), 0);
+    weight.set(node, w);
+    return w;
+  };
+  calcWeight(root);
+  const maxFanOut = new Map;
+  const walkDepth = (node, d) => {
+    const kids = visibleChildren.get(node) ?? [];
+    maxFanOut.set(d, Math.max(maxFanOut.get(d) ?? 0, kids.length));
+    for (const k of kids)
+      walkDepth(k, d + 1);
+  };
+  walkDepth(root, 0);
+  const radius = [0, Math.max(180, layer1.length * 50)];
+  const ringRadius = (d) => {
+    while (radius.length <= d) {
+      const prev = radius.length - 1;
+      radius.push(radius[prev] + Math.max(160, Math.max(1, maxFanOut.get(prev) ?? 1) * 38));
+    }
+    return radius[d];
+  };
+  const place = (node, d, start, sector) => {
+    const kids = visibleChildren.get(node) ?? [];
+    if (kids.length === 0)
+      return;
+    const total = kids.reduce((s, k) => s + (weight.get(k) ?? 1), 0);
+    const spread = d === 0 ? sector : sector * 0.82;
+    let cursor = start + (sector - spread) / 2;
+    const R = ringRadius(d + 1);
+    for (const k of kids) {
+      const kSector = spread * (weight.get(k) ?? 1) / total;
+      const angle = cursor + kSector / 2;
+      graph.setNodeAttribute(k, "x", Math.cos(angle) * R);
+      graph.setNodeAttribute(k, "y", Math.sin(angle) * R);
+      place(k, d + 1, cursor, kSector);
+      cursor += kSector;
+    }
+  };
+  place(root, 0, -Math.PI / 2, 2 * Math.PI);
+  for (const [, hidden] of overflowOf) {
+    const [markerId, ...rest] = hidden;
+    const mx = graph.getNodeAttribute(markerId, "x");
+    const my = graph.getNodeAttribute(markerId, "y");
+    compactOverflowLabels.set(markerId, `+${hidden.length} mais`);
+    for (const id of rest) {
+      compactHiddenNodeIds.add(id);
+      graph.setNodeAttribute(id, "x", mx);
+      graph.setNodeAttribute(id, "y", my);
+    }
+  }
 }
 function buildRootedTree(graph, root) {
   const children = new Map;
@@ -10230,9 +10229,9 @@ function runLayout(graph, _iterations, onDone) {
     } else if (currentLayout === "collapsible-tree") {
       collapsibleTreeLayout(graph);
     } else if (currentLayout === "radial-compact") {
-      radialCompactLayout(graph);
+      radialTreeLayout(graph, true);
     } else {
-      radialLayout(graph);
+      radialTreeLayout(graph, false);
     }
     renderer?.refresh();
     onDone?.();
@@ -11099,13 +11098,9 @@ function showNodeDetails(nodeId, graph) {
   const nodeType = nodeTypeMap.get(nodeId) ?? "desconhecido";
   let details = nodeDetailsMap.get(nodeId) ?? [];
   if (nodeType === "group" && details.length === 0) {
-    graph.neighbors(nodeId).forEach((neighbor) => {
-      const neighborType = nodeTypeMap.get(neighbor);
-      if (neighborType !== "group" && neighborType !== "empresa") {
-        const neighborDetails = nodeDetailsMap.get(neighbor) ?? [];
-        details = details.concat(neighborDetails);
-      }
-    });
+    for (const leaf of groupLeafNodes(graph, nodeId)) {
+      details = details.concat(nodeDetailsMap.get(leaf) ?? []);
+    }
   }
   title.textContent = nodeLabel;
   body.innerHTML = "";
@@ -11446,6 +11441,21 @@ async function init() {
       }
     }
   }
+  const sourceOf = (label) => {
+    const i = label.indexOf(" · ");
+    return i > 0 ? { source: label.slice(0, i), rest: label.slice(i + 3) } : null;
+  };
+  const datasetsBySource = new Map;
+  for (const n of data.nodes) {
+    if (!n.datasetId)
+      continue;
+    const parts = sourceOf(n.datasetLabel ?? n.datasetId);
+    if (!parts)
+      continue;
+    if (!datasetsBySource.has(parts.source))
+      datasetsBySource.set(parts.source, new Set);
+    datasetsBySource.get(parts.source).add(n.datasetId);
+  }
   const datasetGroupIds = new Set;
   for (const n of data.nodes) {
     if (!n.datasetId)
@@ -11454,7 +11464,19 @@ async function init() {
     if (!datasetGroupIds.has(groupId)) {
       datasetGroupIds.add(groupId);
       const groupColor = DATASET_COLORS[n.datasetId] ?? "#888888";
-      ensureGroupNode(graph, groupId, n.datasetLabel ?? n.datasetId, groupColor, rootId);
+      const label = n.datasetLabel ?? n.datasetId;
+      const parts = sourceOf(label);
+      if (parts && (datasetsBySource.get(parts.source)?.size ?? 0) > 1) {
+        const sourceId = `source:${rootId}:${parts.source}`;
+        ensureGroupNode(graph, sourceId, parts.source, groupColor, rootId);
+        graph.setNodeAttribute(sourceId, "size", 18);
+        if (!sourceGroupChildren.has(sourceId))
+          sourceGroupChildren.set(sourceId, []);
+        sourceGroupChildren.get(sourceId).push(groupId);
+        ensureGroupNode(graph, groupId, parts.rest, groupColor, sourceId);
+      } else {
+        ensureGroupNode(graph, groupId, label, groupColor, rootId);
+      }
     }
     const edgeKey = `${groupId}→${n.id}`;
     knownLinkKeys.add(edgeKey);
