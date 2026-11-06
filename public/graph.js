@@ -10276,9 +10276,11 @@ function injectPanelStyles() {
       width: 33vw;
       min-width: 320px;
       max-width: 90vw;
-      height: calc(100vh - 46px - 30px);
-      min-height: calc(100vh - 46px - 30px);
+      /* As tall as its sections, up to the space between the bars. */
+      height: auto;
+      min-height: 0;
       max-height: calc(100vh - 46px - 30px);
+      border-radius: 0 0 10px 0;
       background: #0f0f22;
       color: #e0e0e0;
       display: flex;
@@ -10299,8 +10301,10 @@ function injectPanelStyles() {
       right: 0;
       transform: translateX(100%);
       box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+      border-radius: 0 0 0 10px;
     }
     #lookup-panel[data-dock="bottom"] {
+      border-radius: 0;
       top: auto;
       bottom: 30px;
       width: 100% !important;
@@ -10418,7 +10422,8 @@ function injectPanelStyles() {
       color: #fff;
     }
     #lookup-body {
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
       padding: 0.5rem 0;
     }
@@ -10686,14 +10691,6 @@ function injectPanelStyles() {
       flex: 1;
       min-height: 0;
     }
-    .node-detail-meta {
-      border: 1px solid #1f2a44;
-      border-radius: 6px;
-      background: #0b132b;
-      color: #cbd5e1;
-      margin-bottom: 0.6rem;
-      overflow: hidden;
-    }
     .node-detail-entry {
       border: 1px solid #1f2a44;
       border-radius: 6px;
@@ -10709,6 +10706,14 @@ function injectPanelStyles() {
       background: #121a34;
       border-bottom: 1px solid #1f2a44;
       letter-spacing: 0.02em;
+    }
+    .node-detail-meta {
+      border: 1px solid #1f2a44;
+      border-radius: 6px;
+      background: #0b132b;
+      color: #cbd5e1;
+      margin-bottom: 0.6rem;
+      overflow: hidden;
     }
     .node-detail-table {
       width: 100%;
@@ -11127,7 +11132,6 @@ function showNodeDetails(nodeId, graph) {
   const meta = document.createElement("table");
   meta.className = "node-detail-meta node-detail-table";
   const metaRows = [
-    `<tr><th>ID</th><td>${nodeId}</td></tr>`,
     `<tr><th>Tipo</th><td>${nodeType}</td></tr>`,
     ...Object.entries(attrs).filter(([k, v]) => !SKIP_ATTRS.has(k) && !isBlankValue(v)).map(([k, v]) => `<tr><th>${k}</th><td>${valueText(v)}</td></tr>`)
   ];
