@@ -502,6 +502,13 @@ function edgeAttrs() {
   return { type: "curved", color: COLOR_EDGE_BASE, size: 1.2, zIndex: 1 };
 }
 
+// A detail row with nothing in it ("", null, "-", "—") is left out.
+function isBlankValue(v: unknown): boolean {
+  if (v == null) return true;
+  const t = (typeof v === "object" ? JSON.stringify(v) : String(v)).trim();
+  return t === "" || t === "-" || t === "—" || t === "null";
+}
+
 function valueText(v: unknown): string {
   if (v == null) return "—";
   if (typeof v === "object") return JSON.stringify(v);
@@ -1944,7 +1951,7 @@ function showNodeDetails(nodeId: string, graph: Graph) {
     `<tr><th>ID</th><td>${nodeId}</td></tr>`,
     `<tr><th>Tipo</th><td>${nodeType}</td></tr>`,
     ...Object.entries(attrs)
-      .filter(([k]) => !SKIP_ATTRS.has(k))
+      .filter(([k, v]) => !SKIP_ATTRS.has(k) && !isBlankValue(v))
       .map(([k, v]) => `<tr><th>${k}</th><td>${valueText(v)}</td></tr>`),
   ];
   meta.innerHTML = `<tbody>${metaRows.join("")}</tbody>`;
@@ -1987,6 +1994,7 @@ function showNodeDetails(nodeId: string, graph: Graph) {
     table.className = "node-detail-table";
     const tbody = document.createElement("tbody");
     for (const [k, v] of Object.entries(detail.attributes)) {
+      if (isBlankValue(v)) continue;
       const tr = document.createElement("tr");
       const th = document.createElement("th");
       th.textContent = k;
@@ -2112,10 +2120,8 @@ function renderResultSections(
   body.innerHTML = "";
   let firstExpanded = false;
 
-  // Sort: hits first, then empty
-  const sorted = [...results].sort(
-    (a, b) => (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0),
-  );
+  // Datasets with no hit for this entity are left out of the panel.
+  const sorted = results.filter((r) => r.count > 0);
 
   for (const result of sorted) {
     const section = document.createElement("div");

@@ -9907,6 +9907,12 @@ function drawHoverInsideNode(ctx, data, settings) {}
 function edgeAttrs() {
   return { type: "curved", color: COLOR_EDGE_BASE, size: 1.2, zIndex: 1 };
 }
+function isBlankValue(v) {
+  if (v == null)
+    return true;
+  const t = (typeof v === "object" ? JSON.stringify(v) : String(v)).trim();
+  return t === "" || t === "-" || t === "—" || t === "null";
+}
 function valueText(v) {
   if (v == null)
     return "—";
@@ -11123,7 +11129,7 @@ function showNodeDetails(nodeId, graph) {
   const metaRows = [
     `<tr><th>ID</th><td>${nodeId}</td></tr>`,
     `<tr><th>Tipo</th><td>${nodeType}</td></tr>`,
-    ...Object.entries(attrs).filter(([k]) => !SKIP_ATTRS.has(k)).map(([k, v]) => `<tr><th>${k}</th><td>${valueText(v)}</td></tr>`)
+    ...Object.entries(attrs).filter(([k, v]) => !SKIP_ATTRS.has(k) && !isBlankValue(v)).map(([k, v]) => `<tr><th>${k}</th><td>${valueText(v)}</td></tr>`)
   ];
   meta.innerHTML = `<tbody>${metaRows.join("")}</tbody>`;
   if (nodeId !== currentLookupCnpj && PUBLISHED_IDS.has(nodeId)) {
@@ -11157,6 +11163,8 @@ function showNodeDetails(nodeId, graph) {
     table.className = "node-detail-table";
     const tbody = document.createElement("tbody");
     for (const [k, v] of Object.entries(detail.attributes)) {
+      if (isBlankValue(v))
+        continue;
       const tr = document.createElement("tr");
       const th = document.createElement("th");
       th.textContent = k;
@@ -11263,7 +11271,7 @@ function renderResultSections(results, cnpj, graph) {
   const body = document.getElementById("lookup-body");
   body.innerHTML = "";
   let firstExpanded = false;
-  const sorted = [...results].sort((a, b) => (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0));
+  const sorted = results.filter((r) => r.count > 0);
   for (const result of sorted) {
     const section = document.createElement("div");
     section.dataset.datasetId = result.id;
